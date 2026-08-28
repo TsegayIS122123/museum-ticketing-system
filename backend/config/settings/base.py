@@ -173,8 +173,10 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 20,
+    # Document 04's `data`/`meta` (limit/offset/total) list envelope --
+    # see apps.core.pagination for why this replaces DRF's own
+    # count/next/previous/results shape.
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.EnvelopeLimitOffsetPagination",
     "DEFAULT_THROTTLE_CLASSES": (
         "apps.core.throttling.RedisScopedRateThrottle",
     ),

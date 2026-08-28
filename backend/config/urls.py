@@ -31,7 +31,10 @@ urlpatterns = [
     # deferred until apps.bookings exists (README "Build order").
     path("api/v1/users/me/", CurrentUserView.as_view(), name="current-user"),
 
-    path("api/v1/catalog/", include("apps.catalog.urls")),
+    # Document 04: `/categories` and `/categories/{id}` are top-level
+    # resources (no `/catalog` segment) -- unlike most other apps below,
+    # this app's urls.py is included at the `/api/v1/` root directly.
+    path("api/v1/", include("apps.catalog.urls")),
     path("api/v1/bookings/", include("apps.bookings.urls")),
     path("api/v1/payments/", include("apps.payments.urls")),
     path("api/v1/entrance/", include("apps.entrance.urls")),

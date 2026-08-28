@@ -37,7 +37,18 @@ class AuditLogEntry(TimeStampedModel):
         indexes = [models.Index(fields=["target_type", "target_id"])]
 
 
-# class BilingualTextMixin -- Sec 6.4: staff-editable text (category names,
-# notice templates, booking purpose) is stored as a parallel English/Amharic
-# column pair. Add a reusable abstract mixin here once the first app needs it
-# (see Document 05 for the exact field-naming convention, e.g. name_en/name_am).
+class BilingualNameMixin(models.Model):
+    """Sec 6.4 / FR-LOC-004: any staff-editable "name" column is a parallel
+    English/Amharic pair, each independently maintained -- never
+    machine-translated from the other. First consumer: `apps.catalog.Category`
+    (Document 05 Sec 3.2's `name_en`/`name_am`). A model with a
+    differently-named bilingual pair (e.g. `settlement_transfer`'s
+    `purpose_en`/`purpose_am`) declares its own fields instead of using this
+    mixin -- the naming convention is the point, not a shared field name.
+    """
+
+    name_en = models.TextField()
+    name_am = models.TextField()
+
+    class Meta:
+        abstract = True

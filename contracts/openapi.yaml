@@ -205,6 +205,121 @@ paths:
               schema:
                 $ref: '#/components/schemas/VisitorVerifyStartResponse'
           description: ''
+  /api/v1/categories/:
+    get:
+      operationId: v1_categories_list
+      description: |-
+        GET /categories (FR-CAT-001, public, no auth) and POST /categories
+        (FR-CAT-002, Museum Manager only).
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCategoryList'
+          description: ''
+    post:
+      operationId: v1_categories_create
+      description: |-
+        GET /categories (FR-CAT-001, public, no auth) and POST /categories
+        (FR-CAT-002, Museum Manager only).
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryCreate'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryCreate'
+          description: ''
+  /api/v1/categories/{id}/:
+    put:
+      operationId: v1_categories_update
+      description: |-
+        PUT /categories/{id} and DELETE /categories/{id} -- both Museum
+        Manager only (FR-CAT-002). No GET here: Document 04 has no single-
+        category retrieve endpoint, only the list at /categories.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CategoryUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CategoryUpdate'
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+          description: ''
+    delete:
+      operationId: v1_categories_destroy
+      description: |-
+        PUT /categories/{id} and DELETE /categories/{id} -- both Museum
+        Manager only (FR-CAT-002). No GET here: Document 04 has no single-
+        category retrieve endpoint, only the list at /categories.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/users/me/:
     get:
       operationId: v1_users_me_retrieve
@@ -322,6 +437,78 @@ components:
       - access_token
       - refresh_token
       - user
+    Category:
+      type: object
+      description: |-
+        `Category` (Document 04) -- FR-CAT-001. Read-only: every mutation
+        goes through Create/Update below and services.py, never through this
+        serializer directly.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name_en:
+          type: string
+          readOnly: true
+        name_am:
+          type: string
+          readOnly: true
+        price_etb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        is_free:
+          type: boolean
+          readOnly: true
+        active:
+          type: boolean
+          readOnly: true
+      required:
+      - active
+      - id
+      - is_free
+      - name_am
+      - name_en
+      - price_etb
+    CategoryCreate:
+      type: object
+      description: '`CategoryCreateRequest` -- Museum Manager only (FR-CAT-002).'
+      properties:
+        name_en:
+          type: string
+        name_am:
+          type: string
+        price_etb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        is_free:
+          type: boolean
+      required:
+      - name_am
+      - name_en
+      - price_etb
+    CategoryUpdate:
+      type: object
+      description: |-
+        `CategoryUpdateRequest` -- Museum Manager only (FR-CAT-002). Every
+        field is optional since a single PUT here may only be a price change,
+        only a retire/reactivate (`active`), or any combination.
+      properties:
+        name_en:
+          type: string
+        name_am:
+          type: string
+        price_etb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        is_free:
+          type: boolean
+        active:
+          type: boolean
     DetailResponse:
       type: object
       properties:
@@ -346,6 +533,24 @@ components:
       description: |-
         * `en` - English
         * `am` - Amharic
+    PaginatedCategoryList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/Category'
+        meta:
+          type: object
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            total:
+              type: integer
     ResetPassword:
       type: object
       description: '`ResetPasswordRequest` -- Staff only (FR-ACC-006).'
