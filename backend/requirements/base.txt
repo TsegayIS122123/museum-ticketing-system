@@ -1,0 +1,26 @@
+# Core framework -- Design Spec Sec 3 / Sec 7 (tech stack)
+Django>=5.1,<6.0
+djangorestframework>=3.15
+django-environ>=0.11
+django-cors-headers>=4.4
+psycopg2-binary>=2.9
+
+# Auth -- stateless JWT across Web/Mobile/Staff dashboard, ADR-002
+djangorestframework-simplejwt>=5.3
+
+# Background jobs / cache / queue -- ADR-003, Design Spec Sec 6.1-6.2
+# Active from day one (unlike a project that defers these): FR-PAY-005's
+# daily jobs are core MVP behavior.
+celery>=5.4
+redis>=5.0
+django-redis>=5.4
+django-celery-beat>=2.6
+django-celery-results>=2.5
+
+# Object storage -- DISABLED for now, using local filesystem storage
+# instead (see config/settings/base.py). Re-enable when a paid S3/MinIO
+# account exists (ADR-005, ADR-009):
+# django-storages[s3]>=1.14
+
+# API docs (generated from Document 04's contract)
+drf-spectacular>=0.27

@@ -1,0 +1,32 @@
+# Python / Django (backend/)
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+db.sqlite3
+backend/staticfiles/
+backend/media/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next.js (frontend/)
+node_modules/
+.next/
+out/
+
+# Env files -- never commit real secrets, per-app examples ARE committed
+.env
+.env.local
+!.env.example
+
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# contracts/openapi.yaml is a build artifact but IS committed -- it's the
+# one thing both backend and frontend build against. Do not ignore it.
+# Same for frontend/src/lib/api-types.ts, generated from it but committed
+# so the whole team builds against the same types without everyone running
+# the generator.
