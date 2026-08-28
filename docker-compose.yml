@@ -77,6 +77,8 @@ services:
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./backend:/app
+      - ./contracts:/contracts
+      - .:/workspace
     env_file:
       - ./backend/.env
     ports:
@@ -98,6 +100,7 @@ services:
     command: celery -A config worker -l info -Q notifications,documents,payments
     volumes:
       - ./backend:/app
+      - .:/workspace
     env_file:
       - ./backend/.env
     depends_on:
@@ -113,6 +116,7 @@ services:
     command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - ./backend:/app
+      - .:/workspace
     env_file:
       - ./backend/.env
     depends_on:
@@ -128,6 +132,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+      - .:/workspace
     env_file:
       - ./frontend/.env.local
     environment:

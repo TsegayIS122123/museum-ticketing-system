@@ -163,8 +163,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # --------------------------------------------------------------------------
 
 REST_FRAMEWORK = {
+    # ADR-002: token_version-aware subclass of JWTAuthentication -- an
+    # access token whose token_version claim no longer matches the account
+    # row (e.g. right after a Staff password reset) is rejected immediately
+    # instead of remaining valid for its full 15-minute lifetime.
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.accounts.authentication.TokenVersionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -174,6 +178,13 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": (
         "apps.core.throttling.RedisScopedRateThrottle",
     ),
+    # Sec 6.7. Views opt in per-endpoint via `throttle_scope`; a view with
+    # no `throttle_scope` attribute is unaffected regardless of this list.
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "5/15m",
+        "otp-request": "5/15m",
+        "password-reset-request": "5/15m",
+    },
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }

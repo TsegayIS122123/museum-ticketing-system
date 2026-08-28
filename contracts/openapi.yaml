@@ -1,1575 +1,447 @@
 openapi: 3.0.3
 info:
   title: Museum Ticketing & Booking Platform API
-  version: 0.1.0
-  description: API contract for the museum's digital ticketing track (book, pay, check in, refund, and settle) — additive to, and never merged with, the existing manual/cash counter process.
-servers:
-- url: https://api.museum-tickets.et.example/api/v1
-tags:
-- name: Health
-  description: Service health and readiness checks.
-- name: Auth
-  description: Passwordless Visitor verification (OTP + email link), password-based Staff login, forgot/reset password (Staff only), and token refresh.
-- name: Accounts
-  description: Visitor and staff profile management, and staff provisioning by Platform Admin.
-- name: Catalog
-  description: Ticket categories and pricing.
-- name: Availability
-  description: Date availability for online booking, controlled by the Museum Manager.
-- name: Bookings
-  description: Booking creation, cancellation, rescheduling, and group-booking approval.
-- name: Payments
-  description: Online checkout confirmation via the payment aggregator (Chapa).
-- name: Entrance
-  description: Gate lookup and headcount reconciliation.
-- name: Refunds
-  description: Refund requests and refund records.
-- name: Settlement
-  description: Cashier-to-Finance-Office settlement transfers for the digital track.
-- name: Reporting
-  description: Dashboard and periodic reports for Museum Manager and Platform Admin.
-security:
-- bearerAuth: []
+  version: 1.0.0
+  description: Bilingual (EN/AM) online booking, payment, and gate check-in for the
+    Science Museum's digital ticketing track.
 paths:
-  /health:
-    get:
-      tags:
-      - Health
-      security: []
-      operationId: getHealth
-      summary: Health check
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-  /auth/visitor/verify/start:
+  /api/v1/auth/forgot-password/:
     post:
+      operationId: v1_auth_forgot_password_create
+      description: |-
+        POST /auth/forgot-password -- Staff only (FR-ACC-006). Always 200;
+        see services.request_password_reset for why.
       tags:
-      - Auth
-      security: []
-      operationId: visitorVerifyStart
-      summary: Start passwordless Visitor verification — sends an SMS OTP to the phone and a confirmation link to the email (FR-ACC-001, FR-ACC-003). Used both for a first-time booking and for a returning Visitor looking up their history (FR-ACC-004); no separate signup exists.
+      - v1
       requestBody:
-        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VisitorVerifyStartRequest'
+              $ref: '#/components/schemas/ForgotPassword'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ForgotPassword'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ForgotPassword'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      - {}
       responses:
         '200':
-          description: OK — a verification has been started; no account details are disclosed here even if the email/phone is already on file, to avoid leaking account existence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: v1_auth_login_create
+      description: POST /auth/login -- Staff only (FR-ACC-002, FR-ACC-005).
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffLogin'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffLogin'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffLogin'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+  /api/v1/auth/refresh/:
+    post:
+      operationId: v1_auth_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/auth/reset-password/:
+    post:
+      operationId: v1_auth_reset_password_create
+      description: POST /auth/reset-password -- Staff only (FR-ACC-006).
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPassword'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ResetPassword'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResetPassword'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+          description: ''
+  /api/v1/auth/visitor/verify/confirm/:
+    post:
+      operationId: v1_auth_visitor_verify_confirm_create
+      description: |-
+        POST /auth/visitor/verify/confirm -- completes Visitor verification
+        and issues the same token pair Staff login does (Sec 4.1).
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VisitorVerifyConfirm'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VisitorVerifyConfirm'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VisitorVerifyConfirm'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+          description: ''
+  /api/v1/auth/visitor/verify/email/{token}/:
+    get:
+      operationId: v1_auth_visitor_verify_email_retrieve
+      description: |-
+        GET /auth/visitor/verify/email/{token} -- the secondary/fallback
+        verification channel (Sec 4.1 step 2). Opening this link marks
+        `email_verified_at` but never issues a session on its own; only the
+        OTP path above does that.
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+          description: ''
+  /api/v1/auth/visitor/verify/start/:
+    post:
+      operationId: v1_auth_visitor_verify_start_create
+      description: |-
+        POST /auth/visitor/verify/start (FR-ACC-001, FR-ACC-003, FR-ACC-004).
+        Used for both a first-time booking and a returning Visitor looking up
+        their history -- there is no separate "login" for a Visitor.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VisitorVerifyStart'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VisitorVerifyStart'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VisitorVerifyStart'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      - {}
+      responses:
+        '200':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/VisitorVerifyStartResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          description: Too many verification requests for this email or phone (NFR-SEC rate limit, Document 03 §6.7)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /auth/visitor/verify/confirm:
-    post:
-      tags:
-      - Auth
-      security: []
-      operationId: visitorVerifyConfirm
-      summary: Confirm the SMS OTP and complete Visitor verification/login (FR-ACC-001, FR-ACC-003, FR-ACC-004); issues the same access/refresh token pair as Staff login
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VisitorVerifyConfirmRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '400':
-          description: Invalid or expired OTP, or too many incorrect attempts (Document 05, `account.phone_otp_attempts`)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /auth/visitor/verify/email/{token}:
+          description: ''
+  /api/v1/users/me/:
     get:
+      operationId: v1_users_me_retrieve
+      description: |-
+        GET/PUT /users/me -- Visitor and Staff share this endpoint; there is
+        no scoped RBAC to check beyond "is this account authenticated" (Sec 4.3).
       tags:
-      - Auth
-      security: []
-      operationId: visitorVerifyEmailLink
-      summary: Confirm a Visitor's email via the single-use link sent by visitorVerifyStart (FR-ACC-003) — the secondary verification channel alongside the SMS OTP
-      parameters:
-      - name: token
-        in: path
-        required: true
-        schema:
-          type: string
+      - v1
+      security:
+      - TokenVersionAuth: []
       responses:
         '200':
-          description: Email verified
-        '400':
-          description: Invalid or expired link
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /auth/login:
-    post:
-      tags:
-      - Auth
-      security: []
-      operationId: login
-      summary: Staff login (Cashier, Museum Manager, Platform Admin only) — email + password. There is no password-based login for Visitors; see /auth/visitor/verify/start (FR-ACC-001, FR-ACC-005).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LoginRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-  /auth/forgot-password:
-    post:
-      tags:
-      - Auth
-      security: []
-      operationId: forgotPassword
-      summary: Request a password-reset email (Staff only, FR-ACC-006) — always responds 200 regardless of whether the email matches a staff account, to avoid disclosing account existence
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ForgotPasswordRequest'
-      responses:
-        '200':
-          description: OK
-  /auth/reset-password:
-    post:
-      tags:
-      - Auth
-      security: []
-      operationId: resetPassword
-      summary: Set a new password using a reset token from the forgot-password email (Staff only, FR-ACC-006)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ResetPasswordRequest'
-      responses:
-        '200':
-          description: Password updated
-        '400':
-          description: Invalid or expired reset token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /auth/refresh:
-    post:
-      tags:
-      - Auth
-      operationId: refreshToken
-      summary: Refresh access token
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /users/me:
-    get:
-      tags:
-      - Accounts
-      operationId: getCurrentUser
-      summary: View current user's own profile (Visitor or Staff)
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserProfile'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: '#/components/schemas/Account'
+          description: ''
     put:
+      operationId: v1_users_me_update
+      description: |-
+        GET/PUT /users/me -- Visitor and Staff share this endpoint; there is
+        no scoped RBAC to check beyond "is this account authenticated" (Sec 4.3).
       tags:
-      - Accounts
-      operationId: updateCurrentUser
-      summary: Update current user's own profile (e.g., language preference)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserUpdateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserProfile'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /users/me/bookings:
-    get:
-      tags:
-      - Accounts
-      operationId: listMyBookings
-      summary: View the current Visitor's own booking history and receipts (FR-ACC-004)
-      parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
-      - name: status
-        in: query
-        schema:
-          $ref: '#/components/schemas/BookingStatus'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedBookings'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /admin/staff:
-    get:
-      tags:
-      - Accounts
-      operationId: listStaff
-      summary: List staff accounts (Platform Admin only)
-      parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedUserProfiles'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-    post:
-      tags:
-      - Accounts
-      operationId: createStaffAccount
-      summary: Provision a Cashier or Museum Manager account (FR-ACC-002, Platform Admin only)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StaffCreateRequest'
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserProfile'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          $ref: '#/components/responses/Conflict'
-  /admin/staff/{id}:
-    put:
-      tags:
-      - Accounts
-      operationId: updateStaffAccount
-      summary: Update a staff account's role or active status (Platform Admin only)
-      parameters:
-      - $ref: '#/components/parameters/UserId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StaffUpdateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserProfile'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    delete:
-      tags:
-      - Accounts
-      operationId: deactivateStaffAccount
-      summary: Deactivate a staff account (Platform Admin only)
-      parameters:
-      - $ref: '#/components/parameters/UserId'
-      responses:
-        '204':
-          description: Deactivated
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /categories:
-    get:
-      tags:
-      - Catalog
-      security: []
-      operationId: listCategories
-      summary: List active ticket categories with bilingual names and prices (FR-CAT-001)
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedCategories'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-    post:
-      tags:
-      - Catalog
-      operationId: createCategory
-      summary: Create a ticket category (FR-CAT-002, Museum Manager only)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CategoryCreateRequest'
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Category'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /categories/{id}:
-    put:
-      tags:
-      - Catalog
-      operationId: updateCategory
-      summary: Edit a category's price or bilingual name (FR-CAT-002, Museum Manager only; does not affect already-issued tickets)
-      parameters:
-      - $ref: '#/components/parameters/CategoryId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CategoryUpdateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Category'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    delete:
-      tags:
-      - Catalog
-      operationId: retireCategory
-      summary: Retire a category (FR-CAT-002, Museum Manager only)
-      parameters:
-      - $ref: '#/components/parameters/CategoryId'
-      responses:
-        '204':
-          description: Retired
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /availability:
-    get:
-      tags:
-      - Availability
-      security: []
-      operationId: listDateAvailability
-      summary: Check which dates are open for online booking (FR-BOOK-008)
-      parameters:
-      - name: from
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date
-      - name: to
-        in: query
-        required: true
-        schema:
-          type: string
-          format: date
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DateAvailability'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-  /availability/{date}:
-    put:
-      tags:
-      - Availability
-      operationId: setDateAvailability
-      summary: Open or close a specific date to further online booking (FR-BOOK-008, Museum Manager only)
-      parameters:
-      - $ref: '#/components/parameters/DateParam'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DateAvailabilityUpdateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DateAvailability'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /bookings:
-    get:
-      tags:
-      - Bookings
-      operationId: listBookings
-      summary: List bookings (Staff only; Visitors use /users/me/bookings)
-      parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
-      - name: status
-        in: query
-        schema:
-          $ref: '#/components/schemas/BookingStatus'
-      - name: visitDate
-        in: query
-        schema:
-          type: string
-          format: date
-      - name: bookingType
-        in: query
-        schema:
-          type: string
-          enum:
-          - individual
-          - group
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedBookings'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-    post:
-      tags:
-      - Bookings
-      operationId: createBooking
-      summary: Create a booking and start online payment (FR-BOOK-001, FR-BOOK-003, FR-PAY-001) — requires a Visitor access token from /auth/visitor/verify/confirm (FR-ACC-001); there is no separate account-creation step before this call
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BookingCreateRequest'
-      responses:
-        '201':
-          description: Created — for an individual booking, response includes a checkout URL; for a group booking, it is created as pending_approval and has no checkout URL until the Museum Manager approves it
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: The requested date is closed to online booking (FR-BOOK-008)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /bookings/{id}:
-    get:
-      tags:
-      - Bookings
-      operationId: getBookingById
-      summary: Get a booking's current status, lifecycle timestamps, and receipt link
-      parameters:
-      - $ref: '#/components/parameters/BookingId'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /bookings/lookup:
-    get:
-      tags:
-      - Entrance
-      operationId: lookupBookingByReference
-      summary: Look up a booking by its reference at the gate — same field for a typed code or a keyboard-wedge QR scan (FR-TICKET-001, Cashier only)
-      parameters:
-      - name: reference
-        in: query
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /bookings/{id}/approval:
-    put:
-      tags:
-      - Bookings
-      operationId: decideGroupBooking
-      summary: Approve or decline a group/school booking request (FR-BOOK-003, Museum Manager only)
-      parameters:
-      - $ref: '#/components/parameters/BookingId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BookingApprovalRequest'
-      responses:
-        '200':
-          description: OK — if approved, the response includes a checkout URL for the group leader to pay
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /bookings/{id}/cancel:
-    post:
-      tags:
-      - Bookings
-      operationId: cancelBooking
-      summary: Cancel a Pending booking — triggers a full, automatic refund (FR-BOOK-005, FR-BOOK-006)
-      parameters:
-      - $ref: '#/components/parameters/BookingId'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Booking is no longer Pending and cannot be cancelled
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /bookings/{id}/reschedule:
-    post:
-      tags:
-      - Bookings
-      operationId: rescheduleBooking
-      summary: Reschedule a Pending booking to a different available date, at most once (FR-BOOK-007)
-      parameters:
-      - $ref: '#/components/parameters/BookingId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BookingRescheduleRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Booking is not Pending, or has already been rescheduled once
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /bookings/{id}/check-in:
-    post:
-      tags:
-      - Entrance
-      operationId: checkInBooking
-      summary: Record actual attendance at the gate (FR-TICKET-001–003, Cashier only)
-      parameters:
-      - $ref: '#/components/parameters/BookingId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckInRequest'
-      responses:
-        '200':
-          description: OK — attendedQuantity less than bookedQuantity marks the shortfall as refund-eligible, but does not auto-refund it (FR-TICKET-002)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '400':
-          description: attendedQuantity exceeds bookedQuantity — the excess must book separately (FR-TICKET-005)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Booking is not in a checkable-in state
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /payments/webhooks/chapa:
-    post:
-      tags:
-      - Payments
-      security: []
-      operationId: handleChapaWebhook
-      summary: Chapa payment confirmation callback — the only path that confirms a booking (FR-PAY-002, NFR-SEC-001); verified by signature, and safe to replay (FR-PAY-004)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChapaWebhookPayload'
-      responses:
-        '200':
-          description: Acknowledged (processed, or a no-op if this tx_ref was already applied)
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          description: Invalid webhook signature
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /bookings/{id}/refund-requests:
-    post:
-      tags:
-      - Refunds
-      operationId: requestPartialRefund
-      summary: Request a refund for a partial-attendance shortfall (FR-TICKET-002, FR-REFUND-001b)
-      parameters:
-      - $ref: '#/components/parameters/BookingId'
+      - v1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RefundRequestCreate'
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Refund'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Booking has no refund-eligible shortfall
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /refunds:
-    get:
-      tags:
-      - Refunds
-      operationId: listRefunds
-      summary: List refunds (Visitors see only their own; Staff can filter across all)
-      parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
-      - name: reason
-        in: query
-        schema:
-          type: string
-          enum:
-          - cancellation
-          - partial_shortfall
-          - no_response
+              $ref: '#/components/schemas/AccountUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AccountUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AccountUpdate'
+      security:
+      - TokenVersionAuth: []
       responses:
         '200':
-          description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedRefunds'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /settlement/pending:
-    get:
-      tags:
-      - Settlement
-      operationId: listPendingSettlement
-      summary: List Visited bookings not yet included in a settlement transfer (FR-REPORT-003, Cashier only)
-      parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedBookings'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /settlement/transfers:
-    get:
-      tags:
-      - Settlement
-      operationId: listSettlementTransfers
-      summary: List past settlement transfers (FR-SETTLE-001, Cashier/Museum Manager)
-      parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedSettlementTransfers'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-    post:
-      tags:
-      - Settlement
-      operationId: createSettlementTransfer
-      summary: Batch-transfer all pending Visited revenue (net of refunds) to the Finance Office and generate a Transfer Receipt (FR-SETTLE-001–004, Cashier only)
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SettlementTransfer'
-        '400':
-          description: Nothing pending to settle
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /settlement/transfers/{id}:
-    get:
-      tags:
-      - Settlement
-      operationId: getSettlementTransferById
-      summary: Get a settlement transfer and its Transfer Receipt
-      parameters:
-      - $ref: '#/components/parameters/TransferId'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SettlementTransfer'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /reports/dashboard:
-    get:
-      tags:
-      - Reporting
-      operationId: getDashboard
-      summary: Revenue, visitor counts, group vs. individual split, and status mix (FR-REPORT-001, Museum Manager/Platform Admin)
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DashboardResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /reports/summary:
-    get:
-      tags:
-      - Reporting
-      operationId: getReportSummary
-      summary: Periodic report broken down by category and by school/group (FR-REPORT-002; "yearly" follows the budget/fiscal calendar, not Jan–Dec)
-      parameters:
-      - name: period
-        in: query
-        required: true
-        schema:
-          type: string
-          enum:
-          - daily
-          - weekly
-          - monthly
-          - yearly
-      - name: from
-        in: query
-        schema:
-          type: string
-          format: date
-      - name: to
-        in: query
-        schema:
-          type: string
-          format: date
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReportSummaryResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: '#/components/schemas/Account'
+          description: ''
 components:
-  parameters:
-    UserId:
-      name: id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    CategoryId:
-      name: id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    BookingId:
-      name: id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    TransferId:
-      name: id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    DateParam:
-      name: date
-      in: path
-      required: true
-      schema:
-        type: string
-        format: date
-    Limit:
-      name: limit
-      in: query
-      required: false
-      schema:
-        type: integer
-        default: 20
-        minimum: 1
-        maximum: 100
-    Offset:
-      name: offset
-      in: query
-      required: false
-      schema:
-        type: integer
-        default: 0
-        minimum: 0
-  responses:
-    BadRequest:
-      description: Bad request
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    Unauthorized:
-      description: Unauthorized
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    NotFound:
-      description: Not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    Conflict:
-      description: Conflict
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
   schemas:
-    HealthResponse:
+    Account:
       type: object
+      description: |-
+        `UserProfile` (Document 04) -- Visitor and Staff share one shape; a
+        Visitor's password-adjacent fields are simply never populated.
       properties:
-        status:
+        id:
           type: string
-          example: ok
-        timestamp:
-          type: string
-          format: date-time
-    ErrorResponse:
-      type: object
-      description: "Error message is localized per the caller's language preference (FR-LOC-001)."
-      properties:
-        error:
-          type: object
-          properties:
-            code:
-              type: string
-              example: VALIDATION_ERROR
-            message:
-              type: string
-            fieldErrors:
-              type: object
-              additionalProperties:
-                type: string
-    PaginationMeta:
-      type: object
-      properties:
-        limit:
-          type: integer
-        offset:
-          type: integer
-        total:
-          type: integer
-    VisitorVerifyStartRequest:
-      type: object
-      description: FR-ACC-001. No password field exists anywhere in the Visitor auth schemas — verification is the only credential a Visitor ever has.
-      required:
-      - email
-      - phone
-      properties:
+          format: uuid
+          readOnly: true
         email:
           type: string
-          format: email
+          readOnly: true
         phone:
           type: string
-        fullName:
+          readOnly: true
+          nullable: true
+        full_name:
           type: string
-          description: Optional on a first-time verification; not required to receive an OTP. Collected before checkout if not yet on file.
-        languagePreference:
-          $ref: '#/components/schemas/LanguagePreference'
-    VisitorVerifyStartResponse:
-      type: object
-      properties:
-        verificationId:
+          readOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+        language_preference:
+          allOf:
+          - $ref: '#/components/schemas/LanguagePreferenceEnum'
+          readOnly: true
+        active:
+          type: boolean
+          readOnly: true
+        created_at:
           type: string
-          format: uuid
-        otpExpiresInSeconds:
-          type: integer
-          example: 600
-    VisitorVerifyConfirmRequest:
-      type: object
+          format: date-time
+          readOnly: true
       required:
-      - verificationId
-      - otpCode
-      properties:
-        verificationId:
-          type: string
-          format: uuid
-        otpCode:
-          type: string
-          example: '482913'
-    ForgotPasswordRequest:
-      type: object
-      description: Staff only (FR-ACC-006) — there is no equivalent for Visitors, who have no password to forget.
-      required:
+      - active
+      - created_at
       - email
+      - full_name
+      - id
+      - language_preference
+      - phone
+      - role
+    AccountUpdate:
+      type: object
+      description: |-
+        `UserUpdateRequest` -- an account may only ever edit its own
+        contact/preference fields, never role/active/email (Sec 4.3).
+      properties:
+        full_name:
+          type: string
+          maxLength: 255
+        phone:
+          type: string
+          nullable: true
+        language_preference:
+          $ref: '#/components/schemas/LanguagePreferenceEnum'
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        user:
+          $ref: '#/components/schemas/Account'
+      required:
+      - access_token
+      - refresh_token
+      - user
+    DetailResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    ForgotPassword:
+      type: object
+      description: '`ForgotPasswordRequest` -- Staff only (FR-ACC-006).'
       properties:
         email:
           type: string
           format: email
-    ResetPasswordRequest:
-      type: object
-      description: Staff only (FR-ACC-006).
       required:
-      - token
-      - newPassword
+      - email
+    LanguagePreferenceEnum:
+      enum:
+      - en
+      - am
+      type: string
+      description: |-
+        * `en` - English
+        * `am` - Amharic
+    ResetPassword:
+      type: object
+      description: '`ResetPasswordRequest` -- Staff only (FR-ACC-006).'
       properties:
         token:
           type: string
-        newPassword:
+        new_password:
           type: string
-          format: password
-    LoginRequest:
-      type: object
-      description: Staff only (FR-ACC-002, FR-ACC-005). Visitors authenticate via /auth/visitor/verify/start and /auth/visitor/verify/confirm instead.
+          writeOnly: true
       required:
-      - email
-      - password
+      - new_password
+      - token
+    RoleEnum:
+      enum:
+      - visitor
+      - cashier
+      - museum_manager
+      - platform_admin
+      type: string
+      description: |-
+        * `visitor` - Visitor
+        * `cashier` - Cashier
+        * `museum_manager` - Museum Manager
+        * `platform_admin` - Platform Admin
+    StaffLogin:
+      type: object
+      description: '`LoginRequest` -- Staff only (FR-ACC-002, FR-ACC-005).'
       properties:
         email:
           type: string
           format: email
         password:
           type: string
-          format: password
-    RefreshRequest:
-      type: object
-      required:
-      - refreshToken
-      properties:
-        refreshToken:
-          type: string
-    AuthResponse:
-      type: object
-      properties:
-        accessToken:
-          type: string
-        refreshToken:
-          type: string
-        user:
-          $ref: '#/components/schemas/UserProfile'
-    LanguagePreference:
-      type: string
-      enum:
-      - en
-      - am
-    UserRole:
-      type: string
-      enum:
-      - visitor
-      - cashier
-      - museum_manager
-      - platform_admin
-    UserProfile:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        email:
-          type: string
-          format: email
-        phone:
-          type: string
-        fullName:
-          type: string
-        role:
-          $ref: '#/components/schemas/UserRole'
-        languagePreference:
-          $ref: '#/components/schemas/LanguagePreference'
-        active:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-    PaginatedUserProfiles:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserProfile'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
-    UserUpdateRequest:
-      type: object
-      properties:
-        fullName:
-          type: string
-        phone:
-          type: string
-        languagePreference:
-          $ref: '#/components/schemas/LanguagePreference'
-    StaffCreateRequest:
-      type: object
+          writeOnly: true
       required:
       - email
-      - fullName
-      - role
+      - password
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    VisitorVerifyConfirm:
+      type: object
+      description: '`VisitorVerifyConfirmRequest`.'
+      properties:
+        verification_id:
+          type: string
+          format: uuid
+        otp_code:
+          type: string
+          maxLength: 6
+          minLength: 6
+      required:
+      - otp_code
+      - verification_id
+    VisitorVerifyStart:
+      type: object
+      description: |-
+        `VisitorVerifyStartRequest` (Document 04) -- FR-ACC-001, FR-ACC-003.
+        No password field exists here or anywhere in the Visitor path.
       properties:
         email:
           type: string
           format: email
         phone:
           type: string
-        fullName:
+          maxLength: 32
+        full_name:
           type: string
-        role:
-          type: string
-          enum:
-          - cashier
-          - museum_manager
-    StaffUpdateRequest:
+          default: ''
+          maxLength: 255
+        language_preference:
+          $ref: '#/components/schemas/LanguagePreferenceEnum'
+      required:
+      - email
+      - phone
+    VisitorVerifyStartResponse:
       type: object
       properties:
-        role:
-          type: string
-          enum:
-          - cashier
-          - museum_manager
-        active:
-          type: boolean
-    Category:
-      type: object
-      description: FR-CAT-001. Bilingual name fields are maintained independently (FR-LOC-004).
-      properties:
-        id:
+        verification_id:
           type: string
           format: uuid
-        nameEn:
-          type: string
-          example: Adult / Teacher
-        nameAm:
-          type: string
-        priceEtb:
-          type: number
-          example: 100
-        isFree:
-          type: boolean
-        active:
-          type: boolean
-    CategoryCreateRequest:
-      type: object
-      required:
-      - nameEn
-      - nameAm
-      - priceEtb
-      properties:
-        nameEn:
-          type: string
-        nameAm:
-          type: string
-        priceEtb:
-          type: number
-        isFree:
-          type: boolean
-    CategoryUpdateRequest:
-      type: object
-      properties:
-        nameEn:
-          type: string
-        nameAm:
-          type: string
-        priceEtb:
-          type: number
-        isFree:
-          type: boolean
-        active:
-          type: boolean
-    PaginatedCategories:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Category'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
-    DateAvailability:
-      type: object
-      description: FR-BOOK-008. The system never calculates capacity itself — this flag is entirely the Museum Manager's call.
-      properties:
-        date:
-          type: string
-          format: date
-        isOpenForBooking:
-          type: boolean
-        closedByUserId:
-          type: string
-          format: uuid
-          nullable: true
-        closedAt:
-          type: string
-          format: date-time
-          nullable: true
-    DateAvailabilityUpdateRequest:
-      type: object
-      required:
-      - isOpenForBooking
-      properties:
-        isOpenForBooking:
-          type: boolean
-    BookingStatus:
-      type: string
-      enum:
-      - awaiting_payment
-      - pending_approval
-      - pending
-      - visited
-      - cancelled
-      - refunded
-    BookingType:
-      type: string
-      enum:
-      - individual
-      - group
-    BookingCreateRequest:
-      type: object
-      required:
-      - visitDate
-      - categoryId
-      - quantity
-      - bookingType
-      properties:
-        visitDate:
-          type: string
-          format: date
-        categoryId:
-          type: string
-          format: uuid
-        quantity:
+        otp_expires_in_seconds:
           type: integer
-          minimum: 1
-        bookingType:
-          $ref: '#/components/schemas/BookingType'
-        groupName:
-          type: string
-          description: Required when bookingType is group (e.g., school name), per FR-BOOK-003.
-        groupContactPhone:
-          type: string
-    Booking:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        reference:
-          type: string
-          description: Booking reference presented at the gate, typed or scanned (FR-BOOK-004, FR-TICKET-001).
-        visitorId:
-          type: string
-          format: uuid
-        categoryId:
-          type: string
-          format: uuid
-        visitDate:
-          type: string
-          format: date
-        bookingType:
-          $ref: '#/components/schemas/BookingType'
-        groupName:
-          type: string
-          nullable: true
-        bookedQuantity:
-          type: integer
-        attendedQuantity:
-          type: integer
-          nullable: true
-          description: Set by the Cashier at check-in (FR-TICKET-001). May be less than bookedQuantity.
-        status:
-          $ref: '#/components/schemas/BookingStatus'
-        approvalStatus:
-          type: string
-          nullable: true
-          enum:
-          - pending
-          - approved
-          - declined
-          description: Present only for group bookings (FR-BOOK-003).
-        rescheduledCount:
-          type: integer
-          description: 0 or 1 — a booking may be rescheduled at most once (FR-BOOK-007).
-        noticeSentAt:
-          type: string
-          format: date-time
-          nullable: true
-          description: When the no-show notice was sent, if the visit date has passed while still Pending (FR-PAY-005).
-        checkoutUrl:
-          type: string
-          nullable: true
-          description: Present only while status is awaiting_payment or immediately after group-booking approval.
-        receiptUrl:
-          type: string
-          nullable: true
-          description: The temporary receipt, available once status reaches pending (FR-PAY-002).
-        totalAmountEtb:
-          type: number
-        createdAt:
-          type: string
-          format: date-time
-    PaginatedBookings:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Booking'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
-    BookingApprovalRequest:
-      type: object
       required:
-      - decision
-      properties:
-        decision:
-          type: string
-          enum:
-          - approve
-          - decline
-        note:
-          type: string
-    BookingRescheduleRequest:
-      type: object
-      required:
-      - newVisitDate
-      properties:
-        newVisitDate:
-          type: string
-          format: date
-    CheckInRequest:
-      type: object
-      required:
-      - attendedQuantity
-      properties:
-        attendedQuantity:
-          type: integer
-          minimum: 0
-    ChapaWebhookPayload:
-      type: object
-      description: Chapa's own webhook payload shape; verified by signature before any state change (NFR-SEC-001).
-      required:
-      - tx_ref
-      - status
-      properties:
-        tx_ref:
-          type: string
-        status:
-          type: string
-        amount:
-          type: number
-        currency:
-          type: string
-          example: ETB
-      additionalProperties: true
-    RefundRequestCreate:
-      type: object
-      properties:
-        note:
-          type: string
-    Refund:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        bookingId:
-          type: string
-          format: uuid
-        amountEtb:
-          type: number
-          description: Net of the payment aggregator's own transaction charge (FR-REFUND-003).
-        reason:
-          type: string
-          enum:
-          - cancellation
-          - partial_shortfall
-          - no_response
-        status:
-          type: string
-          enum:
-          - pending
-          - completed
-          - failed
-        chapaRefundReference:
-          type: string
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-    PaginatedRefunds:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Refund'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
-    SettlementTransfer:
-      type: object
-      description: FR-SETTLE-001–004. Always a batch, on the Cashier's own timeline — never automatic or per-booking.
-      properties:
-        id:
-          type: string
-          format: uuid
-        amountEtb:
-          type: number
-          description: Net of any refunds processed against the included bookings (FR-REFUND-005).
-        bookingIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-        referenceNumber:
-          type: string
-        receiptUrl:
-          type: string
-          description: The bilingual Transfer Receipt (FR-SETTLE-004), carried physically to the Finance Office alongside the manual track's deposit slip.
-        initiatedByUserId:
-          type: string
-          format: uuid
-        createdAt:
-          type: string
-          format: date-time
-    PaginatedSettlementTransfers:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/SettlementTransfer'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
-    DashboardResponse:
-      type: object
-      description: FR-REPORT-001.
-      properties:
-        revenueTotalEtb:
-          type: number
-        visitorCountsByCategory:
-          type: object
-          additionalProperties:
-            type: integer
-        groupVsIndividualSplit:
-          type: object
-          properties:
-            group:
-              type: integer
-            individual:
-              type: integer
-        statusMix:
-          type: object
-          properties:
-            pending:
-              type: integer
-            visited:
-              type: integer
-            cancelled:
-              type: integer
-            refunded:
-              type: integer
-    ReportSummaryResponse:
-      type: object
-      description: FR-REPORT-002. "Yearly" follows the organization's budget/fiscal calendar, not Jan–Dec.
-      properties:
-        period:
-          type: string
-          enum:
-          - daily
-          - weekly
-          - monthly
-          - yearly
-        from:
-          type: string
-          format: date
-        to:
-          type: string
-          format: date
-        revenueByCategory:
-          type: object
-          additionalProperties:
-            type: number
-        visitorCountsByGroup:
-          type: object
-          additionalProperties:
-            type: integer
+      - otp_expires_in_seconds
+      - verification_id
+  securitySchemes:
+    TokenVersionAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

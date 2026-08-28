@@ -9,6 +9,8 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from apps.accounts.views import CurrentUserView
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 
@@ -22,6 +24,12 @@ urlpatterns = [
     # Auth -- both credential paths share one refresh endpoint (Sec 4.1).
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+
+    # Document 04 places the profile endpoint under /users/, not /auth/ --
+    # mounted directly here rather than via apps.accounts.urls, which is
+    # scoped to /api/v1/auth/ only. /users/me/bookings (FR-ACC-004) is
+    # deferred until apps.bookings exists (README "Build order").
+    path("api/v1/users/me/", CurrentUserView.as_view(), name="current-user"),
 
     path("api/v1/catalog/", include("apps.catalog.urls")),
     path("api/v1/bookings/", include("apps.bookings.urls")),
