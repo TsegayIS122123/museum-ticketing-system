@@ -186,6 +186,9 @@ REST_FRAMEWORK = {
         "login": "5/15m",
         "otp-request": "5/15m",
         "password-reset-request": "5/15m",
+        # FR-BOOK-001/003: capped per account/IP against fraudulent
+        # AwaitingPayment/PendingApproval bookings (Sec 6.7).
+        "booking-create": "10/15m",
     },
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",

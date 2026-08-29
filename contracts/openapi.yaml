@@ -205,6 +205,214 @@ paths:
               schema:
                 $ref: '#/components/schemas/VisitorVerifyStartResponse'
           description: ''
+  /api/v1/availability/:
+    get:
+      operationId: v1_availability_list
+      description: GET /availability -- public (FR-BOOK-008).
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DateAvailability'
+          description: ''
+  /api/v1/availability/{date}/:
+    put:
+      operationId: v1_availability_update
+      description: PUT /availability/{date} -- Museum Manager only (FR-BOOK-008).
+      parameters:
+      - in: path
+        name: date
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DateAvailabilityUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DateAvailabilityUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DateAvailabilityUpdate'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DateAvailability'
+          description: ''
+  /api/v1/bookings/:
+    get:
+      operationId: listBookings
+      description: |-
+        GET /bookings (Staff only) and POST /bookings (Visitor only,
+        FR-BOOK-001/FR-BOOK-003).
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+    post:
+      operationId: createBooking
+      description: |-
+        GET /bookings (Staff only) and POST /bookings (Visitor only,
+        FR-BOOK-001/FR-BOOK-003).
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/v1/bookings/{id}/:
+    get:
+      operationId: getBooking
+      description: GET /bookings/{id} -- the owning Visitor or any Staff member.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/v1/bookings/{id}/approval/:
+    put:
+      operationId: v1_bookings_approval_update
+      description: PUT /bookings/{id}/approval -- Museum Manager only (FR-BOOK-003).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingApproval'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingApproval'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingApproval'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/v1/bookings/{id}/cancel/:
+    post:
+      operationId: v1_bookings_cancel_create
+      description: POST /bookings/{id}/cancel -- FR-BOOK-005/006.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/v1/bookings/{id}/reschedule/:
+    post:
+      operationId: v1_bookings_reschedule_create
+      description: POST /bookings/{id}/reschedule -- FR-BOOK-007.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingReschedule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingReschedule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingReschedule'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
   /api/v1/categories/:
     get:
       operationId: v1_categories_list
@@ -364,6 +572,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/Account'
           description: ''
+  /api/v1/users/me/bookings/:
+    get:
+      operationId: listMyBookings
+      description: |-
+        GET /users/me/bookings -- FR-ACC-004. Mounted at the root URLconf
+        (config/urls.py), not here, mirroring CurrentUserView's placement --
+        Document 04 puts this under `/users/`, not `/bookings/`.
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBookingList'
+          description: ''
 components:
   schemas:
     Account:
@@ -437,6 +676,157 @@ components:
       - access_token
       - refresh_token
       - user
+    Booking:
+      type: object
+      description: |-
+        `Booking` (Document 04). Read-only -- every mutation goes through
+        the Create/Approval/Cancel/Reschedule serializers below and
+        services.py, never through this serializer directly.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        reference:
+          type: string
+          readOnly: true
+        visitorId:
+          type: string
+          format: uuid
+          readOnly: true
+        categoryId:
+          type: string
+          format: uuid
+          readOnly: true
+        visitDate:
+          type: string
+          format: date
+          readOnly: true
+        bookingType:
+          type: string
+          readOnly: true
+        groupName:
+          type: string
+          readOnly: true
+          nullable: true
+        bookedQuantity:
+          type: integer
+          readOnly: true
+        attendedQuantity:
+          type: integer
+          readOnly: true
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        approvalStatus:
+          type: string
+          readOnly: true
+          nullable: true
+        rescheduledCount:
+          type: integer
+          readOnly: true
+        noticeSentAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        checkoutUrl:
+          type: string
+          readOnly: true
+          nullable: true
+        receiptUrl:
+          type: string
+          readOnly: true
+          nullable: true
+        totalAmountEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - approvalStatus
+      - attendedQuantity
+      - bookedQuantity
+      - bookingType
+      - categoryId
+      - checkoutUrl
+      - createdAt
+      - groupName
+      - id
+      - noticeSentAt
+      - receiptUrl
+      - reference
+      - rescheduledCount
+      - status
+      - totalAmountEtb
+      - visitDate
+      - visitorId
+    BookingApproval:
+      type: object
+      description: '`BookingApprovalRequest` -- Museum Manager only (FR-BOOK-003).'
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionEnum'
+        note:
+          type: string
+          nullable: true
+      required:
+      - decision
+    BookingCreate:
+      type: object
+      description: |-
+        `BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
+        (group). A plain Serializer, not a ModelSerializer: `visitor` is
+        supplied by the view from `request.user`, never from the request
+        body, and `categoryId`/`bookingType` need their own field names
+        mapped onto services.create_booking's kwargs rather than a 1:1 model
+        field mapping.
+      properties:
+        visitDate:
+          type: string
+          format: date
+        categoryId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        bookingType:
+          $ref: '#/components/schemas/BookingTypeEnum'
+        groupName:
+          type: string
+          nullable: true
+        groupContactPhone:
+          type: string
+          nullable: true
+      required:
+      - bookingType
+      - categoryId
+      - quantity
+      - visitDate
+    BookingReschedule:
+      type: object
+      description: '`BookingRescheduleRequest` -- FR-BOOK-007.'
+      properties:
+        newVisitDate:
+          type: string
+          format: date
+      required:
+      - newVisitDate
+    BookingTypeEnum:
+      enum:
+      - individual
+      - group
+      type: string
+      description: |-
+        * `individual` - Individual
+        * `group` - Group
     Category:
       type: object
       description: |-
@@ -509,6 +899,46 @@ components:
           type: boolean
         active:
           type: boolean
+    DateAvailability:
+      type: object
+      description: |-
+        `DateAvailability` (Document 04). Read-only -- every mutation goes
+        through `DateAvailabilityUpdateSerializer` and services.py.
+      properties:
+        date:
+          type: string
+          format: date
+        isOpenForBooking:
+          type: boolean
+        closedByUserId:
+          type: string
+          format: uuid
+          nullable: true
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - closedAt
+      - closedByUserId
+      - date
+      - isOpenForBooking
+    DateAvailabilityUpdate:
+      type: object
+      description: '`DateAvailabilityUpdateRequest` -- Museum Manager only (FR-BOOK-008).'
+      properties:
+        isOpenForBooking:
+          type: boolean
+      required:
+      - isOpenForBooking
+    DecisionEnum:
+      enum:
+      - approve
+      - decline
+      type: string
+      description: |-
+        * `approve` - approve
+        * `decline` - decline
     DetailResponse:
       type: object
       properties:
@@ -533,6 +963,24 @@ components:
       description: |-
         * `en` - English
         * `am` - Amharic
+    PaginatedBookingList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/Booking'
+        meta:
+          type: object
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            total:
+              type: integer
     PaginatedCategoryList:
       type: object
       properties:
@@ -588,6 +1036,22 @@ components:
       required:
       - email
       - password
+    StatusEnum:
+      enum:
+      - awaiting_payment
+      - pending_approval
+      - pending
+      - visited
+      - cancelled
+      - refunded
+      type: string
+      description: |-
+        * `awaiting_payment` - Awaiting payment
+        * `pending_approval` - Pending approval
+        * `pending` - Pending
+        * `visited` - Visited
+        * `cancelled` - Cancelled
+        * `refunded` - Refunded
     TokenRefresh:
       type: object
       properties:

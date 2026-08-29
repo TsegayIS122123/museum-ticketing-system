@@ -14,7 +14,20 @@ display errors generically without per-form translation logic:
 }
 """
 
+from rest_framework.exceptions import APIException
 from rest_framework.views import exception_handler
+
+
+class Conflict(APIException):
+    """A well-formed request that can't be applied because of the
+    resource's *current state* -- e.g. a booking that is no longer
+    `Pending`, or a date closed to online booking (FR-BOOK-005/007/008).
+    Distinct from `ValidationError` (400, bad input) per Document 04's
+    409 responses on `POST /bookings`, `/cancel`, and `/reschedule`."""
+
+    status_code = 409
+    default_detail = "The request conflicts with the resource's current state."
+    default_code = "conflict"
 
 
 def api_exception_handler(exc, context):
