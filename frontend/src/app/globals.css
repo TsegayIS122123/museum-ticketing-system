@@ -1,1 +1,118 @@
 @import "tailwindcss";
+
+@theme {
+  /* Figma Design Tokens */
+  --color-stone-50: #f7f5f0;
+  --color-stone-100: #f5f3ef;
+  --color-stone-200: #e8e4de;
+  --color-stone-300: #d6d0c8;
+  --color-stone-400: #b8b0a4;
+  --color-stone-500: #9a9082;
+  --color-stone-600: #7c7264;
+  --color-stone-700: #5e5446;
+  --color-stone-800: #40362e;
+  --color-stone-900: #1c1917;
+
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+
+  /* Semantic Tokens */
+  --color-primary: var(--color-amber-600);
+  --color-primary-hover: var(--color-amber-700);
+  --color-surface: #ffffff;
+  --color-surface-alt: var(--color-stone-50);
+  --color-text: var(--color-stone-900);
+  --color-text-muted: var(--color-stone-500);
+  --color-success: var(--color-emerald-500);
+  --color-danger: var(--color-red-600);
+  --color-focus: var(--color-amber-600);
+
+  /* Typography - Figma fonts */
+  --font-serif: 'DM Serif Display', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* Base styles */
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background-color: var(--color-surface-alt);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Amharic font fallback */
+html[lang="am"] body {
+  font-family: 'Noto Sans Ethiopic', var(--font-sans);
+}
+
+/* Focus states for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Visitor surface tap targets (44px minimum) */
+[data-surface="visitor"] button,
+[data-surface="visitor"] a,
+[data-surface="visitor"] input,
+[data-surface="visitor"] select,
+[data-surface="visitor"] textarea {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Staff surface - dense */
+[data-surface="staff"] button,
+[data-surface="staff"] a {
+  min-height: 32px;
+  min-width: 32px;
+}
+
+/* Utility classes */
+.tap-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-stone-300);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-stone-400);
+}

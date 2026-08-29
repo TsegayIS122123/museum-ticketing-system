@@ -1,0 +1,265 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useAuth } from '@/lib/auth/auth-context';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
+import { CancelRescheduleControls } from '@/features/booking/components/CancelRescheduleControls';
+import { getBooking } from '@/features/booking/api';
+import { Toast } from '@/components/ui/Toast';
+import { QRCodeSVG } from '@/components/ui/QRCodeSVG';
+
+export default function BookingDetailPage() {
+  const { t, locale } = useTranslation();
+  const params = useParams();
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  const [booking, setBooking] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const bookingId = params.id as string;
+
+  const loadBooking = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getBooking(bookingId);
+      setBooking(data);
+    } catch (error: any) {
+      setToast({
+        message: error.message || 'Failed to load booking',
+        type: 'error',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      router.push(`/${locale}/verify`);
+      return;
+    }
+
+    if (bookingId) {
+      loadBooking();
+    }
+  }, [bookingId, isAuthenticated, authLoading, locale, router]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col" data-surface="visitor">
+        <PublicHeader />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-stone-500">{t('loading')}</div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  if (!booking) {
+    return (
+      <div className="min-h-screen flex flex-col" data-surface="visitor">
+        <PublicHeader />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <Card className="max-w-md w-full text-center">
+            <div className="text-4xl mb-4">🔍</div>
+            <h2 className="text-xl font-bold text-stone-900 mb-2">
+              {t('booking_not_found') || 'Booking Not Found'}
+            </h2>
+            <p className="text-stone-500">{t('booking_not_found_description') || 'The booking you are looking for does not exist.'}</p>
+            <Button
+              className="mt-4"
+              onClick={() => router.push(`/${locale}/bookings`)}
+            >
+              {t('back_to_bookings') || 'Back to Bookings'}
+            </Button>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString(locale === 'en' ? 'en-US' : 'am-ET', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col" data-surface="visitor">
+      <PublicHeader />
+      <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        {/* Back Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-4"
+          onClick={() => router.push(`/${locale}/bookings`)}
+        >
+          ← {t('back_to_bookings') || 'Back to Bookings'}
+        </Button>
+
+        {/* Header */}
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-stone-900">
+              {t('booking_details') || 'Booking Details'}
+            </h1>
+            <p className="font-mono text-sm text-stone-400 mt-1">
+              #{booking.reference}
+            </p>
+          </div>
+          <StatusBadge status={booking.status} />
+        </div>
+
+        {/* Booking Info */}
+        <Card className="mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <div className="text-stone-500">{t('visit_date') || 'Visit Date'}</div>
+              <div className="font-medium text-stone-900">{formatDate(booking.visitDate)}</div>
+            </div>
+            <div>
+              <div className="text-stone-500">{t('category')}</div>
+              <div className="font-medium text-stone-900">
+                {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
+              </div>
+            </div>
+            <div>
+              <div className="text-stone-500">{t('quantity')}</div>
+              <div className="font-medium text-stone-900">{booking.bookedQuantity}</div>
+            </div>
+            <div>
+              <div className="text-stone-500">{t('total')}</div>
+              <div className="font-bold text-lg text-amber-600 font-serif">
+                ETB {booking.totalAmountEtb}
+              </div>
+            </div>
+            {booking.attendedQuantity !== null && booking.attendedQuantity !== undefined && (
+              <div>
+                <div className="text-stone-500">{t('attended')}</div>
+                <div className="font-medium text-stone-900">{booking.attendedQuantity}</div>
+              </div>
+            )}
+            <div>
+              <div className="text-stone-500">{t('booked_on') || 'Booked On'}</div>
+              <div className="font-medium text-stone-900">{formatDateTime(booking.createdAt)}</div>
+            </div>
+          </div>
+
+          {booking.receiptUrl && (
+            <div className="mt-4 pt-4 border-t border-stone-100">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => window.open(booking.receiptUrl, '_blank')}
+              >
+                📄 {t('download_receipt')}
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        {/* QR Code */}
+        {booking.status === 'pending' && (
+          <Card className="mb-6 text-center">
+            <div className="font-semibold text-stone-900 mb-4">
+              {t('digital_ticket') || 'Digital Ticket'}
+            </div>
+            <div className="flex justify-center">
+              <div className="bg-white p-4 rounded-xl shadow-inner border border-stone-200">
+                <QRCodeSVG
+                  value={booking.reference}
+                  size={180}
+                />
+              </div>
+            </div>
+            <div className="mt-3 font-mono text-xs text-stone-400">
+              {booking.reference}
+            </div>
+            <div className="mt-2 text-xs text-stone-500">
+              {t('show_at_gate') || 'Show this QR code at the museum entrance'}
+            </div>
+          </Card>
+        )}
+
+        {/* Shortfall Notice */}
+        {booking.attendedQuantity !== null &&
+          booking.attendedQuantity !== undefined &&
+          booking.attendedQuantity < booking.bookedQuantity && (
+            <Card className="mb-6 bg-amber-50 border-amber-200">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <div className="font-semibold text-amber-800">
+                    {t('partial_attendance') || 'Partial Attendance Recorded'}
+                  </div>
+                  <p className="text-sm text-amber-700">
+                    {booking.bookedQuantity - booking.attendedQuantity} of {booking.bookedQuantity} did not attend.
+                    {booking.status === 'visited' && (
+                      <span className="block mt-1">
+                        {t('refund_available') || 'A refund for the unattended portion is available on request.'}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+        {/* Cancel/Reschedule Controls */}
+        <Card>
+          <div className="font-semibold text-stone-900 mb-3">
+            {t('manage_booking') || 'Manage Booking'}
+          </div>
+          <p className="text-sm text-stone-500 mb-4">
+            {t('manage_booking_description') || 'Cancel or reschedule your booking. Free cancellation up to 48 hours before your visit.'}
+          </p>
+          <CancelRescheduleControls
+            bookingId={booking.id}
+            rescheduledCount={booking.rescheduledCount}
+            currentVisitDate={booking.visitDate}
+            status={booking.status}
+            onActionComplete={loadBooking}
+          />
+        </Card>
+      </main>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </div>
+  );
+}
