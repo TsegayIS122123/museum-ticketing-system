@@ -5,6 +5,122 @@ info:
   description: Bilingual (EN/AM) online booking, payment, and gate check-in for the
     Science Museum's digital ticketing track.
 paths:
+  /api/v1/admin/staff/:
+    get:
+      operationId: v1_admin_staff_list
+      description: |-
+        `GET /admin/staff` and `POST /admin/staff` -- both Platform Admin
+        only (FR-ACC-002).
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAccountList'
+          description: ''
+    post:
+      operationId: v1_admin_staff_create
+      description: |-
+        `GET /admin/staff` and `POST /admin/staff` -- both Platform Admin
+        only (FR-ACC-002).
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffCreate'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffCreate'
+          description: ''
+  /api/v1/admin/staff/{id}/:
+    put:
+      operationId: v1_admin_staff_update
+      description: |-
+        `PUT /admin/staff/{id}` and `DELETE /admin/staff/{id}` -- both
+        Platform Admin only (FR-ACC-002). No `GET` here: Document 04 has no
+        single-staff-account retrieve endpoint, only the list at
+        `/admin/staff` (mirrors `apps.catalog.CategoryDetailView`).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffUpdate'
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+          description: ''
+    delete:
+      operationId: v1_admin_staff_destroy
+      description: |-
+        `PUT /admin/staff/{id}` and `DELETE /admin/staff/{id}` -- both
+        Platform Admin only (FR-ACC-002). No `GET` here: Document 04 has no
+        single-staff-account retrieve endpoint, only the list at
+        `/admin/staff` (mirrors `apps.catalog.CategoryDetailView`).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/auth/forgot-password/:
     post:
       operationId: v1_auth_forgot_password_create
@@ -791,7 +907,7 @@ components:
           readOnly: true
         role:
           allOf:
-          - $ref: '#/components/schemas/RoleEnum'
+          - $ref: '#/components/schemas/AccountRoleEnum'
           readOnly: true
         language_preference:
           allOf:
@@ -813,6 +929,18 @@ components:
       - language_preference
       - phone
       - role
+    AccountRoleEnum:
+      enum:
+      - visitor
+      - cashier
+      - museum_manager
+      - platform_admin
+      type: string
+      description: |-
+        * `visitor` - Visitor
+        * `cashier` - Cashier
+        * `museum_manager` - Museum Manager
+        * `platform_admin` - Platform Admin
     AccountUpdate:
       type: object
       description: |-
@@ -1183,6 +1311,24 @@ components:
       description: |-
         * `en` - English
         * `am` - Amharic
+    PaginatedAccountList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/Account'
+        meta:
+          type: object
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            total:
+              type: integer
     PaginatedBookingList:
       type: object
       properties:
@@ -1323,18 +1469,30 @@ components:
       required:
       - new_password
       - token
-    RoleEnum:
-      enum:
-      - visitor
-      - cashier
-      - museum_manager
-      - platform_admin
-      type: string
+    StaffCreate:
+      type: object
       description: |-
-        * `visitor` - Visitor
-        * `cashier` - Cashier
-        * `museum_manager` - Museum Manager
-        * `platform_admin` - Platform Admin
+        `StaffCreateRequest` (Document 04) -- FR-ACC-002, Platform Admin
+        only. No `password` field: services.create_staff_account provisions
+        the account with no usable password and sends a set-password link
+        instead (FR-ACC-006's flow, reused).
+      properties:
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          default: ''
+          maxLength: 32
+        full_name:
+          type: string
+          maxLength: 255
+        role:
+          $ref: '#/components/schemas/StaffRoleEnum'
+      required:
+      - email
+      - full_name
+      - role
     StaffLogin:
       type: object
       description: '`LoginRequest` -- Staff only (FR-ACC-002, FR-ACC-005).'
@@ -1348,6 +1506,25 @@ components:
       required:
       - email
       - password
+    StaffRoleEnum:
+      enum:
+      - cashier
+      - museum_manager
+      type: string
+      description: |-
+        * `cashier` - Cashier
+        * `museum_manager` - Museum Manager
+    StaffUpdate:
+      type: object
+      description: |-
+        `StaffUpdateRequest` (Document 04) -- FR-ACC-002, Platform Admin
+        only. Every field optional: a single `PUT` may change only `role`,
+        only `active`, or both.
+      properties:
+        role:
+          $ref: '#/components/schemas/StaffRoleEnum'
+        active:
+          type: boolean
     TokenRefresh:
       type: object
       properties:

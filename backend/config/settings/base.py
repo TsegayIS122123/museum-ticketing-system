@@ -205,6 +205,15 @@ SPECTACULAR_SETTINGS = {
                     "check-in for the Science Museum's digital ticketing track.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # apps.platform_admin.serializers.StaffCreateSerializer/StaffUpdateSerializer
+    # both have a `role` field restricted to {cashier, museum_manager} --
+    # distinct from Account.Role's own four-way `role` enum (RoleEnum,
+    # used by AccountSerializer/UserProfile). Same field name, different
+    # choice sets, so schema generation can't dedupe them automatically
+    # and falls back to an auto-numbered name without this override.
+    "ENUM_NAME_OVERRIDES": {
+        "StaffRoleEnum": "apps.platform_admin.serializers.STAFF_ROLE_CHOICES",
+    },
 }
 
 # ADR-002: token_version bumped on password reset / manual revocation

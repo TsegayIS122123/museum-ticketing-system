@@ -17,10 +17,14 @@ do NOT reach for a tenant-scoped manager pattern here.
 See Document 05 (Database Design) for the real fields/tables to implement.
 """
 
-from django.db import models
 
-# from apps.core.models import TimeStampedModel
-
-# class Example(TimeStampedModel):
-#     class Meta:
-#         app_label = "platform_admin"
+# No models here by design. The staff-facing part of FR-ACC-002 this app
+# implements (provisioning, editing, and deactivating Cashier / Museum
+# Manager accounts) operates entirely on `apps.accounts.Account` --
+# Document 05 Sec 3.1's single table already serves every role, including
+# Platform Admin's own -- so a parallel `platform_admin`-owned "staff"
+# table would just duplicate it. See services.py.
+#
+# FR-CAT-002 (category management) is likewise fully owned by
+# apps.catalog, not this app, despite the module docstring's original
+# scope note -- see apps/catalog/models.py's `Category`.
