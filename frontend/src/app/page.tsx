@@ -1,7 +1,6 @@
-export default function Home() {
-  return (
-    <main>
-      <h1>Museum Ticketing & Booking Platform</h1>
-    </main>
-  );
+import { redirect } from 'next/navigation';
+
+// Root page redirects to /en (handled by middleware)
+export default function RootPage() {
+  redirect('/en');
 }

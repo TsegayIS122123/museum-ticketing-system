@@ -1,20 +1,12 @@
-import type { Metadata } from "next";
-import "./globals.css";
+// This is a minimal root layout that just passes through to [lang]/layout.tsx
+// The actual HTML rendering happens in app/[lang]/layout.tsx
 
-export const metadata: Metadata = {
-  title: "Museum Ticketing & Booking Platform",
-  description:
-    "Bilingual (Amharic/English) online booking, payment, and gate check-in for the Science Museum — additive to the museum's existing counter process.",
-};
+import { ReactNode } from 'react';
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
+}: {
+  children: ReactNode;
+}) {
+  return children;
 }
