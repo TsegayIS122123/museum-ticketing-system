@@ -24,3 +24,12 @@ django-celery-results>=2.5
 
 # API docs (generated from Document 04's contract)
 drf-spectacular>=0.27
+
+# Payments -- Chapa's checkout/webhook/refund APIs are plain REST (ADR-008),
+# called directly with `requests` rather than a heavier SDK.
+requests>=2.31
+
+# Temporary receipt / Transfer Receipt PDF rendering (FR-PAY-002, FR-LOC-002/
+# 003, FR-SETTLE-002/004) -- rendered once at issuance and stored in object
+# storage, never regenerated (ADR-009).
+reportlab>=4.2

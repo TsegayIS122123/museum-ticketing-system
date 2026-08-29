@@ -114,6 +114,16 @@ class BookingListCreateView(generics.GenericAPIView):
         booking = services.create_booking(
             visitor=request.user, **serializer.to_service_kwargs()
         )
+        if booking.status == Booking.Status.AWAITING_PAYMENT:
+            # Individual booking (FR-BOOK-001) -- a group booking instead
+            # starts pending_approval (FR-BOOK-003) and gets its checkout
+            # session from BookingApprovalView below, once approved.
+            # Local import: apps.payments depends on apps.bookings, not
+            # the reverse (Design Spec Sec 3.2) -- this view layer is what
+            # composes both, never bookings/services.py itself.
+            from apps.payments.services import create_checkout_session
+
+            create_checkout_session(booking=booking)
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 
@@ -152,6 +162,14 @@ class BookingApprovalView(APIView):
         booking = services.decide_group_booking(
             booking=booking, actor=request.user, **serializer.validated_data
         )
+        if booking.status == Booking.Status.AWAITING_PAYMENT:
+            # Approved (not declined) -- Document 04: "if approved, the
+            # response includes a checkout URL for the group leader to
+            # pay". See BookingListCreateView.post for why this import is
+            # local to the view layer, not services.py.
+            from apps.payments.services import create_checkout_session
+
+            create_checkout_session(booking=booking)
         return Response(BookingSerializer(booking).data)
 
 

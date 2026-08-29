@@ -592,6 +592,36 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/payments/webhooks/chapa/:
+    post:
+      operationId: handleChapaWebhook
+      description: |-
+        POST /payments/webhooks/chapa/ -- AllowAny + signature check
+        (Design Spec Sec 4.2; NFR-SEC-001). The only path that confirms a
+        booking (FR-PAY-002) -- never the client-side `return_url` redirect.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChapaWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChapaWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChapaWebhook'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+        '400':
+          description: No response body
+        '401':
+          description: No response body
   /api/v1/users/me/:
     get:
       operationId: v1_users_me_retrieve
@@ -963,6 +993,31 @@ components:
           type: boolean
         active:
           type: boolean
+    ChapaWebhook:
+      type: object
+      description: |-
+        `ChapaWebhookPayload` (Document 04). Only `tx_ref`/`status` are
+        validated here -- Chapa's payload carries additional fields as needed
+        (Document 04's `additionalProperties: true`), which `services.
+        confirm_payment_from_webhook` stores as-is in `payment.webhook_payload`
+        (`request.data`, not `validated_data`) rather than having every field
+        modeled here.
+      properties:
+        tx_ref:
+          type: string
+        status:
+          type: string
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        currency:
+          type: string
+          nullable: true
+      required:
+      - status
+      - tx_ref
     CheckInRequest:
       type: object
       description: |-

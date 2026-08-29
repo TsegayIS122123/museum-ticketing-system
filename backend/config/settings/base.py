@@ -306,6 +306,15 @@ CHAPA_PUBLIC_KEY = env("CHAPA_PUBLIC_KEY", default="")
 CHAPA_SECRET_KEY = env("CHAPA_SECRET_KEY", default="")
 CHAPA_WEBHOOK_SECRET = env("CHAPA_WEBHOOK_SECRET", default="")
 
+# Publicly reachable base URLs, needed only because Chapa's checkout-session
+# API requires real, absolute URLs to call back to: `callback_url` (the
+# server-to-server webhook, Sec 4.2) and `return_url` (where Chapa redirects
+# the Visitor's browser after paying -- never trusted on its own, FR-PAY-002).
+# Defaults match docker-compose.yml's local ports; a real deployment (Doc 08)
+# overrides both with its actual public hostnames.
+PUBLIC_API_BASE_URL = env("PUBLIC_API_BASE_URL", default="http://localhost:8000")
+PUBLIC_WEB_BASE_URL = env("PUBLIC_WEB_BASE_URL", default="http://localhost:3000")
+
 # --------------------------------------------------------------------------
 # SMS / Email gateways -- SMS is primary for Visitor OTP (FR-ACC-001) and
 # is the higher-urgency alert (Document 08 Sec 5.2); email is the magic-link

@@ -7,6 +7,7 @@ that boundary from the outside).
 
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest import mock
 
 import pytest
 from django.utils import timezone
@@ -20,6 +21,23 @@ from apps.catalog.models import Category
 pytestmark = pytest.mark.django_db
 
 TOMORROW = date.today() + timedelta(days=1)
+
+
+@pytest.fixture(autouse=True)
+def _mock_chapa_checkout():
+    """Every individual booking created here (and every approved group
+    booking) now triggers apps.payments.services.create_checkout_session,
+    which calls out to Chapa (see BookingListCreateView.post/
+    BookingApprovalView.put). This module tests bookings' own
+    permission/ownership/wiring boundary (module docstring), not Chapa
+    integration -- that's apps/payments/tests' job -- so the one function
+    that actually makes the HTTP call is mocked here, autouse, for every
+    test in this file."""
+    with mock.patch(
+        "apps.payments.services._initialize_chapa_checkout",
+        return_value="https://checkout.chapa.co/checkout/test-session",
+    ) as mocked:
+        yield mocked
 
 
 def _make_staff(role, email="staff@example.com"):
@@ -148,6 +166,7 @@ def test_create_individual_booking_allowed_for_visitor():
     assert response.status_code == 201
     assert response.data["status"] == "awaiting_payment"
     assert response.data["reference"]
+    assert response.data["checkoutUrl"]
 
 
 def test_create_group_booking_requires_group_name():
@@ -273,6 +292,7 @@ def test_approval_allowed_for_museum_manager():
     assert response.status_code == 200
     assert response.data["status"] == "awaiting_payment"
     assert response.data["approvalStatus"] == "approved"
+    assert response.data["checkoutUrl"]
 
 
 # --------------------------------------------------------------------------

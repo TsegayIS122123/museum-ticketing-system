@@ -7,14 +7,12 @@ trusted on its own (NFR-SEC-001). Verify the webhook signature before
 touching any booking state.
 """
 
-from rest_framework.routers import DefaultRouter
+from django.urls import path
+
+from . import views
 
 app_name = "payments"
-router = DefaultRouter()
-# router.register("example", views.ExampleViewSet, basename="example")
 
 urlpatterns = [
-    # path("chapa/webhook/", views.ChapaWebhookView.as_view()),  # AllowAny + signature check
+    path("webhooks/chapa/", views.ChapaWebhookView.as_view(), name="chapa-webhook"),
 ]
-
-urlpatterns += router.urls
