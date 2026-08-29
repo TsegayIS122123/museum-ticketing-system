@@ -17,6 +17,7 @@ from apps.accounts.authentication import AccountRefreshToken
 from apps.accounts.models import Account
 from apps.bookings.models import Booking
 from apps.catalog.models import Category
+from apps.payments.models import Payment
 
 pytestmark = pytest.mark.django_db
 
@@ -321,6 +322,17 @@ def test_cancel_succeeds_once_pending():
     booking = Booking.objects.get(id=created["id"])
     booking.status = Booking.Status.PENDING
     booking.save(update_fields=["status"])
+    # Cancelling triggers refunds.services.trigger_cancellation_refund,
+    # which requires a completed Payment -- a real Pending booking can
+    # only exist because confirm_payment_from_webhook already completed
+    # one, so fake that here too rather than just the booking status.
+    Payment.objects.create(
+        booking=booking,
+        tx_ref=f"museum-{booking.id.hex}-test",
+        amount_etb=booking.total_amount_etb,
+        status=Payment.Status.COMPLETED,
+        confirmed_at=timezone.now(),
+    )
 
     response = visitor_client.post(f"/api/v1/bookings/{created['id']}/cancel/")
 

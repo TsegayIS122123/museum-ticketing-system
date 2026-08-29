@@ -415,6 +415,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/Booking'
           description: ''
+  /api/v1/bookings/{id}/refund-requests/:
+    post:
+      operationId: requestPartialRefund
+      description: |-
+        POST /bookings/{id}/refund-requests -- Visitor only
+        (FR-TICKET-002, FR-REFUND-001b). Mounted under the top-level
+        `/bookings/{id}/` path (see `apps.refunds.urls`'s
+        `refund_request_urlpatterns`), even though `refunds` owns the
+        business logic behind it -- mirrors how `apps.entrance`'s
+        Cashier-facing endpoints live at `/bookings/...` despite that app
+        owning FR-TICKET, not `apps.bookings`.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequestCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefundRequestCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefundRequestCreate'
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+          description: ''
   /api/v1/bookings/{id}/reschedule/:
     post:
       operationId: v1_bookings_reschedule_create
@@ -622,6 +662,36 @@ paths:
           description: No response body
         '401':
           description: No response body
+  /api/v1/refunds/:
+    get:
+      operationId: listRefunds
+      description: |-
+        GET /refunds -- any authenticated user (Visitors see only their
+        own; Staff can filter across all, Document 04).
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRefundList'
+          description: ''
   /api/v1/users/me/:
     get:
       operationId: v1_users_me_retrieve
@@ -812,7 +882,7 @@ components:
           nullable: true
         status:
           allOf:
-          - $ref: '#/components/schemas/StatusEnum'
+          - $ref: '#/components/schemas/BookingStatusEnum'
           readOnly: true
         approvalStatus:
           type: string
@@ -913,6 +983,22 @@ components:
           format: date
       required:
       - newVisitDate
+    BookingStatusEnum:
+      enum:
+      - awaiting_payment
+      - pending_approval
+      - pending
+      - visited
+      - cancelled
+      - refunded
+      type: string
+      description: |-
+        * `awaiting_payment` - Awaiting payment
+        * `pending_approval` - Pending approval
+        * `pending` - Pending
+        * `visited` - Visited
+        * `cancelled` - Cancelled
+        * `refunded` - Refunded
     BookingTypeEnum:
       enum:
       - individual
@@ -1133,6 +1219,98 @@ components:
               type: integer
             total:
               type: integer
+    PaginatedRefundList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/Refund'
+        meta:
+          type: object
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            total:
+              type: integer
+    ReasonEnum:
+      enum:
+      - cancellation
+      - partial_shortfall
+      - no_response
+      type: string
+      description: |-
+        * `cancellation` - Cancellation
+        * `partial_shortfall` - Partial shortfall
+        * `no_response` - No response
+    Refund:
+      type: object
+      description: |-
+        `Refund` (Document 04). Read-only -- every mutation goes through
+        `RefundRequestCreateSerializer` and services.py, never through this
+        serializer directly.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        bookingId:
+          type: string
+          format: uuid
+          readOnly: true
+        amountEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        reason:
+          allOf:
+          - $ref: '#/components/schemas/ReasonEnum'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/RefundStatusEnum'
+          readOnly: true
+        chapaRefundReference:
+          type: string
+          readOnly: true
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amountEtb
+      - bookingId
+      - chapaRefundReference
+      - createdAt
+      - id
+      - reason
+      - status
+    RefundRequestCreate:
+      type: object
+      description: |-
+        `RefundRequestCreate` (Document 04) -- FR-TICKET-002/FR-REFUND-001b.
+        `note` is free-text context supplied with a shortfall request
+        (Document 05 Sec 3.5's `refund.note` column).
+      properties:
+        note:
+          type: string
+          nullable: true
+    RefundStatusEnum:
+      enum:
+      - pending
+      - completed
+      - failed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `completed` - Completed
+        * `failed` - Failed
     ResetPassword:
       type: object
       description: '`ResetPasswordRequest` -- Staff only (FR-ACC-006).'
@@ -1170,22 +1348,6 @@ components:
       required:
       - email
       - password
-    StatusEnum:
-      enum:
-      - awaiting_payment
-      - pending_approval
-      - pending
-      - visited
-      - cancelled
-      - refunded
-      type: string
-      description: |-
-        * `awaiting_payment` - Awaiting payment
-        * `pending_approval` - Pending approval
-        * `pending` - Pending
-        * `visited` - Visited
-        * `cancelled` - Cancelled
-        * `refunded` - Refunded
     TokenRefresh:
       type: object
       properties:

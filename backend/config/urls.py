@@ -13,6 +13,7 @@ from apps.accounts.views import CurrentUserView
 from apps.bookings.urls import availability_urlpatterns
 from apps.bookings.views import MyBookingsView
 from apps.entrance.urls import entrance_urlpatterns
+from apps.refunds.urls import refund_request_urlpatterns
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -48,6 +49,11 @@ urlpatterns = [
     # owns the business logic behind them (Design Spec Sec 3.2) -- see
     # apps/entrance/urls.py's module docstring.
     path("api/v1/", include(entrance_urlpatterns)),
+    # Document 04 places `/bookings/{id}/refund-requests` at the top
+    # level (no `/refunds` segment), even though `apps.refunds` owns the
+    # business logic behind it -- see apps/refunds/urls.py's module
+    # docstring.
+    path("api/v1/", include(refund_request_urlpatterns)),
     path("api/v1/refunds/", include("apps.refunds.urls")),
     path("api/v1/settlement/", include("apps.settlement.urls")),
     path("api/v1/reporting/", include("apps.reporting.urls")),

@@ -182,6 +182,15 @@ class BookingCancelView(APIView):
     def post(self, request, id):
         booking = get_object_or_404(Booking, id=id)
         booking = services.cancel_booking(booking=booking, visitor=request.user)
+        # FR-BOOK-006: cancelling a Pending booking triggers a full,
+        # automatic refund. Local import: apps.refunds depends on
+        # apps.bookings, not the reverse (Design Spec Sec 3.2) -- this
+        # view layer is what composes both, never bookings/services.py
+        # itself (see BookingListCreateView.post's identical rationale
+        # for apps.payments).
+        from apps.refunds.services import trigger_cancellation_refund
+
+        trigger_cancellation_refund(booking=booking)
         return Response(BookingSerializer(booking).data)
 
 
