@@ -1,29 +1,46 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
 import { PageContainer } from '@/components/layout/PageContainer';
+import { getPendingGroupBookingsCount } from '@/features/group-bookings/api';
 
 export default function StaffDashboardPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const router = useRouter();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingRequests, setPendingRequests] = useState(0);
 
   // Mock data - in production, fetch from API
   const [stats, setStats] = useState({
     totalRevenue: 3290,
     visitorsToday: 124,
     checkIns: 98,
-    pendingRequests: 2,
   });
 
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        const result = await getPendingGroupBookingsCount();
+        setPendingRequests(result.count);
+      } catch (error) {
+        console.error('Failed to load pending requests:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     // Simulate loading
-    const timer = setTimeout(() => setIsLoading(false), 500);
+    const timer = setTimeout(() => {
+      loadData();
+    }, 500);
+
     return () => clearTimeout(timer);
   }, []);
 
@@ -41,6 +58,8 @@ export default function StaffDashboardPage() {
       </PageContainer>
     );
   }
+
+  const isManager = user?.role === 'museum_manager';
 
   return (
     <PageContainer>
@@ -82,8 +101,8 @@ export default function StaffDashboardPage() {
         />
         <StatCard
           label={t('pending_requests') || 'Pending Requests'}
-          value={stats.pendingRequests}
-          sub="Group bookings"
+          value={pendingRequests}
+          sub={t('group_bookings') || 'Group bookings'}
           color="red"
         />
       </div>
@@ -94,15 +113,60 @@ export default function StaffDashboardPage() {
             {t('quick_actions') || 'Quick Actions'}
           </h3>
           <div className="space-y-3">
-            <Button className="w-full justify-start bg-amber-600 hover:bg-amber-700">
-              🎫 {t('new_booking') || 'New Booking'}
-            </Button>
-            <Button className="w-full justify-start" variant="secondary">
-              📊 {t('view_reports') || 'View Reports'}
-            </Button>
-            <Button className="w-full justify-start" variant="secondary">
-              👥 {t('manage_group_bookings') || 'Manage Group Bookings'}
-            </Button>
+            {isManager && (
+              <>
+                <Button
+                  className="w-full justify-start"
+                  variant="secondary"
+                  onClick={() => router.push(`/${locale}/staff/group-bookings`)}
+                >
+                  👥 {t('manage_group_bookings') || 'Manage Group Bookings'}
+                  {pendingRequests > 0 && (
+                    <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                      {pendingRequests}
+                    </span>
+                  )}
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="secondary"
+                  onClick={() => router.push(`/${locale}/staff/categories`)}
+                >
+                  💲 {t('manage_categories') || 'Manage Categories'}
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="secondary"
+                  onClick={() => router.push(`/${locale}/staff/availability`)}
+                >
+                  📅 {t('manage_availability') || 'Manage Availability'}
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="secondary"
+                  onClick={() => router.push(`/${locale}/staff/reports`)}
+                >
+                  📊 {t('view_reports') || 'View Reports'}
+                </Button>
+              </>
+            )}
+            {!isManager && (
+              <>
+                <Button
+                  className="w-full justify-start bg-amber-600 hover:bg-amber-700"
+                  onClick={() => router.push(`/${locale}/staff/gate`)}
+                >
+                  🚪 {t('gate_check_in') || 'Gate Check-in'}
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="secondary"
+                  onClick={() => router.push(`/${locale}/staff/settlement`)}
+                >
+                  🏦 {t('settlement') || 'Settlement'}
+                </Button>
+              </>
+            )}
           </div>
         </Card>
 

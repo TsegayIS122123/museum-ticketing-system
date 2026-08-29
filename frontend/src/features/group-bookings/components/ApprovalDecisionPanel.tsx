@@ -24,7 +24,6 @@ export function ApprovalDecisionPanel({
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     decision: 'approve' | 'decline';
-    note?: string;
   }>({ open: false, decision: 'approve' });
 
   const [declineNote, setDeclineNote] = useState('');
