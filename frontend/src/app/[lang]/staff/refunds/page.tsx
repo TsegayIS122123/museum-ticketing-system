@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { StatCard } from '@/components/ui/StatCard';
 
 // Mock refund data - in production, fetch from API
 const mockRefunds = [

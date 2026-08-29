@@ -1,3 +1,5 @@
+'use client';
+
 import { StaffLoginForm } from '@/features/account/components/StaffLoginForm';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 

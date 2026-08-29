@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { StaffSidebar } from '@/components/layout/StaffSidebar';
 import { isStaff } from '@/lib/auth/roles';
-import { PageContainer } from '@/components/layout/PageContainer';
 
 interface StaffLayoutProps {
   children: React.ReactNode;
@@ -14,16 +13,22 @@ interface StaffLayoutProps {
 
 export default function StaffLayout({ children }: StaffLayoutProps) {
   const { t, locale } = useTranslation();
+  const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, isAuthenticated } = useAuth();
+  const isLoginRoute = pathname?.endsWith('/staff/login') ?? false;
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isLoginRoute) return;
 
     if (!isAuthenticated || !user || !isStaff(user.role)) {
       router.push(`/${locale}/staff/login`);
     }
-  }, [isAuthenticated, isLoading, user, locale, router]);
+  }, [isAuthenticated, isLoading, user, locale, router, isLoginRoute]);
+
+  if (isLoginRoute) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (

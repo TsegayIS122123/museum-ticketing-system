@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { staffLogin } from '../api';
-import { staffLoginSchema } from '../schemas';
 
 export function StaffLoginForm() {
   const { t, locale } = useTranslation();
@@ -25,10 +24,8 @@ export function StaffLoginForm() {
     e.preventDefault();
     setError(null);
 
-    // Validate
-    const result = staffLoginSchema.safeParse({ email, password });
-    if (!result.success) {
-      setError(result.error.errors[0].message);
+    if (!email || !password) {
+      setError('Please enter both email and password.');
       return;
     }
 
@@ -53,23 +50,23 @@ export function StaffLoginForm() {
         router.push(`/${locale}/`);
       }
     } catch (err: any) {
-      setError(err.message || t('login_failed') || 'Invalid email or password. Please try again.');
+      setError(err.message || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Card className="max-w-md mx-auto">
+    <Card className="max-w-md mx-auto w-full">
       <div className="text-center mb-6">
         <div className="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
           <span className="text-white font-bold text-xl">SM</span>
         </div>
         <h2 className="text-2xl font-serif font-bold text-stone-900">
-          {t('staff_login') || 'Staff Login'}
+          Staff Login
         </h2>
         <p className="text-sm text-stone-500 mt-1">
-          {t('staff_login_description') || 'Sign in to access the staff dashboard'}
+          Sign in to access the staff dashboard
         </p>
       </div>
 
@@ -78,7 +75,7 @@ export function StaffLoginForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <TextField
           id="email"
-          label={t('email')}
+          label="Email"
           type="email"
           placeholder="staff@museum.et"
           value={email}
@@ -89,7 +86,7 @@ export function StaffLoginForm() {
 
         <TextField
           id="password"
-          label={t('password') || 'Password'}
+          label="Password"
           type="password"
           placeholder="••••••••"
           value={password}
@@ -98,29 +95,17 @@ export function StaffLoginForm() {
           autoComplete="current-password"
         />
 
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-stone-500"
-            onClick={() => router.push(`/${locale}/staff/forgot-password`)}
-          >
-            {t('forgot_password') || 'Forgot Password?'}
-          </Button>
-        </div>
-
         <Button
           type="submit"
           size="lg"
           className="w-full bg-amber-600 hover:bg-amber-700"
           disabled={isLoading}
         >
-          {isLoading ? t('loading') : t('sign_in') || 'Sign In'}
+          {isLoading ? 'Loading...' : 'Sign In'}
         </Button>
 
         <div className="text-xs text-stone-400 text-center mt-2">
-          {t('staff_login_note') || 'This page is for museum staff only. Visitors should use the verification flow.'}
+          This page is for museum staff only. Visitors should use the verification flow.
         </div>
       </form>
     </Card>

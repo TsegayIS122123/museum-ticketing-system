@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getAccessToken, setAccessToken, clearAccessToken } from '@/lib/api/client';
+import { setAccessToken, clearAccessToken, getAccessToken } from '@/lib/api/client';
 import { apiClient } from '@/lib/api/client';
 
 interface User {
@@ -12,6 +12,7 @@ interface User {
   role: 'visitor' | 'cashier' | 'museum_manager' | 'platform_admin';
   languagePreference: 'en' | 'am';
   active: boolean;
+  createdAt?: string;
 }
 
 interface AuthContextType {
@@ -33,7 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = getAccessToken();
     if (token) {
-      // Verify token with backend
       apiClient
         .get<User>('/users/me')
         .then((userData) => {

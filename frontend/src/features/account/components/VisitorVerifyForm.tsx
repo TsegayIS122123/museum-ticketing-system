@@ -11,10 +11,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import {
   startVisitorVerification,
   confirmVisitorVerification,
-  type VisitorVerifyStartResponse,
-  type VisitorVerifyConfirmResponse,
 } from '../api';
-import { visitorVerifyStartSchema, visitorVerifyConfirmSchema } from '../schemas';
 
 type Step = 'email-phone' | 'otp';
 
@@ -36,10 +33,8 @@ export function VisitorVerifyForm() {
     e.preventDefault();
     setError(null);
 
-    // Validate
-    const result = visitorVerifyStartSchema.safeParse({ email, phone, fullName });
-    if (!result.success) {
-      setError(result.error.errors[0].message);
+    if (!email || !phone) {
+      setError('Please enter both email and phone number.');
       return;
     }
 
@@ -64,10 +59,8 @@ export function VisitorVerifyForm() {
     e.preventDefault();
     setError(null);
 
-    // Validate OTP
-    const result = visitorVerifyConfirmSchema.safeParse({ verificationId, otpCode });
-    if (!result.success) {
-      setError(result.error.errors[0].message);
+    if (!otpCode || otpCode.length !== 6) {
+      setError('Please enter a valid 6-digit verification code.');
       return;
     }
 
@@ -115,7 +108,7 @@ export function VisitorVerifyForm() {
           />
 
           <div className="text-xs text-stone-500 text-center">
-            {t('otp_sent_to')} {phone}
+            {t('otp_sent_to') || 'Code sent to'} {phone}
           </div>
 
           <Button
@@ -132,9 +125,12 @@ export function VisitorVerifyForm() {
             variant="ghost"
             size="sm"
             className="w-full text-stone-500"
-            onClick={() => setStep('email-phone')}
+            onClick={() => {
+              setStep('email-phone');
+              setError(null);
+            }}
           >
-            ← {t('continue')}
+            ← {t('continue') || 'Back'}
           </Button>
         </form>
       </Card>
@@ -144,6 +140,9 @@ export function VisitorVerifyForm() {
   return (
     <Card className="max-w-md mx-auto">
       <div className="text-center mb-6">
+        <div className="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <span className="text-white font-bold text-xl">SM</span>
+        </div>
         <h2 className="text-2xl font-serif font-bold text-stone-900">
           {t('verify_visitor')}
         </h2>

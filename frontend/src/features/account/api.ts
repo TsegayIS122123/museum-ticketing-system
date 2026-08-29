@@ -1,5 +1,4 @@
 import { apiClient } from '@/lib/api/client';
-import { MOCK_USERS } from '@/mocks/auth.mock';
 
 export interface VisitorVerifyStartResponse {
   verificationId: string;
@@ -9,17 +8,83 @@ export interface VisitorVerifyStartResponse {
 export interface VisitorVerifyConfirmResponse {
   accessToken: string;
   refreshToken: string;
-  user: typeof MOCK_USERS.visitor;
+  user: {
+    id: string;
+    email: string;
+    phone: string;
+    fullName?: string;
+    role: 'visitor' | 'cashier' | 'museum_manager' | 'platform_admin';
+    languagePreference: 'en' | 'am';
+    active: boolean;
+    createdAt: string;
+  };
 }
 
 export interface StaffLoginResponse {
   accessToken: string;
   refreshToken: string;
-  user: typeof MOCK_USERS.cashier;
+  user: {
+    id: string;
+    email: string;
+    phone: string;
+    fullName: string;
+    role: 'cashier' | 'museum_manager' | 'platform_admin';
+    languagePreference: 'en' | 'am';
+    active: boolean;
+    createdAt: string;
+  };
 }
 
-// Mock mode - set to true for testing without backend
+// Mock mode - set to false when backend is ready
 const USE_MOCK = true;
+
+// Store the latest verification ID for mock
+let mockVerificationId: string | null = null;
+
+// Mock user data
+const MOCK_VISITOR = {
+  id: 'mock-visitor-1',
+  email: 'visitor@example.com',
+  phone: '+251912345678',
+  fullName: 'Test Visitor',
+  role: 'visitor' as const,
+  languagePreference: 'en' as const,
+  active: true,
+  createdAt: new Date().toISOString(),
+};
+
+const MOCK_STAFF = {
+  cashier: {
+    id: 'mock-cashier-1',
+    email: 'cashier@museum.et',
+    phone: '+251912345678',
+    fullName: 'Test Cashier',
+    role: 'cashier' as const,
+    languagePreference: 'en' as const,
+    active: true,
+    createdAt: new Date().toISOString(),
+  },
+  manager: {
+    id: 'mock-manager-1',
+    email: 'manager@museum.et',
+    phone: '+251912345678',
+    fullName: 'Test Manager',
+    role: 'museum_manager' as const,
+    languagePreference: 'en' as const,
+    active: true,
+    createdAt: new Date().toISOString(),
+  },
+  admin: {
+    id: 'mock-admin-1',
+    email: 'admin@museum.et',
+    phone: '+251912345678',
+    fullName: 'Test Admin',
+    role: 'platform_admin' as const,
+    languagePreference: 'en' as const,
+    active: true,
+    createdAt: new Date().toISOString(),
+  },
+};
 
 // Visitor passwordless verification - step 1: request OTP
 export async function startVisitorVerification(input: {
@@ -29,10 +94,10 @@ export async function startVisitorVerification(input: {
   languagePreference?: 'en' | 'am';
 }): Promise<VisitorVerifyStartResponse> {
   if (USE_MOCK) {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
+    mockVerificationId = 'mock-verification-id-' + Date.now();
     return {
-      verificationId: 'mock-verification-id',
+      verificationId: mockVerificationId,
       otpExpiresInSeconds: 600,
     };
   }
@@ -45,13 +110,23 @@ export async function confirmVisitorVerification(input: {
   otpCode: string;
 }): Promise<VisitorVerifyConfirmResponse> {
   if (USE_MOCK) {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Check if verification ID matches
+    if (input.verificationId !== mockVerificationId) {
+      throw new Error('Invalid verification ID. Please restart the verification process.');
+    }
+    
     // Any 6-digit code works in mock mode
-    return {
-      accessToken: 'mock-access-token-' + Date.now(),
-      refreshToken: 'mock-refresh-token-' + Date.now(),
-      user: MOCK_USERS.visitor,
-    };
+    if (input.otpCode.length === 6 && /^\d{6}$/.test(input.otpCode)) {
+      mockVerificationId = null; // Clear after use
+      return {
+        accessToken: 'mock-access-token-' + Date.now(),
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+        user: MOCK_VISITOR,
+      };
+    }
+    throw new Error('Invalid OTP code. Please enter a 6-digit code.');
   }
   return apiClient.post<VisitorVerifyConfirmResponse>('/auth/visitor/verify/confirm', input);
 }
@@ -62,16 +137,17 @@ export async function staffLogin(input: {
   password: string;
 }): Promise<StaffLoginResponse> {
   if (USE_MOCK) {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
     
-    // Match email to role
-    let user: any = MOCK_USERS.cashier;
+    let user: any;
     if (input.email.includes('manager')) {
-      user = MOCK_USERS.manager;
+      user = MOCK_STAFF.manager;
     } else if (input.email.includes('admin')) {
-      user = MOCK_USERS.admin;
-    } else if (input.email.includes('visitor')) {
-      user = MOCK_USERS.visitor;
+      user = MOCK_STAFF.admin;
+    } else if (input.email.includes('cashier')) {
+      user = MOCK_STAFF.cashier;
+    } else {
+      throw new Error('Invalid credentials. Please check your email and password.');
     }
     
     return {
@@ -86,7 +162,7 @@ export async function staffLogin(input: {
 // Staff forgot password
 export async function staffForgotPassword(input: { email: string }): Promise<void> {
   if (USE_MOCK) {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
     return;
   }
   return apiClient.post<void>('/auth/forgot-password', input);
@@ -98,7 +174,7 @@ export async function staffResetPassword(input: {
   newPassword: string;
 }): Promise<void> {
   if (USE_MOCK) {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
     return;
   }
   return apiClient.post<void>('/auth/reset-password', input);
@@ -108,7 +184,7 @@ export async function staffResetPassword(input: {
 export async function getCurrentUser(): Promise<VisitorVerifyConfirmResponse['user']> {
   if (USE_MOCK) {
     await new Promise(resolve => setTimeout(resolve, 300));
-    return MOCK_USERS.visitor;
+    return MOCK_VISITOR;
   }
   return apiClient.get<VisitorVerifyConfirmResponse['user']>('/users/me');
 }
@@ -121,7 +197,7 @@ export async function updateCurrentUser(input: {
 }): Promise<VisitorVerifyConfirmResponse['user']> {
   if (USE_MOCK) {
     await new Promise(resolve => setTimeout(resolve, 300));
-    return { ...MOCK_USERS.visitor, ...input };
+    return { ...MOCK_VISITOR, ...input };
   }
   return apiClient.put<VisitorVerifyConfirmResponse['user']>('/users/me', input);
 }

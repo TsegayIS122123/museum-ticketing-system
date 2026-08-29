@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import '../globals.css';
 import { ReactNode } from 'react';
-import { AuthProvider } from '@/lib/auth/auth-context';
 
 export const metadata: Metadata = {
   title: 'Science Museum - Ticketing & Booking',
@@ -23,9 +22,7 @@ export default async function RootLayout({ children, params }: RootLayoutProps) 
   return (
     <html lang={lang}>
       <body className="antialiased min-h-screen flex flex-col bg-stone-50">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        {children}
       </body>
     </html>
   );

@@ -41,11 +41,7 @@ const roleInfo: Record<UserRole, { name: string; badge: string; initials: string
   platform_admin: { name: 'Admin', badge: 'Platform Admin', initials: 'A', badgeColor: 'bg-purple-500/20 text-purple-200' },
 };
 
-interface StaffSidebarProps {
-  onSignOut?: () => void;
-}
-
-export function StaffSidebar({ onSignOut }: StaffSidebarProps) {
+export function StaffSidebar() {
   const { t, locale } = useTranslation();
   const pathname = usePathname();
   const router = useRouter();
@@ -60,7 +56,6 @@ export function StaffSidebar({ onSignOut }: StaffSidebarProps) {
 
   const handleSignOut = () => {
     logout();
-    if (onSignOut) onSignOut();
     router.push(`/${locale}`);
   };
 
@@ -104,7 +99,7 @@ export function StaffSidebar({ onSignOut }: StaffSidebarProps) {
               )}
             >
               <span className="text-base w-5 text-center">{item.icon}</span>
-              {t(item.label) || item.label}
+              {item.label}
             </button>
           );
         })}
@@ -129,7 +124,7 @@ export function StaffSidebar({ onSignOut }: StaffSidebarProps) {
           onClick={handleSignOut}
           className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors py-1 text-left cursor-pointer"
         >
-          ← {t('sign_out') || 'Sign Out'}
+          ← Sign Out
         </button>
       </div>
     </aside>

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { PublicHeader } from '@/components/layout/PublicHeader';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { StepIndicator } from '@/components/ui/StepIndicator';
 import { DateCategoryPicker } from '@/features/booking/components/DateCategoryPicker';
 import { BookingSummary } from '@/features/booking/components/BookingSummary';
@@ -16,14 +18,12 @@ type Step = 'category' | 'datetime' | 'details' | 'payment';
 export default function BookPage() {
   const { t, locale } = useTranslation();
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
-  // Step state
   const [currentStep, setCurrentStep] = useState<Step>('category');
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Form state
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [visitDate, setVisitDate] = useState('');
@@ -40,7 +40,7 @@ export default function BookPage() {
     t('payment') || 'Payment',
   ];
 
-  const stepIndex = steps.indexOf(t(steps[currentStep] as any) || 'Tickets');
+  const stepIndex = ['category', 'datetime', 'details', 'payment'].indexOf(currentStep);
 
   const handleCategoryNext = () => {
     if (categoryId && quantity > 0) {
@@ -76,12 +76,16 @@ export default function BookPage() {
         specialRequests: specialRequests || undefined,
       });
 
-      // Redirect to checkout (if URL provided) or confirmation
-      if (booking.checkoutUrl) {
-        window.location.href = booking.checkoutUrl;
-      } else {
-        router.push(`/${locale}/book/confirmation?reference=${booking.reference}`);
-      }
+      // Show success message
+      setToast({
+        message: t('booking_created') || 'Booking created successfully! Reference: ' + booking.reference,
+        type: 'success',
+      });
+
+      // Redirect to bookings page after short delay
+      setTimeout(() => {
+        router.push(`/${locale}/bookings`);
+      }, 2000);
     } catch (error: any) {
       setToast({
         message: error.message || 'Failed to create booking. Please try again.',
@@ -277,6 +281,3 @@ export default function BookPage() {
     </div>
   );
 }
-
-// Import Card for the datetime step
-import { Card } from '@/components/ui/Card';
