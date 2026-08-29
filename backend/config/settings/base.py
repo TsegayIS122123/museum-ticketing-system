@@ -323,6 +323,13 @@ PUBLIC_WEB_BASE_URL = env("PUBLIC_WEB_BASE_URL", default="http://localhost:3000"
 
 SMS_GATEWAY_API_KEY = env("SMS_GATEWAY_API_KEY", default="")
 SMS_GATEWAY_SENDER_ID = env("SMS_GATEWAY_SENDER_ID", default="")
+# Generic HTTPS SMS gateway endpoint (Design Spec Sec 3.2/3.3's C4 diagrams
+# name it only as "SMS Gateway" -- deployment-target-agnostic per Sec 1.3,
+# same reasoning as the object-storage prefix design). Left blank in
+# development/test -- apps.notifications.services no-ops (logs only) when
+# this is unset, mirroring EMAIL_BACKEND's console fallback below.
+SMS_GATEWAY_URL = env("SMS_GATEWAY_URL", default="")
+SMS_GATEWAY_TIMEOUT_SECONDS = env.int("SMS_GATEWAY_TIMEOUT_SECONDS", default=10)
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = env("EMAIL_HOST", default="")
@@ -330,3 +337,4 @@ EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Museum Ticketing <no-reply@museum.example>")
