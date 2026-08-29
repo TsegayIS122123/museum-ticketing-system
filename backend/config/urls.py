@@ -12,6 +12,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from apps.accounts.views import CurrentUserView
 from apps.bookings.urls import availability_urlpatterns
 from apps.bookings.views import MyBookingsView
+from apps.entrance.urls import entrance_urlpatterns
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -42,7 +43,11 @@ urlpatterns = [
     path("api/v1/", include(availability_urlpatterns)),
     path("api/v1/bookings/", include("apps.bookings.urls")),
     path("api/v1/payments/", include("apps.payments.urls")),
-    path("api/v1/entrance/", include("apps.entrance.urls")),
+    # Document 04 places `/bookings/lookup` and `/bookings/{id}/check-in`
+    # at the top level (no `/entrance` segment), even though `apps.entrance`
+    # owns the business logic behind them (Design Spec Sec 3.2) -- see
+    # apps/entrance/urls.py's module docstring.
+    path("api/v1/", include(entrance_urlpatterns)),
     path("api/v1/refunds/", include("apps.refunds.urls")),
     path("api/v1/settlement/", include("apps.settlement.urls")),
     path("api/v1/reporting/", include("apps.reporting.urls")),

@@ -379,6 +379,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/Booking'
           description: ''
+  /api/v1/bookings/{id}/check-in/:
+    post:
+      operationId: checkInBooking
+      description: |-
+        POST /bookings/{id}/check-in -- Cashier only
+        (FR-TICKET-001 - FR-TICKET-003, FR-TICKET-005).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckInRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CheckInRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CheckInRequest'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
   /api/v1/bookings/{id}/reschedule/:
     post:
       operationId: v1_bookings_reschedule_create
@@ -404,6 +440,34 @@ paths:
             schema:
               $ref: '#/components/schemas/BookingReschedule'
         required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/v1/bookings/lookup/:
+    get:
+      operationId: lookupBookingByReference
+      description: |-
+        GET /bookings/lookup -- Cashier only (FR-TICKET-001, FR-TICKET-004).
+
+        Mounted under /api/v1/ (config/urls.py), not /api/v1/entrance/, since
+        Document 04 places this at `/bookings/lookup` -- the entrance module
+        owns the business logic (Design Spec Sec 3.2) without owning that
+        part of the URL namespace, mirroring how `bookings` owns
+        `/availability` despite that also not living under its own prefix.
+      parameters:
+      - in: query
+        name: reference
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
       security:
       - TokenVersionAuth: []
       responses:
@@ -899,6 +963,21 @@ components:
           type: boolean
         active:
           type: boolean
+    CheckInRequest:
+      type: object
+      description: |-
+        `CheckInRequest` (Document 04) -- FR-TICKET-001. `attendedQuantity`
+        may be 0 (nobody in the party showed up) but never negative; the
+        upper bound (must not exceed bookedQuantity, FR-TICKET-005) is a
+        cross-field business rule against the booking being checked in, not a
+        field-level constraint this serializer can express on its own -- that
+        check lives in services.check_in_booking.
+      properties:
+        attendedQuantity:
+          type: integer
+          minimum: 0
+      required:
+      - attendedQuantity
     DateAvailability:
       type: object
       description: |-
