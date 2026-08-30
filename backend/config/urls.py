@@ -56,7 +56,11 @@ urlpatterns = [
     path("api/v1/", include(refund_request_urlpatterns)),
     path("api/v1/refunds/", include("apps.refunds.urls")),
     path("api/v1/settlement/", include("apps.settlement.urls")),
-    path("api/v1/reporting/", include("apps.reporting.urls")),
+    # Document 04's actual paths are `/reports/dashboard` and
+    # `/reports/summary` -- `apps.reporting` owns the business logic
+    # (Design Spec Sec 3.2), but is mounted under `/reports/`, not
+    # `/reporting/`, to match the contract exactly.
+    path("api/v1/reports/", include("apps.reporting.urls")),
     path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/admin/", include("apps.platform_admin.urls")),
 ]

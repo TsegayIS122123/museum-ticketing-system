@@ -1,4 +1,7 @@
-from django.contrib import admin
+"""
+reporting -- admin
 
-# from .models import Example
-# admin.site.register(Example)
+Nothing to register: this app owns no models (see models.py) -- every
+figure it surfaces is read from `bookings`, `payments`, and `settlement`
+rows, which are administered through their own apps' admin registrations.
+"""

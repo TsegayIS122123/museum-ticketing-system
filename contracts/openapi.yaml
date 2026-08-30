@@ -855,6 +855,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedRefundList'
           description: ''
+  /api/v1/reports/dashboard/:
+    get:
+      operationId: getDashboard
+      description: |-
+        GET /reports/dashboard -- Museum Manager/Platform Admin only
+        (FR-REPORT-001).
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+          description: ''
+  /api/v1/reports/summary/:
+    get:
+      operationId: getReportSummary
+      description: |-
+        GET /reports/summary -- Museum Manager/Platform Admin only
+        (FR-REPORT-002).
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSummary'
+          description: ''
   /api/v1/settlement/my-balance/:
     get:
       operationId: getMyOutstandingBalance
@@ -1639,6 +1673,27 @@ components:
       - totalAmountEtb
       - visitDate
       - visitorId
+    Dashboard:
+      type: object
+      description: '`GET /reports/dashboard` response shape (FR-REPORT-001).'
+      properties:
+        revenueTotalEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        visitorCountsByCategory:
+          type: object
+          additionalProperties:
+            type: integer
+        groupVsIndividualSplit:
+          $ref: '#/components/schemas/GroupVsIndividualSplit'
+        statusMix:
+          $ref: '#/components/schemas/StatusMix'
+      required:
+      - groupVsIndividualSplit
+      - revenueTotalEtb
+      - statusMix
+      - visitorCountsByCategory
     DateAvailability:
       type: object
       description: |-
@@ -1695,6 +1750,16 @@ components:
           format: email
       required:
       - email
+    GroupVsIndividualSplit:
+      type: object
+      properties:
+        group:
+          type: integer
+        individual:
+          type: integer
+      required:
+      - group
+      - individual
     LanguagePreferenceEnum:
       enum:
       - en
@@ -1821,6 +1886,18 @@ components:
         voucherReference:
           type: string
           maxLength: 255
+    PeriodEnum:
+      enum:
+      - daily
+      - weekly
+      - monthly
+      - yearly
+      type: string
+      description: |-
+        * `daily` - daily
+        * `weekly` - weekly
+        * `monthly` - monthly
+        * `yearly` - yearly
     ReasonEnum:
       enum:
       - cancellation
@@ -1895,6 +1972,38 @@ components:
         * `pending` - Pending
         * `completed` - Completed
         * `failed` - Failed
+    ReportSummary:
+      type: object
+      description: |-
+        `GET /reports/summary` response shape (FR-REPORT-002). "Yearly"
+        follows the organization's fiscal calendar, not Jan-Dec -- see
+        `services.resolve_period_range`.
+      properties:
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        from_:
+          type: string
+          format: date
+          title: 'From '
+        to:
+          type: string
+          format: date
+        revenueByCategory:
+          type: object
+          additionalProperties:
+            type: string
+            format: decimal
+            pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        visitorCountsByGroup:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+      - from_
+      - period
+      - revenueByCategory
+      - to
+      - visitorCountsByGroup
     ResetPassword:
       type: object
       description: '`ResetPasswordRequest` -- Staff only (FR-ACC-006).'
@@ -1963,6 +2072,22 @@ components:
           $ref: '#/components/schemas/StaffRoleEnum'
         active:
           type: boolean
+    StatusMix:
+      type: object
+      properties:
+        pending:
+          type: integer
+        visited:
+          type: integer
+        cancelled:
+          type: integer
+        refunded:
+          type: integer
+      required:
+      - cancelled
+      - pending
+      - refunded
+      - visited
     TokenRefresh:
       type: object
       properties:

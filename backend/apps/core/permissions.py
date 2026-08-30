@@ -40,6 +40,21 @@ class IsCashier(BasePermission):
         )
 
 
+class IsMuseumManagerOrPlatformAdmin(BasePermission):
+    """Museum Manager or Platform Admin -- the two roles FR-REPORT-001/002
+    grant dashboard/report access to (Document 02 Sec 2.8). Neither
+    `IsMuseumManager` nor `IsPlatformAdmin` alone covers this pairing, and
+    `IsStaff` is too broad (it also admits Cashier, who has no reporting
+    access per Document 02)."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, "role", None) in {"museum_manager", "platform_admin"}
+        )
+
+
 class IsStaff(BasePermission):
     """Any of Cashier / Museum Manager / Platform Admin -- i.e. not a Visitor."""
 

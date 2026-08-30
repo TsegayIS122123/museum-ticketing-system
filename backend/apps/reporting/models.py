@@ -4,23 +4,16 @@ reporting -- models
 Implements FR modules: FR-REPORT
 Depends on: bookings, payments, settlement
 
-Per Design Spec Sec 3.1: data shape and database-level constraints ONLY.
-No business logic here -- see services.py.
+Deliberately empty. Per Document 05 Sec 7 ("FR-REPORT-001 - FR-REPORT-003 |
+Derived from `booking`, `payment`, `cashier_reconciliation` (no dedicated
+table -- see Document 03 Sec 3.2, the `reporting` app is a query layer
+only)"): this module has no tables of its own. Every figure it surfaces
+(revenue, visitor counts, status mix, per-cashier settlement position) is
+computed on demand from rows owned by `apps.bookings`, `apps.payments`,
+and `apps.settlement` -- see services.py for the actual queries.
 
-Per Design Spec Sec 6.4: any staff-editable text (names, templates, notices)
-is stored as a parallel English/Amharic column pair, not a single column
-with runtime translation -- see Document 05 for the exact fields/tables.
-
-Per ADR-004: this project has no multi-tenancy layer (single venue) --
-do NOT reach for a tenant-scoped manager pattern here.
-
-See Document 05 (Database Design) for the real fields/tables to implement.
+This is not an oversight to "fill in later": adding a model here would
+mean duplicating/denormalizing data another app already owns as the
+system of record, which is exactly what Document 05's note above rules
+out.
 """
-
-from django.db import models
-
-# from apps.core.models import TimeStampedModel
-
-# class Example(TimeStampedModel):
-#     class Meta:
-#         app_label = "reporting"
