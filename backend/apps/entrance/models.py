@@ -17,8 +17,6 @@ do NOT reach for a tenant-scoped manager pattern here.
 See Document 05 (Database Design) for the real fields/tables to implement.
 """
 
-from django.db import models
-
 # from apps.core.models import TimeStampedModel
 
 # class Example(TimeStampedModel):

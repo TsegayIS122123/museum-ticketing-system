@@ -188,3 +188,32 @@ class Account(AbstractBaseUser, TimeStampedModel):
             self.Role.MUSEUM_MANAGER,
             self.Role.PLATFORM_ADMIN,
         }
+
+    # --- Django admin-site access (NOT Django's permission framework) ---
+    # Deliberately not using django.contrib.auth.models.PermissionsMixin:
+    # per ADR-004 / Document 03 Sec 4.3, authorization everywhere else in
+    # this codebase is a flat `role` check, not a Group/Permission model,
+    # and every admin.py in this project is already written as a
+    # Platform-Admin-only "internal support/debugging view" (see e.g.
+    # accounts/admin.py, payments/admin.py). Introducing the full
+    # Permission/Group machinery here would add a second, parallel
+    # authorization system that nothing else in the app uses. These four
+    # attributes are exactly what AdminSite / ModelAdmin need to check;
+    # nothing else in Django auth requires PermissionsMixin itself.
+    @property
+    def is_staff(self):
+        """Only a Platform Admin may log into /admin/ at all."""
+        return self.role == self.Role.PLATFORM_ADMIN
+
+    @property
+    def is_superuser(self):
+        """No per-permission model exists, so admin access is all-or-
+        nothing: a Platform Admin can do anything the admin.py for a given
+        model allows (has_add_permission/readonly_fields still apply)."""
+        return self.role == self.Role.PLATFORM_ADMIN
+
+    def has_perm(self, perm, obj=None):
+        return self.is_superuser
+
+    def has_module_perms(self, app_label):
+        return self.is_superuser
