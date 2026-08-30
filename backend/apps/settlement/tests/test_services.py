@@ -327,7 +327,8 @@ def test_initiate_reconciliation_scoped_to_one_cashier_only(mock_call):
 # --------------------------------------------------------------------------
 
 
-def test_confirm_success_marks_completed_and_attributes_bookings_and_refunds():
+@mock.patch("apps.settlement.tasks.render_and_store_transfer_receipt.delay")
+def test_confirm_success_marks_completed_and_attributes_bookings_and_refunds(mock_render):
     cashier = _make_cashier()
     booking_one = _make_visited_booking(cashier=cashier, quantity=1, unit_price=Decimal("100.00"))
     booking_two = _make_visited_booking(cashier=cashier, quantity=1, unit_price=Decimal("100.00"))
@@ -352,9 +353,11 @@ def test_confirm_success_marks_completed_and_attributes_bookings_and_refunds():
     assert booking_two.reconciliation_id == reconciliation.id
     assert refund.deducted_in_transfer_id_id == reconciliation.id
     assert services.get_outstanding_balance(cashier=cashier) == Decimal("0")
+    mock_render.assert_called_once_with(reconciliation_id=str(reconciliation.id))
 
 
-def test_confirm_success_writes_audit_log_entry():
+@mock.patch("apps.settlement.tasks.render_and_store_transfer_receipt.delay")
+def test_confirm_success_writes_audit_log_entry(mock_render):
     cashier = _make_cashier()
     _make_visited_booking(cashier=cashier, quantity=1, unit_price=Decimal("100.00"))
     reconciliation = CashierReconciliation.objects.create(
@@ -369,7 +372,8 @@ def test_confirm_success_writes_audit_log_entry():
     assert entry.metadata["booking_count"] == 1
 
 
-def test_confirm_success_does_not_touch_other_cashiers_bookings():
+@mock.patch("apps.settlement.tasks.render_and_store_transfer_receipt.delay")
+def test_confirm_success_does_not_touch_other_cashiers_bookings(mock_render):
     cashier_a = _make_cashier(email="cashier-a@example.com")
     cashier_b = _make_cashier(email="cashier-b@example.com")
     _make_visited_booking(cashier=cashier_a, quantity=1, unit_price=Decimal("100.00"))
@@ -383,6 +387,23 @@ def test_confirm_success_does_not_touch_other_cashiers_bookings():
     booking_b.refresh_from_db()
     assert booking_b.reconciliation is None
     assert services.get_outstanding_balance(cashier=cashier_b) == Decimal("500.00")
+
+
+def test_confirm_success_enqueues_transfer_receipt_render_task():
+    """Only on the COMPLETED path -- a FAILED transfer has nothing to
+    prove, so `confirm_reconciliation_failure` (below) must never enqueue
+    this."""
+    cashier = _make_cashier()
+    reconciliation = CashierReconciliation.objects.create(
+        cashier=cashier, amount_etb=Decimal("100.00"), status=CashierReconciliation.Status.PENDING
+    )
+
+    with mock.patch(
+        "apps.settlement.tasks.render_and_store_transfer_receipt.delay"
+    ) as mock_render:
+        services.confirm_reconciliation_success(reconciliation=reconciliation)
+
+    mock_render.assert_called_once_with(reconciliation_id=str(reconciliation.id))
 
 
 # --------------------------------------------------------------------------
@@ -405,6 +426,22 @@ def test_confirm_failure_marks_failed_and_leaves_bookings_eligible():
     assert reconciliation.failure_reason == "Insufficient funds."
     assert booking.reconciliation is None
     assert services.get_outstanding_balance(cashier=cashier) == Decimal("100.00")
+
+
+def test_confirm_failure_does_not_enqueue_transfer_receipt_render_task():
+    """A FAILED transfer has nothing to prove -- no receipt should ever be
+    generated for it."""
+    cashier = _make_cashier()
+    reconciliation = CashierReconciliation.objects.create(
+        cashier=cashier, amount_etb=Decimal("100.00"), status=CashierReconciliation.Status.PENDING
+    )
+
+    with mock.patch(
+        "apps.settlement.tasks.render_and_store_transfer_receipt.delay"
+    ) as mock_render:
+        services.confirm_reconciliation_failure(reconciliation=reconciliation, reason="Insufficient funds.")
+
+    mock_render.assert_not_called()
 
 
 # --------------------------------------------------------------------------
@@ -447,9 +484,10 @@ def test_webhook_success_event_confirms_reconciliation():
         cashier=cashier, amount_etb=Decimal("100.00"), status=CashierReconciliation.Status.PENDING
     )
 
-    services.handle_chapa_transfer_webhook(
-        payload={"event": "payout.success", "status": "success", "reference": str(reconciliation.id)}
-    )
+    with mock.patch("apps.settlement.tasks.render_and_store_transfer_receipt.delay"):
+        services.handle_chapa_transfer_webhook(
+            payload={"event": "payout.success", "status": "success", "reference": str(reconciliation.id)}
+        )
 
     reconciliation.refresh_from_db()
     assert reconciliation.status == CashierReconciliation.Status.COMPLETED
@@ -490,15 +528,19 @@ def test_webhook_is_idempotent_on_replay():
     )
     payload = {"status": "success", "reference": str(reconciliation.id)}
 
-    services.handle_chapa_transfer_webhook(payload=payload)
-    first_completed_at = CashierReconciliation.objects.get(id=reconciliation.id).completed_at
+    with mock.patch("apps.settlement.tasks.render_and_store_transfer_receipt.delay") as mock_render:
+        services.handle_chapa_transfer_webhook(payload=payload)
+        first_completed_at = CashierReconciliation.objects.get(id=reconciliation.id).completed_at
 
-    # A replayed webhook delivery for the same (already COMPLETED)
-    # reference must not error or re-run the attribution/audit-log side
-    # effects a second time.
-    services.handle_chapa_transfer_webhook(payload=payload)
+        # A replayed webhook delivery for the same (already COMPLETED)
+        # reference must not error or re-run the attribution/audit-log side
+        # effects a second time.
+        services.handle_chapa_transfer_webhook(payload=payload)
 
     reconciliation.refresh_from_db()
     assert reconciliation.status == CashierReconciliation.Status.COMPLETED
     assert reconciliation.completed_at == first_completed_at
     assert AuditLogEntry.objects.filter(action="settlement.reconciliation_completed").count() == 1
+    # The replay must not re-enqueue rendering either -- an already-issued
+    # transfer receipt is never regenerated (ADR-009).
+    mock_render.assert_called_once()
