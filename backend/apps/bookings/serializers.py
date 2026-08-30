@@ -54,6 +54,17 @@ class BookingSerializer(serializers.ModelSerializer):
     totalAmountEtb = serializers.DecimalField(
         source="total_amount_etb", read_only=True, max_digits=12, decimal_places=2
     )
+    # The real Document No/Ref No the Cashier keys back in via `PATCH
+    # /bookings/{id}/ifmis-voucher/` (apps.entrance) -- null until then.
+    ifmisVoucherReference = serializers.CharField(
+        source="ifmis_voucher_reference", read_only=True, allow_null=True
+    )
+    # Set only once this booking's amount has been swept into a
+    # *completed* per-cashier reconciliation (apps.settlement) -- null
+    # for every booking still outstanding on its cashier's ledger.
+    reconciliationId = serializers.UUIDField(
+        source="reconciliation_id", read_only=True, allow_null=True
+    )
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
 
     class Meta:
@@ -74,6 +85,8 @@ class BookingSerializer(serializers.ModelSerializer):
             "noticeSentAt",
             "checkoutUrl",
             "receiptUrl",
+            "ifmisVoucherReference",
+            "reconciliationId",
             "totalAmountEtb",
             "createdAt",
         ]

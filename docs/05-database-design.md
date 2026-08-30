@@ -24,7 +24,7 @@ This document covers the relational schema for PostgreSQL (the system of record 
 |---|---|
 | Primary keys | Every table uses a `UUID` primary key (`uuid_generate_v4()` at insert time), so booking references, receipt URLs, and API resource IDs never leak a record count or creation order. **One deliberate exception:** `date_availability` (Section 4.7) is keyed by the calendar date itself, since that table is inherently one row per date. |
 | Timestamps | Every table has `created_at` (`TIMESTAMPTZ`, default `now()`); tables that are updated after creation also have `updated_at`. `audit_log` is the one exception — it is insert-only by design (Section 4.8). |
-| No physical deletes on financial or lifecycle records | `account`, `category`, `booking`, `payment`, `refund`, and `settlement_transfer` are never `DELETE`d by an application action. Status/flag columns (`status`, `active`, `is_open_for_booking`) represent state transitions instead — "retiring" a category or "deactivating" a staff account both set a flag, they never remove the row. This is what makes NFR-RETENTION-001's one-year retention guarantee possible without a separate archival step. |
+| No physical deletes on financial or lifecycle records | `account`, `category`, `booking`, `payment`, `refund`, and `cashier_reconciliation` are never `DELETE`d by an application action. Status/flag columns (`status`, `active`, `is_open_for_booking`) represent state transitions instead — "retiring" a category or "deactivating" a staff account both set a flag, they never remove the row. This is what makes NFR-RETENTION-001's one-year retention guarantee possible without a separate archival step. |
 | Enumerations | Fixed, closed vocabularies (`status`, `role`, `booking_type`, `gateway`, `channel`, etc.) are implemented as PostgreSQL `CHECK` constraints against a `TEXT` column rather than native `ENUM` types, so adding a value later is a constraint migration, not a type migration. |
 | Money | `amount_etb` / `price_etb` columns are `NUMERIC(12,2)`, never a floating-point type — every one of them ultimately feeds a receipt or a Finance Office reconciliation figure. |
 | Bilingual fields | Any staff-editable text that appears on a Visitor- or Cashier-facing screen or generated document is stored as an explicit parallel-column pair — `_en` / `_am` — never a single column with runtime translation, so FR-LOC-004's "independently maintainable" requirement is a schema property, not a service-layer promise (Document 03 §6.4). |
@@ -41,7 +41,7 @@ erDiagram
     ACCOUNT ||--o{ BOOKING : "approves (approved_by_user_id)"
     ACCOUNT ||--o{ BOOKING : "checks in (checked_in_by_user_id)"
     ACCOUNT ||--o{ REFUND : requests
-    ACCOUNT ||--o{ SETTLEMENT_TRANSFER : initiates
+    ACCOUNT ||--o{ CASHIER_RECONCILIATION : "is the cashier for"
     ACCOUNT ||--o{ DATE_AVAILABILITY : "opens/closes"
     ACCOUNT ||--o{ NOTIFICATION : receives
     ACCOUNT ||--o{ AUDIT_LOG : performs
@@ -51,16 +51,16 @@ erDiagram
     BOOKING ||--o{ PAYMENT : "paid via"
     BOOKING ||--o{ REFUND : "refunded via"
     BOOKING ||--o{ NOTIFICATION : triggers
-    BOOKING }o--o| SETTLEMENT_TRANSFER : "included in"
+    BOOKING }o--o| CASHIER_RECONCILIATION : "included in (once completed)"
 
     PAYMENT ||--o{ REFUND : "reversed by"
 
-    SETTLEMENT_TRANSFER ||--o{ REFUND : "nets off (deducted_in_transfer_id)"
+    CASHIER_RECONCILIATION ||--o{ REFUND : "nets off (deducted_in_transfer_id)"
 
     NOTIFICATION ||--o{ NOTIFICATION_DELIVERY : "fanned out as"
 ```
 
-*Diagram note:* `DATE_AVAILABILITY` is not tied to `BOOKING` by a foreign key — it is consulted, not referenced, at booking-creation time (Document 03 §6.2 caches this lookup). The relationship shown to `ACCOUNT` reflects only `closed_by_user_id`.
+*Diagram note:* `DATE_AVAILABILITY` is not tied to `BOOKING` by a foreign key — it is consulted, not referenced, at booking-creation time (Document 03 §6.2 caches this lookup). The relationship shown to `ACCOUNT` reflects only `closed_by_user_id`. `CASHIER_RECONCILIATION` is scoped to exactly one `ACCOUNT` (the Cashier personally responsible for that money in IFMIS, per the IFMIS decision) — there is no platform-wide settlement entity in this schema.
 
 ---
 
@@ -161,11 +161,11 @@ Implements FR-BOOK-001 – FR-BOOK-008 and the lifecycle mechanics of FR-PAY-002
 | `checked_in_by_user_id` | UUID | `FK → account.id` | The Cashier who recorded attendance (NFR-AUDIT-001). |
 | `chapa_checkout_url` | TEXT | | Present only while `awaiting_payment`, or immediately after a group booking's approval; cleared once payment is confirmed. |
 | `receipt_url` | TEXT | | Pointer into object storage (`receipts/temporary/{booking_id}.pdf`, Document 03 §6.3). Populated once, at payment confirmation, and never regenerated (ADR-009). |
-| `settled` | BOOLEAN | `NOT NULL DEFAULT false` | |
-| `settlement_transfer_id` | UUID | `FK → settlement_transfer.id` | Set together with `settled = true`, at the moment a `Visited` booking is included in a batch transfer (FR-SETTLE-002). |
+| `ifmis_voucher_reference` | TEXT | `NULLABLE` | The real Document No/Ref No the Cashier gets back from IFMIS after keying this check-in's transaction into IFMIS herself. Not known at the instant check-in happens — she reports it back separately (`PATCH /bookings/{id}/ifmis-voucher`, `apps.entrance`); the platform never generates or calls IFMIS for this value (FR-GOV-001). |
+| `reconciliation_id` | UUID | `FK → cashier_reconciliation.id ON DELETE RESTRICT` | Set once, only when this booking's amount has been included in a *completed* per-cashier reconciliation (Section 3.6) — never at the moment a reconciliation is merely initiated. `RESTRICT` (not `SET NULL`/`CASCADE`): a reconciliation with bookings attributed to it must never be deleted out from under them. |
 | `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
 
-**Indexes:** unique on `reference`; (`visitor_id`); (`category_id`); (`status`, `visit_date`) — serves both the daily no-show sweep (`status='pending' AND visit_date < today`, Document 03 §5.2) and staff filtering (`GET /bookings?status=&visitDate=`); partial index on `id` `WHERE status='visited' AND settled=false` for the settlement-pending listing (FR-REPORT-003, FR-SETTLE-001); partial index on `notice_sent_at` `WHERE status='pending' AND notice_sent_at IS NOT NULL` for the seven-day no-response sweep.
+**Indexes:** unique on `reference`; (`visitor_id`); (`category_id`); (`status`, `visit_date`) — serves both the daily no-show sweep (`status='pending' AND visit_date < today`, Document 03 §5.2) and staff filtering (`GET /bookings?status=&visitDate=`); partial index on `checked_in_by_user_id` `WHERE status='visited' AND reconciliation_id IS NULL` — this is the query behind one Cashier's outstanding balance (FR-SETTLE, Section 3.6), scoped per-cashier rather than platform-wide since accountability in IFMIS is personal, not pooled; partial index on `notice_sent_at` `WHERE status='pending' AND notice_sent_at IS NOT NULL` for the seven-day no-response sweep.
 
 ### 3.4 `payments` app
 
@@ -208,31 +208,45 @@ Implements FR-REFUND-001 – FR-REFUND-005 and NFR-AUDIT-001.
 | `requested_by_user_id` | UUID | `FK → account.id` | Nullable — the two automatic paths (cancellation, no-response) have no requester; only `partial_shortfall` (FR-REFUND-001b) is Visitor-initiated. |
 | `note` | TEXT | | Free-text context supplied with a shortfall request. |
 | `chapa_refund_reference` | TEXT | | External reference once Chapa confirms the refund (ADR-008). |
-| `deducted_in_transfer_id` | UUID | `FK → settlement_transfer.id` | Set only when this refund concerns a booking whose amount had **already** been included in an earlier settlement transfer. FR-REFUND-005 requires the Finance Office to see the *net* figure on a future transfer, never an overstated gross one — this column is what marks a refund as already accounted for, once that future transfer nets it off. |
+| `deducted_in_transfer_id` | UUID | `FK → cashier_reconciliation.id ON DELETE RESTRICT` | Set only when this refund concerns a booking whose amount had **already** been included in an earlier, *completed* per-cashier reconciliation (Section 3.6). FR-REFUND-005 requires the figure a Cashier settles to be *net* of her own refunds, never an overstated gross one — this column is what marks a refund as already accounted for, once that reconciliation nets it off. Kept as `deducted_in_transfer_id` (not renamed) per this schema's convention for actor/target columns whose own name already ends in `_id` (e.g. `requested_by_user_id`). |
 | `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
 
-**Indexes:** (`booking_id`); (`status`); partial index on `id` `WHERE deducted_in_transfer_id IS NULL AND status='completed'` — this is exactly the set a new settlement transfer must net off (Document 03 §5.3).
+**Indexes:** (`booking_id`); (`status`); partial index on `id` `WHERE deducted_in_transfer_id IS NULL AND status='completed'` — this is exactly the set a new reconciliation must net off for its cashier (Document 03 §5.3), scoped through `booking.checked_in_by_user_id` at query time so two cashiers' refunds never cross into each other's balance.
 
 ### 3.6 `settlement` app
 
-#### `settlement_transfer`
+#### `cashier_reconciliation`
 
-Implements FR-SETTLE-001 – FR-SETTLE-004.
+Implements FR-SETTLE. Per the IFMIS decision (Document 01/02): this is a *per-cashier* running
+balance, never a platform-wide batch. Whoever checked a visitor in personally enters that
+transaction into IFMIS under her own name, so this table has one row per reconciliation
+**attempt** by **one** Cashier — a real Chapa Transfer moving her outstanding balance out of
+Chapa's pooled merchant balance into the university's fixed bank account. This is not a receipt
+and nothing is ever generated from it for a Visitor: the IFMIS vouchers she has already handed
+out one-per-visitor (`booking.ifmis_voucher_reference`, Section 3.3) remain the only audit trail
+Finance uses.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | UUID | PK | |
-| `amount_etb` | NUMERIC(12,2) | `NOT NULL, CHECK (amount_etb > 0)` | The net figure: Σ(`Visited` booking amounts not yet settled) − Σ(refunds not yet deducted), per FR-REFUND-005. |
-| `reference_number` | TEXT | `UNIQUE NOT NULL` | Printed on the Transfer Receipt (FR-SETTLE-004). |
-| `purpose_en` / `purpose_am` | TEXT | `NOT NULL` | The receipt's purpose/description line, independently editable per FR-LOC-004; defaults to a standard phrase (e.g. "Digital ticket revenue settlement") but can be overridden per transfer. |
-| `receipt_url` | TEXT | | Pointer into object storage (`receipts/settlement/{transfer_id}.pdf`); populated once, at render time, and never regenerated (ADR-009). |
-| `initiated_by_user_id` | UUID | `NOT NULL, FK → account.id` | The Cashier (FR-SETTLE-002); required for NFR-AUDIT-001. |
-| `status` | TEXT | `CHECK (status IN ('processing','completed','failed')) NOT NULL DEFAULT 'processing'` | |
+| `cashier_id` | UUID | `NOT NULL, FK → account.id ON DELETE RESTRICT` | The Cashier personally responsible for this money in IFMIS — the same person as `checked_in_by_user_id` on every booking this reconciliation ends up covering. |
+| `amount_etb` | NUMERIC(12,2) | `NOT NULL, CHECK (amount_etb > 0)` | The net figure — Σ(this cashier's `Visited` booking amounts not yet reconciled) − Σ(her refunds not yet deducted), per FR-REFUND-005 — fixed at creation time (computed under a row lock) and never recomputed after the fact, even if the attempt later fails. |
+| `chapa_transfer_reference` | TEXT | `NULLABLE` | Chapa's own reference for this transfer, populated once the Transfer API call has been made; used to match a later confirming webhook back to this row. |
+| `status` | TEXT | `CHECK (status IN ('pending','completed','failed')) NOT NULL DEFAULT 'pending'` | |
+| `initiated_at` | TIMESTAMPTZ | `NULLABLE` | |
+| `completed_at` | TIMESTAMPTZ | `NULLABLE` | |
+| `failure_reason` | TEXT | `NULLABLE` | Populated on the `failed` path only. |
 | `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
 
-**Indexes:** unique on `reference_number`; (`initiated_by_user_id`); (`status`).
+**Indexes:** (`cashier_id`); (`status`).
 
-*Note:* there is no join table between `settlement_transfer` and `booking`. A booking belongs to at most one transfer over its lifetime (once `settled=true`, it stays there), so `booking.settlement_transfer_id` (Section 3.3) is a plain foreign key, not a many-to-many relationship — the `bookingIds` array in the API response (Document 04, `SettlementTransfer.bookingIds`) is simply `SELECT id FROM booking WHERE settlement_transfer_id = :id`.
+*Note:* there is no join table between `cashier_reconciliation` and `booking`. A booking belongs
+to at most one reconciliation over its lifetime (once attributed, on completion, it stays there),
+so `booking.reconciliation_id` (Section 3.3) is a plain foreign key, not a many-to-many
+relationship — set only by `confirm_reconciliation_success`, atomically, across every `Visited`,
+still-unreconciled booking checked in by that cashier, never at the moment a reconciliation is
+merely initiated. A `pending` reconciliation that later fails leaves its underlying bookings/
+refunds untouched and eligible for the cashier's next attempt.
 
 ### 3.7 `core` app
 
@@ -286,7 +300,7 @@ Implements NFR-AUDIT-001, backing [Document 03, Section 6.6](03-software-design-
 |---|---|---|---|
 | `id` | UUID | PK | |
 | `actor_user_id` | UUID | `FK → account.id` | Nullable for system-initiated actions — the daily no-show/refund jobs (Document 03 §5.2) act with no human actor. |
-| `action` | TEXT | `NOT NULL` | e.g. `booking.cancelled`, `booking.rescheduled`, `booking.checked_in`, `refund.issued`, `settlement_transfer.created`, `date_availability.changed`. |
+| `action` | TEXT | `NOT NULL` | e.g. `booking.cancelled`, `booking.rescheduled`, `booking.checked_in`, `booking.ifmis_voucher_recorded`, `refund.issued`, `settlement.reconciliation_completed`, `date_availability.changed`. |
 | `entity_type` | TEXT | `NOT NULL` | The table name the action concerns. |
 | `entity_id` | UUID | `NOT NULL` | |
 | `metadata` | JSONB | | Free-form context — e.g. old/new `visit_date` on a reschedule, or the refund amount and reason. |
@@ -304,20 +318,21 @@ Beyond the per-table indexes in Section 3, the following choices exist specifica
 |---|---|
 | NFR-PERF-001 (dashboard reflects a change within seconds) | `booking(status, visit_date)` and `payment(status)` are indexed, since every dashboard/report query filters on one or both; notification sending is entirely off the request path (Section 3.7). |
 | NFR-IDEMPOTENT-001 / FR-PAY-004 (no duplicate payment confirmation) | `payment.tx_ref` is `UNIQUE`, making a duplicate webhook a constraint violation the service layer catches and no-ops on, not a race condition it has to detect itself. |
-| NFR-CONSIST-001 (atomic money operations) | Every state change described as one financial "operation" in Document 02 (payment confirmation, a refund, a settlement transfer) is written as a single database transaction spanning exactly the rows in Section 3.3–3.6 it touches — never split across a request and a later job for the same operation. |
+| NFR-CONSIST-001 (atomic money operations) | Every state change described as one financial "operation" in Document 02 (payment confirmation, a refund, a cashier reconciliation) is written as a single database transaction spanning exactly the rows in Section 3.3–3.6 it touches — never split across a request and a later job for the same operation. |
 | NFR-AUDIT-001 | `audit_log(entity_type, entity_id)` and `audit_log(actor_user_id, created_at)` (Section 3.7). |
 | FR-BOOK-007 (reschedule at most once) | `booking.rescheduled_count` `CHECK (<= 1)` — a database-enforced invariant, not only a `services.py` check (Section 3.3). |
 | FR-TICKET-005 (excess attendees not admitted under the original booking) | `booking.attended_quantity` `CHECK (<= booked_quantity)`. |
-| FR-REFUND-005 (net figure on a future settlement) | `refund.deducted_in_transfer_id`, with a partial index on the not-yet-deducted set (Section 3.5), is exactly what the settlement-transfer query nets off. |
+| FR-REFUND-005 (net figure on a reconciliation) | `refund.deducted_in_transfer_id`, with a partial index on the not-yet-deducted set (Section 3.5), is exactly what a cashier's reconciliation nets off — scoped through `booking.checked_in_by_user_id` so it is always one cashier's own refunds, never pooled across cashiers. |
+| FR-SETTLE (per-cashier outstanding balance) | `booking`'s partial index on `checked_in_by_user_id` `WHERE status='visited' AND reconciliation_id IS NULL` (Section 3.3) is exactly the query behind one Cashier's "my balance" screen — accountability in IFMIS is personal, so this is never a platform-wide aggregate. |
 | FR-BOOK-008 (manual, Museum-Manager-controlled date availability) | `date_availability` keyed directly by date, populated only for dates explicitly acted on (Section 3.7). |
 
 ---
 
 ## 5. Data Retention (NFR-RETENTION-001)
 
-Booking, payment, refund, and settlement records must be retained for **at least one year**, aligned to the organization's budget/fiscal calendar (Document 02 §3, §5). This schema supports that requirement structurally, not through a scheduled purge job:
+Booking, payment, refund, and reconciliation records must be retained for **at least one year**, aligned to the organization's budget/fiscal calendar (Document 02 §3, §5). This schema supports that requirement structurally, not through a scheduled purge job:
 
-- `booking`, `payment`, `refund`, and `settlement_transfer` are never physically deleted by any application code path — Section 1.3's no-physical-delete convention applies to all four.
+- `booking`, `payment`, `refund`, and `cashier_reconciliation` are never physically deleted by any application code path — Section 1.3's no-physical-delete convention applies to all four.
 - `category` is "retired," never deleted, so a historical booking's `category_name_en/am` and `unit_price_etb` snapshot (Section 3.3) always resolves correctly even after the live category is gone from the public catalog.
 - `account` is "deactivated," never deleted, for the same reason — a deactivated Cashier's `id` may still be `checked_in_by_user_id` on a two-year-old booking, and that reference must keep resolving.
 - The exact fiscal-year boundary (Hamle 1–Sene 30 vs. an institution-specific cycle) is an open question noted in [Document 02, Section 5](02-software-requirements-specification.md#5-open-questions). The schema does not hard-code a boundary anywhere — `Reporting` module queries (Document 03 §3.2) take the fiscal year's start/end as a configuration value, not a schema constant, so resolving that open question later requires no migration.
@@ -340,18 +355,18 @@ Schema changes are applied as Django migrations, one migration file per app per 
 | FR-BOOK-008 | `date_availability` |
 | FR-PAY-001 – FR-PAY-004 | `payment`, `booking` |
 | FR-PAY-005 | `booking.notice_sent_at`, `refund` (reason=`no_response`), `notification` |
-| FR-TICKET-001 – FR-TICKET-005 | `booking` (`attended_quantity`, `checked_in_at`, `checked_in_by_user_id`) |
-| FR-REFUND-001 – FR-REFUND-005 | `refund`, `payment`, `settlement_transfer.id` (via `deducted_in_transfer_id`) |
-| FR-SETTLE-001 – FR-SETTLE-004 | `settlement_transfer`, `booking.settled` / `settlement_transfer_id` |
-| FR-REPORT-001 – FR-REPORT-003 | Derived from `booking`, `payment`, `settlement_transfer` (no dedicated table — see Document 03 §3.2, the `reporting` app is a query layer only) |
-| FR-GOV-001 – FR-GOV-002 | No table — deliberately no IFMIS-facing schema exists (Document 02 §2.9) |
-| FR-LOC-001 – FR-LOC-004 | `category.name_en/am`, `settlement_transfer.purpose_en/am`, `account.language_preference` |
+| FR-TICKET-001 – FR-TICKET-005 | `booking` (`attended_quantity`, `checked_in_at`, `checked_in_by_user_id`, `ifmis_voucher_reference`) |
+| FR-REFUND-001 – FR-REFUND-005 | `refund`, `payment`, `cashier_reconciliation.id` (via `deducted_in_transfer_id`) |
+| FR-SETTLE | `cashier_reconciliation`, `booking.reconciliation_id` / `checked_in_by_user_id` — per-cashier, never a platform-wide batch (see the IFMIS decision) |
+| FR-REPORT-001 – FR-REPORT-003 | Derived from `booking`, `payment`, `cashier_reconciliation` (no dedicated table — see Document 03 §3.2, the `reporting` app is a query layer only) |
+| FR-GOV-001 – FR-GOV-002 | No IFMIS-facing table or API integration exists (Document 02 §2.9); `booking.ifmis_voucher_reference` records only the voucher reference the Cashier reports back after keying the transaction into IFMIS herself |
+| FR-LOC-001 – FR-LOC-004 | `category.name_en/am`, `account.language_preference` |
 | NFR-SEC-001 | `payment.confirmed_at` (set only post-signature-verification) |
 | NFR-IDEMPOTENT-001 | `payment.tx_ref` (`UNIQUE`) |
 | NFR-CONSIST-001 | Section 4 (indexing strategy / transactional writes) |
 | NFR-AUDIT-001 | `audit_log` |
 | NFR-PERF-001 | Section 4 |
-| NFR-LOCALE-001 | Bilingual column convention (Section 1.3) applied across `category` and `settlement_transfer` |
+| NFR-LOCALE-001 | Bilingual column convention (Section 1.3) applied to `category` |
 | NFR-RETENTION-001 | Section 5 |
 
 ---

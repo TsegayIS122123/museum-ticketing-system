@@ -211,8 +211,23 @@ SPECTACULAR_SETTINGS = {
     # used by AccountSerializer/UserProfile). Same field name, different
     # choice sets, so schema generation can't dedupe them automatically
     # and falls back to an auto-numbered name without this override.
+    #
+    # Likewise, `status` is reused as a field name across several
+    # unrelated models. Booking.Status and NotificationDelivery.Status
+    # each have their own distinct value set and need their own name.
+    # Refund.Status and CashierReconciliation.Status are BOTH
+    # pending/completed/failed -- identical choice sets, so
+    # drf-spectacular treats them as the same enum and they must share
+    # one override name (giving them two different names is itself a
+    # collision -- "ENUM_NAME_OVERRIDES has duplication issues").
+    # Payment.status is a plain CharField on the webhook payload
+    # serializer (not a ChoiceField), so it never generates an enum and
+    # doesn't need an entry here.
     "ENUM_NAME_OVERRIDES": {
         "StaffRoleEnum": "apps.platform_admin.serializers.STAFF_ROLE_CHOICES",
+        "BookingStatusEnum": "apps.bookings.models.Booking.Status",
+        "NotificationDeliveryStatusEnum": "apps.notifications.models.NotificationDelivery.Status",
+        "RefundStatusEnum": "apps.refunds.models.Refund.Status",
     },
 }
 
@@ -314,6 +329,20 @@ MEDIA_ROOT = BASE_DIR / "media"
 CHAPA_PUBLIC_KEY = env("CHAPA_PUBLIC_KEY", default="")
 CHAPA_SECRET_KEY = env("CHAPA_SECRET_KEY", default="")
 CHAPA_WEBHOOK_SECRET = env("CHAPA_WEBHOOK_SECRET", default="")
+
+# --------------------------------------------------------------------------
+# Finance's fixed bank destination -- apps.settlement.services.
+# call_chapa_transfer_api moves each cashier's outstanding balance here via
+# Chapa's Transfer API (never anywhere else -- there is only ever this one
+# destination, unlike a per-user payout destination). No hardcoded
+# defaults: these are real production values, not sandbox-safe like the
+# CHAPA_* keys above, so an unset value must fail loudly rather than
+# silently transferring to an empty/placeholder account.
+# --------------------------------------------------------------------------
+
+FINANCE_BANK_ACCOUNT_NAME = env("FINANCE_BANK_ACCOUNT_NAME")
+FINANCE_BANK_ACCOUNT_NUMBER = env("FINANCE_BANK_ACCOUNT_NUMBER")
+FINANCE_BANK_CODE = env("FINANCE_BANK_CODE")
 
 # Publicly reachable base URLs, needed only because Chapa's checkout-session
 # API requires real, absolute URLs to call back to: `callback_url` (the

@@ -501,6 +501,15 @@ paths:
       description: |-
         POST /bookings/{id}/check-in -- Cashier only
         (FR-TICKET-001 - FR-TICKET-003, FR-TICKET-005).
+
+        Returns `CheckInResponseSerializer`, not the plain `BookingSerializer`
+        -- the IFMIS-decision build prompt's Step 7: the response carries the
+        extra fields the Cashier needs to key this transaction into IFMIS
+        herself (payer name, amount in figures/words, purpose string).
+        `services.check_in_booking`'s own business logic and return value
+        (the `Booking` instance) are unchanged; only how the response is
+        *serialized* differs from every other endpoint that returns a
+        `Booking`.
       parameters:
       - in: path
         name: id
@@ -522,6 +531,44 @@ paths:
             schema:
               $ref: '#/components/schemas/CheckInRequest'
         required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckInResponse'
+          description: ''
+  /api/v1/bookings/{id}/ifmis-voucher/:
+    patch:
+      operationId: recordIfmisVoucherReference
+      description: |-
+        PATCH /bookings/{id}/ifmis-voucher/ -- Cashier only, and only the
+        same Cashier who checked this booking in (services.py enforces this,
+        not this permission class -- it needs the specific booking, not just
+        the role). Called after she's actually entered the transaction into
+        IFMIS and gotten the real voucher reference back; settable once.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedIfmisVoucherUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedIfmisVoucherUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedIfmisVoucherUpdate'
       security:
       - TokenVersionAuth: []
       responses:
@@ -808,6 +855,110 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedRefundList'
           description: ''
+  /api/v1/settlement/my-balance/:
+    get:
+      operationId: getMyOutstandingBalance
+      description: |-
+        GET /settlement/my-balance/ -- Cashier only. Her own outstanding
+        balance (unreconciled Visited bookings minus unreconciled completed
+        refunds) -- never a platform-wide total (IFMIS decision).
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutstandingBalance'
+          description: ''
+  /api/v1/settlement/reconcile/:
+    post:
+      operationId: initiateReconciliation
+      description: |-
+        POST /settlement/reconcile/ -- Cashier only. The one-click action:
+        locks her outstanding bookings/refunds, creates a `PENDING`
+        reconciliation row, and calls Chapa's Transfer API to move her
+        balance into the university's fixed bank account. A confirm dialog on
+        the client is sufficient before calling this (no OTP step -- already
+        decided); this endpoint itself performs no additional confirmation.
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashierReconciliation'
+          description: ''
+  /api/v1/settlement/reconciliations/:
+    get:
+      operationId: listReconciliations
+      description: |-
+        GET /settlement/reconciliations/ -- any authenticated Staff member.
+        A Cashier sees only her own attempts; Museum Manager/Platform Admin
+        see every cashier's (mirrors `apps.refunds.views.RefundListView`'s own
+        ownership-scoping pattern).
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCashierReconciliationList'
+          description: ''
+  /api/v1/settlement/webhook/chapa-transfer/:
+    post:
+      operationId: handleChapaTransferWebhook
+      description: |-
+        POST /settlement/webhook/chapa-transfer/ -- AllowAny + signature
+        check (mirrors `apps.payments.views.ChapaWebhookView` exactly, same
+        HMAC-SHA256-over-the-raw-body verification against
+        `CHAPA_WEBHOOK_SECRET`). The only path that ever moves a
+        reconciliation out of `PENDING` -- there is no client-side redirect
+        for a bank transfer to (incorrectly) trust instead.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChapaTransferWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChapaTransferWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChapaTransferWebhook'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+        '400':
+          description: No response body
+        '401':
+          description: No response body
   /api/v1/users/me/:
     get:
       operationId: v1_users_me_retrieve
@@ -1032,6 +1183,15 @@ components:
           type: string
           readOnly: true
           nullable: true
+        ifmisVoucherReference:
+          type: string
+          readOnly: true
+          nullable: true
+        reconciliationId:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
         totalAmountEtb:
           type: string
           format: decimal
@@ -1051,8 +1211,10 @@ components:
       - createdAt
       - groupName
       - id
+      - ifmisVoucherReference
       - noticeSentAt
       - receiptUrl
+      - reconciliationId
       - reference
       - rescheduledCount
       - status
@@ -1135,6 +1297,68 @@ components:
       description: |-
         * `individual` - Individual
         * `group` - Group
+    CashierReconciliation:
+      type: object
+      description: |-
+        `CashierReconciliation` (per-cashier settlement transfer). Read-only
+        -- every mutation goes through `services.initiate_reconciliation` /
+        `confirm_reconciliation_success` / `confirm_reconciliation_failure`,
+        never through this serializer directly.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        cashierId:
+          type: string
+          format: uuid
+          readOnly: true
+        amountEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        chapaTransferReference:
+          type: string
+          readOnly: true
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/RefundStatusEnum'
+          readOnly: true
+        initiatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        transferReceiptUrl:
+          type: string
+          readOnly: true
+          nullable: true
+        failureReason:
+          type: string
+          readOnly: true
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amountEtb
+      - cashierId
+      - chapaTransferReference
+      - completedAt
+      - createdAt
+      - failureReason
+      - id
+      - initiatedAt
+      - status
+      - transferReceiptUrl
     Category:
       type: object
       description: |-
@@ -1207,6 +1431,44 @@ components:
           type: boolean
         active:
           type: boolean
+    ChapaTransferWebhook:
+      type: object
+      description: |-
+        Chapa's Transfer (Payout) webhook payload
+        (https://developer.chapa.co/integrations/webhooks -- `"type":
+        "Payout"` events, e.g. `event: "payout.success"`). Only `reference`/
+        `status` are validated here -- mirrors
+        `apps.payments.serializers.ChapaWebhookSerializer`'s own choice to
+        model just the two fields the service layer actually branches on and
+        pass the rest of the payload through as-is. `reference` is the value
+        *we* supplied when calling the Transfer API
+        (`services.call_chapa_transfer_api` sends `str(reconciliation.id)`),
+        which Chapa echoes back unchanged -- that's what
+        `services.handle_chapa_transfer_webhook` looks the row up by, not
+        `chapa_reference` (Chapa's own internal id for the transfer, stored
+        for reference but never used as a lookup key).
+      properties:
+        event:
+          type: string
+          nullable: true
+        reference:
+          type: string
+        status:
+          type: string
+          nullable: true
+        chapa_reference:
+          type: string
+          nullable: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        currency:
+          type: string
+          nullable: true
+      required:
+      - reference
     ChapaWebhook:
       type: object
       description: |-
@@ -1247,6 +1509,136 @@ components:
           minimum: 0
       required:
       - attendedQuantity
+    CheckInResponse:
+      type: object
+      description: |-
+        `Booking`, extended with the IFMIS voucher-prep fields the Cashier
+        needs to key into IFMIS herself at the moment of check-in (per the
+        IFMIS decision: the platform never calls IFMIS -- it only gives her
+        the exact fields to copy in). Returned only from `POST
+        /bookings/{id}/check-in` -- every other endpoint that returns a
+        `Booking` keeps using the plain `BookingSerializer`, since these
+        fields are only meaningful right after a check-in action, not as a
+        general-purpose booking field.
+
+        All four are derived read-only from data `check_in_booking` already
+        wrote (or that existed on the booking beforehand) -- nothing here
+        changes `check_in_booking`'s own business logic or return value; this
+        serializer only shapes its *response* representation.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        reference:
+          type: string
+          readOnly: true
+        visitorId:
+          type: string
+          format: uuid
+          readOnly: true
+        categoryId:
+          type: string
+          format: uuid
+          readOnly: true
+        visitDate:
+          type: string
+          format: date
+          readOnly: true
+        bookingType:
+          type: string
+          readOnly: true
+        groupName:
+          type: string
+          readOnly: true
+          nullable: true
+        bookedQuantity:
+          type: integer
+          readOnly: true
+        attendedQuantity:
+          type: integer
+          readOnly: true
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/BookingStatusEnum'
+          readOnly: true
+        approvalStatus:
+          type: string
+          readOnly: true
+          nullable: true
+        rescheduledCount:
+          type: integer
+          readOnly: true
+        noticeSentAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        checkoutUrl:
+          type: string
+          readOnly: true
+          nullable: true
+        receiptUrl:
+          type: string
+          readOnly: true
+          nullable: true
+        ifmisVoucherReference:
+          type: string
+          readOnly: true
+          nullable: true
+        reconciliationId:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        totalAmountEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        payerName:
+          type: string
+          readOnly: true
+        amountFigures:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        amountWords:
+          type: string
+          readOnly: true
+        ifmisPurpose:
+          type: string
+          readOnly: true
+      required:
+      - amountFigures
+      - amountWords
+      - approvalStatus
+      - attendedQuantity
+      - bookedQuantity
+      - bookingType
+      - categoryId
+      - checkoutUrl
+      - createdAt
+      - groupName
+      - id
+      - ifmisPurpose
+      - ifmisVoucherReference
+      - noticeSentAt
+      - payerName
+      - receiptUrl
+      - reconciliationId
+      - reference
+      - rescheduledCount
+      - status
+      - totalAmountEtb
+      - visitDate
+      - visitorId
     DateAvailability:
       type: object
       description: |-
@@ -1311,6 +1703,22 @@ components:
       description: |-
         * `en` - English
         * `am` - Amharic
+    OutstandingBalance:
+      type: object
+      description: |-
+        `GET /settlement/my-balance/` response shape. Wraps a plain
+        Decimal (the return value of `services.get_outstanding_balance`) --
+        there is no model behind this endpoint, it's a computed figure, so a
+        plain `Serializer` over a `{"balance_etb": ...}` dict is used rather
+        than a `ModelSerializer`.
+      properties:
+        balanceEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - balanceEtb
     PaginatedAccountList:
       type: object
       properties:
@@ -1338,6 +1746,24 @@ components:
             type: array
             items:
               $ref: '#/components/schemas/Booking'
+        meta:
+          type: object
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            total:
+              type: integer
+    PaginatedCashierReconciliationList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/CashierReconciliation'
         meta:
           type: object
           properties:
@@ -1383,6 +1809,18 @@ components:
               type: integer
             total:
               type: integer
+    PatchedIfmisVoucherUpdate:
+      type: object
+      description: |-
+        `IfmisVoucherUpdateRequest` -- Cashier only. The real Document
+        No/Ref No she gets back from IFMIS after keying the check-in
+        transaction in herself (services.record_ifmis_voucher_reference
+        enforces the "same cashier, settable once" rule -- this serializer is
+        field-shape validation only).
+      properties:
+        voucherReference:
+          type: string
+          maxLength: 255
     ReasonEnum:
       enum:
       - cancellation

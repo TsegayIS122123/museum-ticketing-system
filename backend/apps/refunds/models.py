@@ -88,15 +88,19 @@ class Refund(TimeStampedModel):
     # value later passed to Chapa's own verify-refund endpoint.
     chapa_refund_reference = models.TextField(null=True, blank=True)
 
-    # FK to `settlement.SettlementTransfer` per Doc05 Sec 3.5 -- that app
-    # doesn't have a model yet (Sec 3.2's dependency order: settlement
-    # depends on refunds, not the reverse), so this is a plain UUID for
-    # now rather than a FK to a model that isn't there, mirroring
-    # `bookings.Booking.settlement_transfer_id`'s own justification. Set
-    # only by `apps.settlement`, once it exists, at the moment a *future*
-    # transfer nets this refund off (FR-REFUND-005) -- never written by
-    # this app's own services.py.
-    deducted_in_transfer_id = models.UUIDField(null=True, blank=True)
+    # FK to `settlement.CashierReconciliation`, set only by
+    # `apps.settlement` at the moment a *future* per-cashier
+    # reconciliation nets this refund off against her balance
+    # (FR-REFUND-005) -- never written by this app's own services.py.
+    # Kept as `deducted_in_transfer_id` (not renamed) per this codebase's
+    # convention for actor/target FKs whose own name already ends in
+    # `_id` (e.g. `requested_by_user_id`) -- no `db_column` override.
+    deducted_in_transfer_id = models.ForeignKey(
+        "settlement.CashierReconciliation",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
 
     class Meta:
         app_label = "refunds"

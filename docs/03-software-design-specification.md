@@ -36,7 +36,7 @@ C4Context
     title System Context — Museum Ticketing & Booking Platform
 
     Person(visitor, "Visitor", "Books and pays for a ticket online, or pays cash at the counter")
-    Person(cashier, "Cashier", "Verifies headcount at the gate, reconciles cash, initiates settlement transfers")
+    Person(cashier, "Cashier", "Verifies headcount at the gate, keys each visitor's transaction into IFMIS herself, and settles her own outstanding balance via a Chapa transfer")
     Person(manager, "Museum Manager", "Approves group bookings, controls date availability, configures ticket categories/prices, views reporting")
     Person(admin, "Platform Admin", "Provisions staff accounts")
 
@@ -47,7 +47,7 @@ C4Context
     System_Ext(sms, "SMS Gateway", "Delivers SMS fallback notifications to Ethiopian carriers")
 
     Rel(visitor, platform, "Books, pays, cancels/reschedules, views receipts")
-    Rel(cashier, platform, "Confirms attendance, requests settlement transfers")
+    Rel(cashier, platform, "Confirms attendance, records IFMIS voucher references, requests her own reconciliation transfer")
     Rel(manager, platform, "Approves group bookings, opens/closes dates, configures categories/prices, views dashboard")
     Rel(admin, platform, "Manages staff accounts")
 
@@ -56,7 +56,7 @@ C4Context
     Rel(platform, sms, "Sends SMS notifications", "HTTPS API")
 ```
 
-**Note on external parties not shown above:** the **Finance Office** and **IFMIS** are real parties in this system's business process (Document 02, §1 and §2.9) but are deliberately **not system integrations**. Per FR-GOV-001, the Cashier hands the Finance Office a physical Transfer Receipt; nothing in this architecture calls IFMIS or the Finance Office's systems directly. They are omitted from the diagram above for that reason — including them with a `Rel` arrow would misstate this as a technical integration.
+**Note on external parties not shown above:** the **Finance Office** and **IFMIS** are real parties in this system's business process (Document 02, §1 and §2.9) but are deliberately **not system integrations**. Per FR-GOV-001, nothing in this architecture calls IFMIS or the Finance Office's systems directly. Per the IFMIS decision (Document 01/02, §2.7): the Cashier personally keys each visitor's transaction into IFMIS herself, under her own name, and hands the resulting voucher directly to the visitor — the platform's role is limited to giving her the fields to copy in (`apps.entrance`) and tracking her own outstanding balance (`apps.settlement`); it never produces a document of its own for the Finance Office. They are omitted from the diagram above for that reason — including them with a `Rel` arrow would misstate this as a technical integration.
 
 **Note on the manual/cash track:** the existing counter process (cash, paper receipt) is unaffected by this platform and has no representation here — see the system model note in Document 02.
 
@@ -74,11 +74,11 @@ C4Container
         Container(web, "Web Application", "Next.js (React)", "Visitor self-service site + Staff dashboard, both bilingual (EN/AM)")
         Container(mobile, "Mobile App", "React Native", "Visitor booking, payment, and receipts on iOS/Android — same API as web")
         Container(api, "API Application", "Django + Django REST Framework", "Stateless REST API implementing all FR-* modules")
-        Container(worker, "Background Worker", "Celery", "Notifications, receipt rendering, no-show detection, refund/settlement processing")
+        Container(worker, "Background Worker", "Celery", "Notifications, receipt rendering, no-show detection, refund processing")
         Container(beat, "Scheduler", "Celery Beat", "Daily no-show detection and refund-deadline checks (FR-PAY-005)")
-        ContainerDb(db, "Primary Database", "PostgreSQL", "System of record for accounts, bookings, payments, refunds, settlements")
+        ContainerDb(db, "Primary Database", "PostgreSQL", "System of record for accounts, bookings, payments, refunds, cashier reconciliations")
         ContainerDb(cache, "Cache & Broker", "Redis", "Celery broker/result backend, rate-limit counters")
-        ContainerDb(storage, "Object Storage", "S3-compatible (cloud or self-hosted, e.g. MinIO)", "Generated receipts (temporary + Transfer Receipts)")
+        ContainerDb(storage, "Object Storage", "S3-compatible (cloud or self-hosted, e.g. MinIO)", "Generated receipts (temporary, at payment confirmation only)")
     }
 
     System_Ext(chapa, "Chapa")
@@ -94,11 +94,11 @@ C4Container
     Rel(web, api, "REST/JSON over HTTPS")
     Rel(api, db, "Reads/writes", "SQL")
     Rel(api, cache, "Rate-limit checks, enqueues jobs")
-    Rel(api, chapa, "Initiates checkout, verifies webhook signature")
+    Rel(api, chapa, "Initiates checkout, verifies webhook signatures, initiates a cashier's reconciliation transfer")
     Rel(worker, db, "Reads/writes")
     Rel(worker, cache, "Dequeues jobs")
     Rel(worker, storage, "Renders and stores receipt PDFs")
-    Rel(worker, chapa, "Issues refunds and settlement transfers")
+    Rel(worker, chapa, "Issues refunds")
     Rel(worker, email, "Sends email")
     Rel(worker, sms, "Sends SMS")
     Rel(beat, cache, "Schedules periodic jobs")
@@ -135,8 +135,8 @@ C4Component
     Rel(entrance, bookings, "Reads/updates status of")
     Rel(refunds, entrance, "Reads attendance outcome from")
     Rel(refunds, payments, "Reverses")
-    Rel(settlement, entrance, "Aggregates settled bookings from")
-    Rel(settlement, refunds, "Nets out refunds from")
+    Rel(settlement, bookings, "Aggregates one cashier's outstanding Visited bookings from")
+    Rel(settlement, refunds, "Nets out that cashier's undeducted refunds from")
     Rel(reporting, bookings, "Aggregates from")
     Rel(reporting, payments, "Aggregates from")
     Rel(reporting, settlement, "Aggregates from")
@@ -171,13 +171,15 @@ This separation lets acceptance criteria expressed as business behavior (e.g., F
 | `payments` | FR-PAY | `bookings` |
 | `entrance` | FR-TICKET | `bookings` |
 | `refunds` | FR-REFUND | `payments`, `entrance` |
-| `settlement` | FR-SETTLE | `entrance`, `refunds` |
+| `settlement` | FR-SETTLE | `bookings`, `refunds` |
 | `reporting` | FR-REPORT | `bookings`, `payments`, `settlement` |
 | `notifications` | Cross-cutting (consumed by every module that issues a receipt or notice) | `core` |
 | `platform_admin` | Staff-facing part of FR-ACC-002, FR-CAT-002 | `accounts`, `catalog` |
 | `core` | Shared kernel: bilingual fields, receipt rendering, audit log, base permissions | none |
 
 Localization (FR-LOC) is not a separate app; it is a cross-cutting concern applied to every module's models, serializers, and generated documents (§6.4), since bilingual support is a property of *every* module's output, not a bounded domain of its own.
+
+`settlement`'s Chapa Transfer webhook reuses `payments`' own signature-verification helper rather than duplicating it — an incidental utility dependency, not a business-logic one, and not reflected as a `Rel` in §2.3 for that reason.
 
 ### 3.3 Single-tenant simplification
 
@@ -337,6 +339,8 @@ sequenceDiagram
 
 Because a QR scanner emulates keyboard input (ADR-007), this is the **same code path** whether the Cashier types the reference or scans a code — the API never needs to know which happened.
 
+The check-in response also carries the payer name, amount in figures/words, and a generated purpose string the Cashier needs to key this transaction into IFMIS herself (`apps.entrance`, per FR-GOV-001 — the platform never calls IFMIS directly). Once she has the real Document No/Ref No back from IFMIS, a small follow-up call, `PATCH /bookings/{id}/ifmis-voucher`, records it on the booking (`booking.ifmis_voucher_reference`, Document 05 §3.3) — restricted to the same Cashier who checked the visitor in, and settable only once.
+
 ### 5.2 No-response notice and automatic refund (FR-PAY-005, FR-REFUND-001c)
 
 ```mermaid
@@ -366,31 +370,54 @@ sequenceDiagram
 
 Both checks are idempotent: a booking that is rescheduled or refunded between runs no longer matches the `WHERE` clause on the next run, so no explicit lock is needed beyond the status check itself.
 
-### 5.3 Cashier-initiated settlement transfer (FR-SETTLE-001–004)
+### 5.3 Cashier-initiated reconciliation (FR-SETTLE)
+
+Per the IFMIS decision (Document 01/02, §2.7): this is a **per-cashier** running balance, settled
+by a real Chapa transfer, never a platform-wide batch — and the platform generates no receipt of
+its own for it. The Chapa Transfer call is made synchronously from the API tier (not enqueued to
+the Celery worker, unlike refunds — §6.1), but the transfer's own confirmation is asynchronous:
+initiating it only ever produces a `pending` row, and a later webhook call is what moves it to
+`completed` or `failed`.
 
 ```mermaid
 sequenceDiagram
     actor C as Cashier
     participant A as API (settlement)
     participant D as PostgreSQL
-    participant W as Worker
     participant P as Chapa (transfer)
-    participant S as Object Storage
 
-    C->>A: POST /settlement/transfer
-    A->>D: SELECT Visited bookings WHERE settled=false
-    D-->>A: Bookings + any refunds against them
-    A->>A: net_amount = Σ(booking amount) − Σ(refunds since last transfer) (FR-REFUND-005)
-    A->>D: Create SettlementTransfer(amount=net_amount, status=processing)
-    A->>P: Initiate transfer to Finance Office account
-    P-->>A: Transfer confirmed, reference
-    A->>D: Mark included bookings settled=true
-    A->>W: Enqueue Transfer Receipt render (bilingual, FR-SETTLE-004)
-    W->>S: Store Transfer Receipt PDF
-    A-->>C: 200 {transfer_reference, receipt_url}
+    C->>A: POST /settlement/reconcile (after a client-side confirm dialog — no OTP)
+    A->>D: Lock this cashier's Visited/unreconciled bookings and undeducted refunds
+    A->>A: balance = Σ(booking amounts) − Σ(refund amounts)
+    alt balance <= 0
+        A-->>C: 400 Nothing to reconcile
+    else balance > 0
+        A->>D: Create CashierReconciliation(cashier, amount=balance, status=pending)
+        Note over A,D: Transaction commits here -- row locks released before calling Chapa
+        A->>P: Initiate transfer (amount, reference = reconciliation.id)
+        alt Chapa call fails synchronously
+            A->>D: Mark reconciliation failed (underlying bookings/refunds untouched)
+            A-->>C: 502 Could not reach the payment provider
+        else Chapa accepts the transfer
+            A->>D: Store chapa_transfer_reference
+            A-->>C: 201 {id, amountEtb, status: pending, chapaTransferReference}
+        end
+    end
+
+    Note over P: Chapa settles the transfer asynchronously
+    P->>A: POST /settlement/webhook/chapa-transfer (signature-verified, replay-safe)
+    alt Transfer succeeded
+        A->>D: Mark reconciliation completed; attribute every Visited/unreconciled booking<br/>and undeducted refund for this cashier to it, in one transaction
+    else Transfer failed
+        A->>D: Mark reconciliation failed -- bookings/refunds are untouched and<br/>remain eligible for this cashier's next attempt
+    end
 ```
 
-The Cashier then prints or downloads the Transfer Receipt and carries it — alongside the manual track's existing cash deposit slip — to the Finance Office in person (FR-SETTLE-003). Nothing past this point is part of the system.
+The Cashier then carries her own proof of the completed Chapa transfer to the Finance Office,
+alongside the IFMIS vouchers she has already handed each visitor individually at check-in
+(`booking.ifmis_voucher_reference`, Document 05 §3.3) — those vouchers, not a document this
+platform generates, are what show Finance how many visitors she handled and how much she owed
+(FR-GOV-001). Nothing past the webhook call above is part of the system.
 
 ---
 
@@ -400,13 +427,15 @@ The Cashier then prints or downloads the Transfer Receipt and carries it — alo
 
 | Job | Triggered by | Satisfies |
 |---|---|---|
-| `render_and_store_receipt` | Booking payment confirmed; settlement transfer completed | FR-PAY-002, FR-SETTLE-002, FR-LOC-002/003 |
+| `render_and_store_receipt` | Booking payment confirmed | FR-PAY-002, FR-LOC-002/003 |
 | `send_notification` | Booking confirmed, no-show notice, refund confirmed, reschedule confirmed | NFR-PERF-001 (keeps these off the request path) |
 | `check_pending_visit_date_passed` | Celery Beat, daily | FR-PAY-005 (step 1: notice) |
 | `check_no_response_refund` | Celery Beat, daily | FR-PAY-005 (step 2: auto-refund) |
 | `process_refund` | Visitor cancellation, shortfall refund request, no-response auto-refund | FR-REFUND-001–004 |
 
-All jobs retry automatically on transient failure and log a structured failure event on final exhaustion. Financial jobs (`process_refund`, the settlement transfer call) are additionally guarded by a DB-level "already processed" check before calling Chapa, so a retried job cannot double-refund or double-transfer (NFR-IDEMPOTENT-001, NFR-CONSIST-001).
+All jobs retry automatically on transient failure and log a structured failure event on final exhaustion. `process_refund` is additionally guarded by a DB-level "already processed" check before calling Chapa, so a retried job cannot double-refund (NFR-IDEMPOTENT-001, NFR-CONSIST-001).
+
+A cashier's reconciliation transfer (`apps.settlement.services.initiate_reconciliation`) is deliberately **not** a Celery job — it runs synchronously in the `POST /settlement/reconcile` request cycle, since the Cashier is waiting on its immediate result (a `pending` row and a Chapa reference, or a clear failure). Its actual confirmation is asynchronous, but arrives as a Chapa webhook call (`POST /settlement/webhook/chapa-transfer`, §5.3) rather than a scheduled or enqueued job — mirroring how `apps.payments`' own payment-confirmation webhook is handled synchronously in the request cycle, not via Celery Beat or a queued task.
 
 ### 6.2 Caching and queue design (Redis)
 
@@ -423,14 +452,13 @@ Category and availability caches are invalidated on write (a Museum Manager pric
 | Prefix | Contents | Access pattern |
 |---|---|---|
 | `receipts/temporary/{booking_id}.pdf` | Temporary receipt issued at payment confirmation (FR-PAY-002) | Private; readable by the owning Visitor via a short-lived signed URL |
-| `receipts/settlement/{transfer_id}.pdf` | Transfer Receipt (FR-SETTLE-002/004) | Private; readable by Cashier/Museum Manager |
 
-Receipts are **rendered once and stored**, not regenerated on demand, so a receipt's content always matches exactly what was issued at the time — important since these documents may later be relied on by the Finance Office (see ADR-009). S3-compatible storage is chosen specifically because it has a drop-in, self-hosted equivalent (e.g. MinIO), consistent with the still-undecided hosting target.
+Receipts are **rendered once and stored**, not regenerated on demand, so a receipt's content always matches exactly what was issued at the time — important since these documents may later be relied on by the Finance Office (see ADR-009). A cashier's reconciliation transfer (§5.3) deliberately has no entry here: per the IFMIS decision, the platform never generates a document for that transfer — the Cashier's own proof of the Chapa transfer, alongside the IFMIS vouchers already handed to each visitor (Document 05 §3.3), is what she carries to the Finance Office instead. S3-compatible storage is chosen specifically because it has a drop-in, self-hosted equivalent (e.g. MinIO), consistent with the still-undecided hosting target.
 
 ### 6.4 Internationalization implementation (FR-LOC-001–004)
 
 - **Data model:** any staff-editable text (category names, notice templates, booking purpose) is stored as a parallel-column pair (an English value and an Amharic value) rather than a single column with runtime translation — chosen because FR-LOC-004 requires each language to be independently maintainable, not machine-inferred from the other.
-- **Generated documents:** every receipt and notice is rendered from a single bilingual template that places the Amharic and English content together on one document. The amount-in-words conversion (for both languages) lives once, in `core`, and is used by both the temporary receipt and the Transfer Receipt — so the conversion logic and its correctness only need to be verified in one place.
+- **Generated documents:** every receipt and notice is rendered from a single bilingual template that places the Amharic and English content together on one document. The amount-in-words conversion used on the temporary receipt is a plain-English helper with no external dependency, since the only other place this figure is needed — `apps.entrance`'s IFMIS voucher-prep fields (§5.1) — is Cashier-facing screen text the Cashier keys into IFMIS herself, not a generated document, so it is implemented locally there rather than shared from `core`.
 - **Web and Mobile:** both clients share the same message-catalog approach (English/Amharic JSON), and a Visitor's language choice is stored on their account so it follows them between the web site and the mobile app, not just within one session.
 
 ### 6.5 Error handling and API response contract
@@ -451,8 +479,8 @@ The `message` field is localized per the Visitor's language preference (§6.4), 
 
 ### 6.6 Observability
 
-- **Structured logging:** every log line carries a `correlation_id`, generated at the reverse-proxy layer and propagated through any background job it triggers, so a booking, its payment, and its eventual settlement can be traced end-to-end.
-- **Audit logging:** every refund, settlement transfer, date closure (FR-BOOK-008), manual attendance entry, and cancellation/reschedule is written to an append-only `AuditLog` table in `core` — never to application logs alone — directly implementing NFR-AUDIT-001.
+- **Structured logging:** every log line carries a `correlation_id`, generated at the reverse-proxy layer and propagated through any background job it triggers, so a booking, its payment, and its eventual reconciliation can be traced end-to-end.
+- **Audit logging:** every refund, cashier reconciliation, IFMIS voucher recorded at check-in, date closure (FR-BOOK-008), manual attendance entry, and cancellation/reschedule is written to an append-only `AuditLog` table in `core` — never to application logs alone — directly implementing NFR-AUDIT-001.
 - **Metrics:** request latency, error rate, and job queue depth exported in a standard, vendor-neutral format, consistent with the deployment-target-agnostic principle (§1.3).
 
 ### 6.7 Rate limiting
@@ -590,10 +618,17 @@ A failing stage blocks progression; production deployment requires manual approv
 **Rationale:** Chapa exposes a documented refund capability tied to the original `tx_ref`; using it directly is what makes FR-REFUND-002's "system calculates and processes it, not a person" requirement achievable end-to-end.
 **Consequence:** The refunded amount is net of Chapa's own transaction charge (FR-REFUND-003), which must be computed and stored per refund, not assumed equal to the original charge.
 
-### ADR-009: Receipts are rendered once and persisted, not regenerated on demand
-**Decision:** Both the temporary receipt (FR-PAY-002) and the Transfer Receipt (FR-SETTLE-002) are rendered to PDF and stored in object storage at the moment they're issued.
-**Rationale:** These are financial documents the Finance Office may later rely on for reconciliation. If receipt template design changes after go-live, a regenerate-on-demand approach would silently alter the content of a document that's already been physically handed over and audited elsewhere — an unacceptable inconsistency for a financial record.
+### ADR-009: The temporary receipt is rendered once and persisted, not regenerated on demand
+**Decision:** The temporary receipt (FR-PAY-002) is rendered to PDF and stored in object storage at the moment it's issued.
+**Rationale:** This is a financial document the Finance Office may later rely on for reconciliation. If receipt template design changes after go-live, a regenerate-on-demand approach would silently alter the content of a document that's already been physically handed over and audited elsewhere — an unacceptable inconsistency for a financial record.
 **Consequence:** A template change only affects newly issued receipts going forward; historical receipts remain exactly as issued, which is the correct behavior for an audit trail.
+**Superseded scope:** an earlier design also rendered a "Transfer Receipt" here for the (platform-wide, batched) settlement transfer described in the original FR-SETTLE-001–004 wording. That design was replaced by the per-cashier reconciliation model (ADR-010) before this document's Settlement Module (§2.3, §3.2) was implemented — no Transfer Receipt is generated for a reconciliation transfer, per that ADR.
+
+### ADR-010: Per-cashier reconciliation, not a platform-wide settlement batch
+**Decision:** `apps.settlement` tracks a running balance **per Cashier** (`CashierReconciliation`, scoped by `booking.checked_in_by_user_id`), settled by a real Chapa Transfer into the university's fixed bank account — never one shared, platform-wide total, and never a document the platform generates for the transfer itself.
+**Rationale:** IFMIS ties financial responsibility to a named individual, not the institution as a whole. A Cashier who checks a visitor in personally keys that one transaction into IFMIS under her own name and hands the visitor the resulting voucher — the same thing she already does for a paper ticket. The platform's job is only to (a) give her the fields to copy into IFMIS at check-in (`apps.entrance`, §5.1) and (b) track what she individually still owes, so that settling up is her own number, never mixed with another cashier's shift. A single dedicated settlement account, or multiple cashiers sharing one IFMIS login, were both considered and rejected: neither preserves the per-transaction accountability IFMIS requires (see docs/ decision summary).
+**Consequence:** There is no batch settlement endpoint, no join table between a reconciliation and the bookings it covers beyond a plain FK (`booking.reconciliation_id`, Document 05 §3.6), and no platform-generated Transfer Receipt (superseding the relevant part of ADR-009, above) — the IFMIS vouchers she has already handed each visitor (`booking.ifmis_voucher_reference`) remain the only audit trail Finance uses for that transfer.
+**Trade-off accepted:** A reconciliation attempt's outcome is only known once Chapa's transfer webhook confirms it (§5.3), not at the moment `POST /settlement/reconcile` returns — the Cashier sees a `pending` status first, mirroring how payment confirmation itself is webhook-driven (§4.2) rather than synchronous with checkout.
 
 ---
 

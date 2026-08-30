@@ -26,9 +26,11 @@ check is booking state (only a `Pending` booking is checkable-in) and the
 headcount invariant (FR-TICKET-005).
 """
 
+from decimal import ROUND_HALF_UP, Decimal
+
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
 from apps.bookings.models import Booking
 from apps.core.exceptions import Conflict
@@ -132,5 +134,95 @@ def check_in_booking(*, booking, attended_quantity, actor):
             "attended_quantity": attended_quantity,
             "refund_eligible": shortfall > 0,
         },
+    )
+    return booking
+
+
+# --------------------------------------------------------------------------
+# IFMIS voucher-prep at check-in (the settlement-rebuild build prompt's
+# Step 7). Reuses `check_in_booking`'s existing return value -- neither
+# function above is touched -- this is presentation logic for the
+# Cashier's IFMIS data-entry screen, plus a small follow-up write once she
+# reports back the real voucher reference.
+# --------------------------------------------------------------------------
+
+_ONES = [
+    "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+    "Seventeen", "Eighteen", "Nineteen",
+]
+_TENS = [
+    "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety",
+]
+_SCALES = [(1_000_000_000, "Billion"), (1_000_000, "Million"), (1_000, "Thousand"), (100, "Hundred")]
+
+
+def _integer_to_words(n: int) -> str:
+    """Plain English long-form spelling of a non-negative integer -- no
+    external dependency (`num2words` isn't in requirements/base.txt) since
+    the only use is spelling out whole-Birr amounts for an IFMIS voucher,
+    a bounded and simple need."""
+    if n == 0:
+        return "Zero"
+    words = []
+    remainder = n
+    for value, name in _SCALES:
+        if remainder >= value:
+            count, remainder = divmod(remainder, value)
+            words.append(f"{_integer_to_words(count)} {name}")
+    if remainder:
+        if remainder < 20:
+            words.append(_ONES[remainder])
+        else:
+            tens, ones = divmod(remainder, 10)
+            words.append(f"{_TENS[tens]}{'-' + _ONES[ones].lower() if ones else ''}")
+    return " ".join(words)
+
+
+def amount_in_words_etb(amount: Decimal) -> str:
+    """The "amount in words" field a Cashier copies onto an IFMIS
+    voucher -- e.g. `Decimal("1250.50")` -> `"One Thousand Two Hundred
+    Fifty Birr and Fifty Cents"`. `amount` is always non-negative here
+    (a `Booking.total_amount_etb`, DB-constrained positive elsewhere), so
+    no sign handling is needed."""
+    quantized = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    birr, cents = divmod(int(quantized * 100), 100)
+    words = f"{_integer_to_words(birr)} Birr"
+    if cents:
+        words += f" and {_integer_to_words(cents)} Cents"
+    return words
+
+
+def record_ifmis_voucher_reference(*, booking, actor, voucher_reference):
+    """Implements `PATCH /bookings/{id}/ifmis-voucher/`. Called once the
+    Cashier has actually keyed this transaction into IFMIS and gotten the
+    real Document No/Ref No back -- the platform never generates or
+    guesses this value itself (per the IFMIS decision: IFMIS is a closed
+    system, no API calls to it).
+
+    Restricted to the same Cashier who checked this booking in
+    (`checked_in_by_user_id`) -- not any Cashier on shift today, since
+    it's *her* name on that IFMIS entry, and settable only once: a
+    voucher reference already recorded here is never overwritten, since
+    that would let the one thing tying this booking to a specific IFMIS
+    entry silently change after the fact.
+    """
+    if booking.checked_in_by_user_id_id != actor.id:
+        raise PermissionDenied(
+            "Only the cashier who checked this booking in may record its IFMIS voucher."
+        )
+
+    if booking.ifmis_voucher_reference:
+        raise Conflict("An IFMIS voucher reference has already been recorded for this booking.")
+
+    booking.ifmis_voucher_reference = voucher_reference
+    booking.save(update_fields=["ifmis_voucher_reference", "updated_at"])
+
+    write_audit_log(
+        actor_id=actor.id,
+        action="booking.ifmis_voucher_recorded",
+        target_type="booking",
+        target_id=booking.id,
+        metadata={"ifmis_voucher_reference": voucher_reference},
     )
     return booking

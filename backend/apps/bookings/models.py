@@ -91,9 +91,10 @@ class Booking(TimeStampedModel):
     (payments, entrance, refunds, settlement, reporting) hangs off it.
 
     Fields owned operationally by a future app (`checked_in_*`,
-    `chapa_checkout_url`, `receipt_url`, `settled`) are declared here
-    because this is the authoritative table per Document 05 -- they are
-    simply never *written* by this app's services.py, only read.
+    `chapa_checkout_url`, `receipt_url`, `ifmis_voucher_reference`,
+    `reconciliation`) are declared here because this is the authoritative
+    table per Document 05 -- they are simply never *written* by this
+    app's services.py, only read.
     """
 
     class BookingType(models.TextChoices):
@@ -185,12 +186,23 @@ class Booking(TimeStampedModel):
     # Populated once, at payment confirmation, by apps.payments (ADR-009).
     receipt_url = models.TextField(null=True, blank=True)
 
-    settled = models.BooleanField(default=False)
-    # FK to `settlement.SettlementTransfer` per Doc05 Sec 3.3 -- that app
-    # doesn't exist yet (Sec 3.2's dependency order), so this is a plain
-    # UUID for now rather than a FK to a model that isn't there. Migrate
-    # to a real FK once apps.settlement lands.
-    settlement_transfer_id = models.UUIDField(null=True, blank=True)
+    # The real Document No/Ref No the Cashier gets back from IFMIS at
+    # check-in. Not known at the instant `check_in_booking` runs -- she
+    # keys the transaction into IFMIS separately and reports it back via
+    # `PATCH /bookings/{id}/ifmis-voucher/` (apps.entrance, Step 7).
+    ifmis_voucher_reference = models.TextField(null=True, blank=True)
+
+    # Set once this booking's amount has been included in a *completed*
+    # per-cashier reconciliation (apps.settlement.CashierReconciliation).
+    # PROTECT: a reconciliation that has bookings attributed to it must
+    # never be deleted out from under them.
+    reconciliation = models.ForeignKey(
+        "settlement.CashierReconciliation",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="bookings",
+    )
 
     class Meta:
         app_label = "bookings"
@@ -238,9 +250,9 @@ class Booking(TimeStampedModel):
         indexes = [
             models.Index(fields=["status", "visit_date"], name="booking_status_visit_date_idx"),
             models.Index(
-                fields=["id"],
-                name="booking_unsettled_visited_idx",
-                condition=models.Q(status="visited", settled=False),
+                fields=["checked_in_by_user_id"],
+                name="booking_visited_unrecon_idx",
+                condition=models.Q(status="visited", reconciliation__isnull=True),
             ),
             models.Index(
                 fields=["notice_sent_at"],

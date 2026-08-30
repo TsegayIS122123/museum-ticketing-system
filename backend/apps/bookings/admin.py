@@ -35,8 +35,8 @@ class BookingAdmin(admin.ModelAdmin):
         "checked_in_by_user_id",
         "chapa_checkout_url",
         "receipt_url",
-        "settled",
-        "settlement_transfer_id",
+        "ifmis_voucher_reference",
+        "reconciliation",
         "created_at",
         "updated_at",
     ]

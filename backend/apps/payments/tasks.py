@@ -2,8 +2,12 @@
 payments -- Celery tasks (queue: documents per Sec 6.1-6.2)
 
 `render_and_store_receipt` runs once, triggered by payment confirmation
-(`services.confirm_payment_from_webhook`); `apps.settlement`'s own task
-(`render_transfer_receipt`) renders the separate Transfer Receipt.
+(`services.confirm_payment_from_webhook`). This is the Visitor-facing
+receipt for her booking payment -- distinct from
+`apps.settlement.tasks.render_and_store_transfer_receipt`, the
+Cashier-facing receipt proving a reconciliation transfer to Finance went
+through. Same once-and-store pattern (ADR-009), different audience and
+document.
 """
 
 import io
@@ -28,8 +32,9 @@ def _render_receipt_pdf(*, booking) -> bytes:
     """FR-LOC-002/003: every generated document presents Amharic and
     English together, not as a language the Visitor has to switch to.
     Kept deliberately simple (a plain two-column bilingual layout) --
-    this is a temporary receipt, not the final Document 05 Sec 6.3
-    settlement paperwork, which apps.settlement renders separately."""
+    this is the only generated financial document in this system; a
+    cashier's reconciliation transfer (apps.settlement) produces no
+    document of its own (per the IFMIS decision)."""
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, _height = A4
