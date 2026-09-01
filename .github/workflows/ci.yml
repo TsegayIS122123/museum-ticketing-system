@@ -78,5 +78,5 @@ jobs:
 
       - name: Contract drift check
         run: |
-          ./scripts/export_contract.sh
+          bash ./scripts/export_contract.sh
           git diff --exit-code -- ../contracts/openapi.yaml
