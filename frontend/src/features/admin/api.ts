@@ -1,32 +1,14 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
+import type { StaffAccountResponse } from '@/lib/api-contract';
 import type { StaffCreateInput, StaffUpdateInput } from './schemas';
 
-// Real backend shape (contracts/openapi.yaml -- Account). Snake_case,
-// same as everywhere else Account appears (GET /users/me/, AuthResponse).
-export interface StaffAccountResponse {
-  id: string;
-  email: string;
-  phone: string | null;
-  full_name: string;
-  role: 'visitor' | 'cashier' | 'museum_manager' | 'platform_admin';
-  language_preference: 'en' | 'am';
-  active: boolean;
-  created_at: string;
-}
-
-export interface StaffAccountListResponse {
-  data: StaffAccountResponse[];
-  meta: {
-    limit: number;
-    offset: number;
-    total: number;
-  };
-}
+export type { StaffAccountResponse };
+export type StaffAccountListResponse = components['schemas']['PaginatedAccountList'];
 
 // GET /admin/staff/ -- Platform Admin only. Paginated envelope (flat
-// data array -- see the note in src/lib/api-types.ts / the contract's
-// Paginated*List double-array bug, which is a drf-spectacular
-// schema-generation artifact, not the real runtime shape).
+// data array -- see the note in apps/core/pagination.py / the contract's
+// Paginated*List schema).
 export async function getStaffAccounts(params?: {
   limit?: number;
   offset?: number;
@@ -46,6 +28,11 @@ export async function getStaffAccounts(params?: {
 // POST /admin/staff/ -- Platform Admin only. No password field: the
 // backend provisions the account with no usable password and emails a
 // set-password link (reuses the forgot-password flow).
+//
+// Response is typed via StaffAccountResponse (api-contract.ts ->
+// components["schemas"]["Account"]) rather than the operation's own
+// generated response type, which is a verified drf-spectacular bug: see
+// the comment on StaffAccountResponse in api-contract.ts.
 export async function createStaffAccount(input: StaffCreateInput): Promise<StaffAccountResponse> {
   return apiClient.post<StaffAccountResponse>('/admin/staff/', input);
 }

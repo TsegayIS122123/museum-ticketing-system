@@ -1,11 +1,7 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
 
-export interface DateAvailability {
-  date: string;
-  isOpenForBooking: boolean;
-  closedByUserId: string | null;
-  closedAt: string | null;
-}
+export type DateAvailability = components['schemas']['DateAvailability'];
 
 // GET /availability/?from=YYYY-MM-DD&to=YYYY-MM-DD -- both query params
 // are REQUIRED by the backend (returns 400 if either is missing), even

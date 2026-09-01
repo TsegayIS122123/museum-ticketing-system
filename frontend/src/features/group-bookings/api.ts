@@ -1,4 +1,6 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
+import type { Booking, BookingListResponse } from '@/lib/api-contract';
 
 // Real backend model (contracts/openapi.yaml): there is no dedicated
 // group-booking resource. A group visit is a Booking with
@@ -8,44 +10,8 @@ import { apiClient } from '@/lib/api/client';
 // never part of this payload -- it comes from the authenticated visitor's
 // account (request.user) on the backend.
 
-export type BookingStatus =
-  | 'awaiting_payment'
-  | 'pending_approval'
-  | 'pending'
-  | 'visited'
-  | 'cancelled'
-  | 'refunded';
-
-export interface Booking {
-  id: string;
-  reference: string;
-  visitorId: string;
-  categoryId: string;
-  visitDate: string;
-  bookingType: 'individual' | 'group';
-  groupName: string | null;
-  bookedQuantity: number;
-  attendedQuantity: number | null;
-  status: BookingStatus;
-  approvalStatus: 'approved' | 'declined' | null;
-  rescheduledCount: number;
-  noticeSentAt: string | null;
-  checkoutUrl: string | null;
-  receiptUrl: string | null;
-  ifmisVoucherReference: string | null;
-  reconciliationId: string | null;
-  totalAmountEtb: string; // decimal string
-  createdAt: string;
-}
-
-export interface BookingListResponse {
-  data: Booking[];
-  meta: {
-    limit: number;
-    offset: number;
-    total: number;
-  };
-}
+export type { Booking, BookingListResponse };
+export type BookingStatus = components['schemas']['BookingStatusEnum'];
 
 export interface CreateGroupBookingInput {
   visitDate: string;
@@ -57,21 +23,22 @@ export interface CreateGroupBookingInput {
 
 export interface DecideGroupBookingInput {
   bookingId: string;
-  decision: 'approve' | 'decline';
+  decision: components['schemas']['DecisionEnum'];
   note?: string | null;
 }
 
 // POST /bookings -- Visitor only, with bookingType: 'group'. The visitor
 // must already be logged in/verified; the endpoint has no anonymous path.
 export async function submitGroupBooking(input: CreateGroupBookingInput): Promise<Booking> {
-  return apiClient.post<Booking>('/bookings/', {
+  const body: components['schemas']['BookingCreate'] = {
     visitDate: input.visitDate,
     categoryId: input.categoryId,
     quantity: input.quantity,
     bookingType: 'group',
     groupName: input.groupName ?? null,
     groupContactPhone: input.groupContactPhone ?? null,
-  });
+  };
+  return apiClient.post<Booking>('/bookings/', body);
 }
 
 // GET /bookings?bookingType=group -- Staff only. There is no separate
@@ -103,8 +70,9 @@ export async function getGroupBooking(id: string): Promise<Booking> {
 // bookings" endpoint -- callers should use getGroupBookings({ status:
 // 'pending_approval' }) and read meta.total.
 export async function decideGroupBooking(input: DecideGroupBookingInput): Promise<Booking> {
-  return apiClient.put<Booking>(`/bookings/${input.bookingId}/approval/`, {
+  const body: components['schemas']['BookingApproval'] = {
     decision: input.decision,
     note: input.note ?? null,
-  });
+  };
+  return apiClient.put<Booking>(`/bookings/${input.bookingId}/approval/`, body);
 }

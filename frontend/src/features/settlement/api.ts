@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
 
 // Real backend model (contracts/openapi.yaml): settlement is NOT a
 // selectable-list-of-bookings-then-batch-transfer flow. There is no
@@ -6,33 +7,10 @@ import { apiClient } from '@/lib/api/client';
 // sees her own aggregate outstanding balance and fires one no-parameter
 // "reconcile" action against it.
 
-export interface OutstandingBalance {
-  balanceEtb: string; // decimal string, e.g. "1234.50"
-}
-
-export type ReconciliationStatus = 'pending' | 'completed' | 'failed';
-
-export interface CashierReconciliation {
-  id: string;
-  cashierId: string;
-  amountEtb: string; // decimal string
-  chapaTransferReference: string | null;
-  status: ReconciliationStatus;
-  initiatedAt: string | null;
-  completedAt: string | null;
-  transferReceiptUrl: string | null;
-  failureReason: string | null;
-  createdAt: string;
-}
-
-export interface ReconciliationListResponse {
-  data: CashierReconciliation[];
-  meta: {
-    limit: number;
-    offset: number;
-    total: number;
-  };
-}
+export type OutstandingBalance = components['schemas']['OutstandingBalance'];
+export type ReconciliationStatus = components['schemas']['CashierReconciliation']['status'];
+export type CashierReconciliation = components['schemas']['CashierReconciliation'];
+export type ReconciliationListResponse = components['schemas']['PaginatedCashierReconciliationList'];
 
 // GET /settlement/my-balance/ -- Cashier only. Her own outstanding balance.
 export async function getMyOutstandingBalance(): Promise<OutstandingBalance> {

@@ -1,29 +1,10 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
+import type { ReportSummary } from '@/lib/api-contract';
 
-export type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
-
-export interface DashboardResponse {
-  revenueTotalEtb: string;
-  visitorCountsByCategory: Record<string, number>;
-  groupVsIndividualSplit: {
-    group: number;
-    individual: number;
-  };
-  statusMix: {
-    pending: number;
-    visited: number;
-    cancelled: number;
-    refunded: number;
-  };
-}
-
-export interface ReportSummaryResponse {
-  period: ReportPeriod;
-  from: string;
-  to: string;
-  revenueByCategory: Record<string, string>;
-  visitorCountsByGroup: Record<string, number>;
-}
+export type ReportPeriod = components['schemas']['PeriodEnum'];
+export type DashboardResponse = components['schemas']['Dashboard'];
+export type ReportSummaryResponse = ReportSummary;
 
 // GET /reports/dashboard -- Museum Manager/Platform Admin only
 export async function getDashboard(): Promise<DashboardResponse> {

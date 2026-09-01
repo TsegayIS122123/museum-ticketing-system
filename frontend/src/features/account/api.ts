@@ -1,4 +1,6 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
+import type { TokenRefreshRequest, TokenRefreshResponse } from '@/lib/api-contract';
 
 // Real backend shape (contracts/openapi.yaml). Every auth-related
 // serializer here is snake_case -- including the request bodies and the
@@ -9,74 +11,51 @@ import { apiClient } from '@/lib/api/client';
 // Account do not) -- not something the frontend can paper over, it has
 // to match what's actually sent.
 
-export interface Account {
-  id: string;
-  email: string;
-  phone: string | null;
-  full_name: string;
-  role: 'visitor' | 'cashier' | 'museum_manager' | 'platform_admin';
-  language_preference: 'en' | 'am';
-  active: boolean;
-  created_at: string;
-}
-
-export interface VisitorVerifyStartResponse {
-  verification_id: string;
-  otp_expires_in_seconds: number;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  user: Account;
-}
+export type Account = components['schemas']['Account'];
+export type VisitorVerifyStartResponse = components['schemas']['VisitorVerifyStartResponse'];
+export type AuthResponse = components['schemas']['AuthResponse'];
 
 // POST /auth/visitor/verify/start/ -- step 1: request OTP.
-export async function startVisitorVerification(input: {
-  email: string;
-  phone: string;
-  full_name?: string;
-  language_preference?: 'en' | 'am';
-}): Promise<VisitorVerifyStartResponse> {
+export async function startVisitorVerification(
+  input: components['schemas']['VisitorVerifyStart']
+): Promise<VisitorVerifyStartResponse> {
   return apiClient.post<VisitorVerifyStartResponse>('/auth/visitor/verify/start/', input);
 }
 
 // POST /auth/visitor/verify/confirm/ -- step 2: confirm OTP, issues the
 // same token pair staff login does.
-export async function confirmVisitorVerification(input: {
-  verification_id: string;
-  otp_code: string;
-}): Promise<AuthResponse> {
+export async function confirmVisitorVerification(
+  input: components['schemas']['VisitorVerifyConfirm']
+): Promise<AuthResponse> {
   return apiClient.post<AuthResponse>('/auth/visitor/verify/confirm/', input);
 }
 
 // POST /auth/login/ -- Staff only (password-based).
-export async function staffLogin(input: {
-  email: string;
-  password: string;
-}): Promise<AuthResponse> {
+export async function staffLogin(input: components['schemas']['StaffLogin']): Promise<AuthResponse> {
   return apiClient.post<AuthResponse>('/auth/login/', input);
 }
 
 // POST /auth/forgot-password/ -- Staff only. Always 200 regardless of
 // whether the email matches an account (services.request_password_reset).
-export async function staffForgotPassword(input: { email: string }): Promise<void> {
+export async function staffForgotPassword(
+  input: components['schemas']['ForgotPassword']
+): Promise<void> {
   return apiClient.post<void>('/auth/forgot-password/', input);
 }
 
 // POST /auth/reset-password/ -- Staff only.
-export async function staffResetPassword(input: {
-  token: string;
-  new_password: string;
-}): Promise<void> {
+export async function staffResetPassword(
+  input: components['schemas']['ResetPassword']
+): Promise<void> {
   return apiClient.post<void>('/auth/reset-password/', input);
 }
 
 // POST /auth/refresh/ -- exchanges a refresh token for a new access
 // token. Not currently wired up anywhere in the app (no refresh_token is
 // persisted today -- see auth-context.tsx), but the endpoint is real.
-export async function refreshAccessToken(refresh: string): Promise<{ access: string }> {
-  return apiClient.post<{ access: string }>('/auth/refresh/', { refresh });
+export async function refreshAccessToken(refresh: string): Promise<TokenRefreshResponse> {
+  const body: TokenRefreshRequest = { refresh };
+  return apiClient.post<TokenRefreshResponse>('/auth/refresh/', body);
 }
 
 // GET /users/me/ -- current account, Visitor or Staff.
@@ -85,10 +64,8 @@ export async function getCurrentUser(): Promise<Account> {
 }
 
 // PUT /users/me/
-export async function updateCurrentUser(input: {
-  full_name?: string;
-  phone?: string;
-  language_preference?: 'en' | 'am';
-}): Promise<Account> {
+export async function updateCurrentUser(
+  input: components['schemas']['AccountUpdate']
+): Promise<Account> {
   return apiClient.put<Account>('/users/me/', input);
 }

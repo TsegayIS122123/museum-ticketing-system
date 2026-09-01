@@ -4,5 +4,5 @@
 # after manually editing contracts/openapi.yaml ahead of a backend change.
 
 set -euo pipefail
-npx openapi-typescript ../contracts/openapi.yaml -o src/lib/api-types.ts
+npx openapi-typescript ../contracts/openapi.yaml --default-non-nullable false -o src/lib/api-types.ts
 echo "src/lib/api-types.ts regenerated."

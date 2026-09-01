@@ -1,55 +1,9 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
+import type { Booking, BookingListResponse } from '@/lib/api-contract';
 
-export type BookingStatus =
-  | 'awaiting_payment'
-  | 'pending_approval'
-  | 'pending'
-  | 'visited'
-  | 'cancelled'
-  | 'refunded';
-
-export interface BookingResponse {
-  id: string;
-  reference: string;
-  visitorId: string;
-  categoryId: string;
-  // Bilingual category name *snapshot* taken at booking time -- always
-  // present, even if the category has since been renamed or retired.
-  categoryNameEn: string;
-  categoryNameAm: string;
-  visitDate: string;
-  bookingType: 'individual' | 'group';
-  groupName: string | null;
-  // Who a Cashier calls/SMSs to reach this booking's requester. For a
-  // group booking this is the number collected at booking time
-  // (`groupContactPhone`); for an individual booking there is no
-  // separate contact number -- use visitorEmail/visitorPhone instead.
-  groupContactPhone: string | null;
-  visitorName: string;
-  visitorEmail: string;
-  visitorPhone: string | null;
-  bookedQuantity: number;
-  attendedQuantity: number | null;
-  status: BookingStatus;
-  approvalStatus: 'approved' | 'declined' | null;
-  rescheduledCount: number;
-  noticeSentAt: string | null;
-  checkoutUrl: string | null;
-  receiptUrl: string | null;
-  ifmisVoucherReference: string | null;
-  reconciliationId: string | null;
-  totalAmountEtb: string; // decimal string, e.g. "150.00" -- NOT a number
-  createdAt: string;
-}
-
-export interface BookingListResponse {
-  data: BookingResponse[];
-  meta: {
-    limit: number;
-    offset: number;
-    total: number;
-  };
-}
+export type { Booking as BookingResponse, BookingListResponse } from '@/lib/api-contract';
+export type BookingStatus = components['schemas']['BookingStatusEnum'];
 
 // BookingCreateRequest (contracts/openapi.yaml): visitor identity comes
 // from the authenticated user (request.user) on the backend, never from
@@ -60,23 +14,16 @@ export interface BookingListResponse {
 // for where the old UI collected these; that "Details" step needs a
 // product decision (drop the fields, or insert a login/verify step
 // before checkout), not just a type fix.
-export interface CreateBookingInput {
-  visitDate: string;
-  categoryId: string;
-  quantity: number;
-  bookingType: 'individual' | 'group';
-  groupName?: string | null;
-  groupContactPhone?: string | null;
-}
+export type CreateBookingInput = components['schemas']['BookingCreate'];
 
 // POST /bookings/ -- Visitor only (must be logged in/OTP-verified).
-export async function createBooking(input: CreateBookingInput): Promise<BookingResponse> {
-  return apiClient.post<BookingResponse>('/bookings/', input);
+export async function createBooking(input: CreateBookingInput): Promise<Booking> {
+  return apiClient.post<Booking>('/bookings/', input);
 }
 
 // GET /bookings/{id}/ -- the owning visitor or any Staff member.
-export async function getBooking(id: string): Promise<BookingResponse> {
-  return apiClient.get<BookingResponse>(`/bookings/${id}/`);
+export async function getBooking(id: string): Promise<Booking> {
+  return apiClient.get<Booking>(`/bookings/${id}/`);
 }
 
 // GET /users/me/bookings/ -- the current visitor's own bookings. Paginated
@@ -96,13 +43,13 @@ export async function getMyBookings(params?: {
 }
 
 // POST /bookings/{id}/cancel/ (FR-BOOK-005/006).
-export async function cancelBooking(id: string): Promise<BookingResponse> {
-  return apiClient.post<BookingResponse>(`/bookings/${id}/cancel/`);
+export async function cancelBooking(id: string): Promise<Booking> {
+  return apiClient.post<Booking>(`/bookings/${id}/cancel/`);
 }
 
 // POST /bookings/{id}/reschedule/ -- at most once (FR-BOOK-007).
-export async function rescheduleBooking(id: string, newVisitDate: string): Promise<BookingResponse> {
-  return apiClient.post<BookingResponse>(`/bookings/${id}/reschedule/`, { newVisitDate });
+export async function rescheduleBooking(id: string, newVisitDate: string): Promise<Booking> {
+  return apiClient.post<Booking>(`/bookings/${id}/reschedule/`, { newVisitDate });
 }
 
 // GET /availability/?from=...&to=... -- both query params are REQUIRED by
@@ -115,7 +62,7 @@ export async function rescheduleBooking(id: string, newVisitDate: string): Promi
 // endpoint isn't paginated on the backend.
 export async function checkDateAvailability(date: string): Promise<{ isOpenForBooking: boolean }> {
   const query = new URLSearchParams({ from: date, to: date });
-  const dates = await apiClient.get<{ date: string; isOpenForBooking: boolean }[]>(
+  const dates = await apiClient.get<components['schemas']['DateAvailability'][]>(
     `/availability/?${query.toString()}`
   );
   const match = dates.find((d) => d.date === date);

@@ -1,21 +1,15 @@
 import { z } from 'zod';
+import type { components } from '@/lib/api-types';
 
 // Real backend shape (contracts/openapi.yaml -- Category/CategoryCreate/
-// CategoryUpdate). Field names are snake_case here: AccountSerializer,
+// CategoryUpdate), derived directly from the generated schema rather than
+// hand-copied. Field names are snake_case here: AccountSerializer,
 // CategorySerializer etc. use plain DRF ModelSerializer field names, not
 // the camelCase renderer the plain (non-model) serializers use elsewhere
 // in this API. price_etb is a decimal-formatted string, not a number.
 // There are no description fields on the backend at all -- keeping them
 // here would just be more invented data the server will silently drop.
-
-export interface Category {
-  id: string;
-  name_en: string;
-  name_am: string;
-  price_etb: string; // decimal string, e.g. "100.00"
-  is_free: boolean;
-  active: boolean;
-}
+export type Category = components['schemas']['Category'];
 
 export const categoryCreateSchema = z.object({
   name_en: z.string()

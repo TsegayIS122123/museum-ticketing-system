@@ -1054,43 +1054,43 @@ export interface components {
             readonly balanceEtb: string;
         };
         PaginatedAccountList: {
-            data?: components["schemas"]["Account"][];
-            meta?: {
-                limit?: number;
-                offset?: number;
-                total?: number;
+            data: components["schemas"]["Account"][];
+            meta: {
+                limit: number;
+                offset: number;
+                total: number;
             };
         };
         PaginatedBookingList: {
-            data?: components["schemas"]["Booking"][];
-            meta?: {
-                limit?: number;
-                offset?: number;
-                total?: number;
+            data: components["schemas"]["Booking"][];
+            meta: {
+                limit: number;
+                offset: number;
+                total: number;
             };
         };
         PaginatedCashierReconciliationList: {
-            data?: components["schemas"]["CashierReconciliation"][];
-            meta?: {
-                limit?: number;
-                offset?: number;
-                total?: number;
+            data: components["schemas"]["CashierReconciliation"][];
+            meta: {
+                limit: number;
+                offset: number;
+                total: number;
             };
         };
         PaginatedCategoryList: {
-            data?: components["schemas"]["Category"][];
-            meta?: {
-                limit?: number;
-                offset?: number;
-                total?: number;
+            data: components["schemas"]["Category"][];
+            meta: {
+                limit: number;
+                offset: number;
+                total: number;
             };
         };
         PaginatedRefundList: {
-            data?: components["schemas"]["Refund"][];
-            meta?: {
-                limit?: number;
-                offset?: number;
-                total?: number;
+            data: components["schemas"]["Refund"][];
+            meta: {
+                limit: number;
+                offset: number;
+                total: number;
             };
         };
         /**
@@ -1187,7 +1187,7 @@ export interface components {
             /** Format: email */
             email: string;
             /** @default  */
-            phone: string;
+            phone?: string;
             full_name: string;
             role: components["schemas"]["StaffRoleEnum"];
         };
@@ -1237,7 +1237,7 @@ export interface components {
             email: string;
             phone: string;
             /** @default  */
-            full_name: string;
+            full_name?: string;
             language_preference?: components["schemas"]["LanguagePreferenceEnum"];
         };
         VisitorVerifyStartResponse: {

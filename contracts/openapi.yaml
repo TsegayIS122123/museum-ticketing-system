@@ -1864,6 +1864,13 @@ components:
               type: integer
             total:
               type: integer
+          required:
+          - limit
+          - offset
+          - total
+      required:
+      - data
+      - meta
     PaginatedBookingList:
       type: object
       properties:
@@ -1880,6 +1887,13 @@ components:
               type: integer
             total:
               type: integer
+          required:
+          - limit
+          - offset
+          - total
+      required:
+      - data
+      - meta
     PaginatedCashierReconciliationList:
       type: object
       properties:
@@ -1896,6 +1910,13 @@ components:
               type: integer
             total:
               type: integer
+          required:
+          - limit
+          - offset
+          - total
+      required:
+      - data
+      - meta
     PaginatedCategoryList:
       type: object
       properties:
@@ -1912,6 +1933,13 @@ components:
               type: integer
             total:
               type: integer
+          required:
+          - limit
+          - offset
+          - total
+      required:
+      - data
+      - meta
     PaginatedRefundList:
       type: object
       properties:
@@ -1928,6 +1956,13 @@ components:
               type: integer
             total:
               type: integer
+          required:
+          - limit
+          - offset
+          - total
+      required:
+      - data
+      - meta
     PatchedIfmisVoucherUpdate:
       type: object
       description: |-

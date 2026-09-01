@@ -1,14 +1,8 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
 import type { Category, CategoryCreateInput, CategoryUpdateInput } from './schemas';
 
-export interface CategoryListResponse {
-  data: Category[];
-  meta: {
-    limit: number;
-    offset: number;
-    total: number;
-  };
-}
+export type CategoryListResponse = components['schemas']['PaginatedCategoryList'];
 
 // GET /categories/ -- public, no auth. Active-only by default
 // (services.list_active_categories on the backend). Pass

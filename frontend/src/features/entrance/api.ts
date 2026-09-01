@@ -1,28 +1,23 @@
 import { apiClient } from '@/lib/api/client';
-import type { BookingResponse } from '@/features/booking/api';
+import type { Booking, CheckInResponse } from '@/lib/api-contract';
 
 // GET /bookings/lookup and POST /bookings/{id}/check-in both return the
-// plain `Booking` shape (BookingResponse, apps.bookings.serializers.
-// BookingSerializer) -- there is no separate "lookup" resource on the
-// backend and no visitorName/visitorEmail/visitorPhone/visitTime/
-// isCheckedIn/checkedInAt/checkedInBy/shortfall/isPartial fields anywhere
-// in the contract. "Checked in" is just `status === 'visited'`
+// plain `Booking` shape (apps.bookings.serializers.BookingSerializer) --
+// there is no separate "lookup" resource on the backend and no
+// visitorName/visitorEmail/visitorPhone/visitTime/isCheckedIn/
+// checkedInAt/checkedInBy/shortfall/isPartial fields anywhere in the
+// contract. "Checked in" is just `status === 'visited'`
 // (apps.entrance.services.check_in_booking transitions the booking
 // straight to Visited); there is no separate boolean or timestamp for it
 // -- `createdAt` is the booking's creation time, not the check-in time,
 // and the API has no check-in-timestamp field at all today.
-export type BookingLookupResponse = BookingResponse;
+export type BookingLookupResponse = Booking;
 
 // POST /bookings/{id}/check-in's response (CheckInResponseSerializer,
 // apps.entrance.serializers) -- the same Booking fields above, plus four
 // IFMIS voucher-prep fields the Cashier needs to key this transaction
 // into IFMIS herself (the platform never calls IFMIS directly).
-export interface CheckInResponse extends BookingResponse {
-  payerName: string;
-  amountFigures: string; // decimal string, e.g. "150.00" -- NOT a number
-  amountWords: string;
-  ifmisPurpose: string;
-}
+export type { CheckInResponse };
 
 // GET /bookings/lookup?reference=... -- Cashier only (FR-TICKET-001,
 // FR-TICKET-004). Accepts either a typed reference or a keyboard-wedge
@@ -57,6 +52,6 @@ export async function getBooking(id: string): Promise<BookingLookupResponse> {
 export async function recordIfmisVoucherReference(
   bookingId: string,
   voucherReference: string
-): Promise<BookingResponse> {
-  return apiClient.patch<BookingResponse>(`/bookings/${bookingId}/ifmis-voucher/`, { voucherReference });
+): Promise<Booking> {
+  return apiClient.patch<Booking>(`/bookings/${bookingId}/ifmis-voucher/`, { voucherReference });
 }

@@ -57,6 +57,8 @@ class EnvelopeLimitOffsetPagination(LimitOffsetPagination):
                         "offset": {"type": "integer"},
                         "total": {"type": "integer"},
                     },
+                    "required": ["limit", "offset", "total"],
                 },
             },
+            "required": ["data", "meta"],
         }

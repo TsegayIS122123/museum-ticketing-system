@@ -1,23 +1,8 @@
 import { apiClient } from '@/lib/api/client';
+import type { components } from '@/lib/api-types';
 
-export interface Refund {
-  id: string;
-  bookingId: string;
-  amountEtb: string;
-  reason: 'cancellation' | 'partial_shortfall' | 'no_response';
-  status: 'pending' | 'completed' | 'failed';
-  chapaRefundReference: string | null;
-  createdAt: string;
-}
-
-export interface RefundListResponse {
-  data: Refund[];
-  meta: {
-    limit: number;
-    offset: number;
-    total: number;
-  };
-}
+export type Refund = components['schemas']['Refund'];
+export type RefundListResponse = components['schemas']['PaginatedRefundList'];
 
 // GET /refunds -- Visitors see only their own; Staff see all. `reason`
 // filters across all three Refund.Reason values (services.list_refunds
