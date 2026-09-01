@@ -7,5 +7,11 @@ export default function RootLayout({
 }: {
   children: ReactNode;
 }) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <html lang="en">
+      <body className="antialiased min-h-screen flex flex-col bg-stone-50">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
+    </html>
+  );
 }

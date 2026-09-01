@@ -138,6 +138,7 @@ services:
       - ./frontend/.env.local
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
+      WATCHPACK_POLLING: "true"
     ports:
       - "3000:3000"
     depends_on:
