@@ -1,6 +1,11 @@
 import { ApiError, type ApiErrorPayload } from './errors';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE =
+  typeof window === 'undefined'
+    ? process.env.API_INTERNAL_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:8000/api/v1'
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 // In-memory token storage (Option A - safest against XSS)
 let accessToken: string | null = null;

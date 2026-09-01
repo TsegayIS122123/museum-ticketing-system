@@ -18,6 +18,7 @@ from .serializers import (
     VisitorVerifyConfirmSerializer,
     VisitorVerifyStartSerializer,
 )
+from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializer
 
 # `AuthResponse` (Document 04) -- the token pair + profile shape shared by
 # every flow that ends in a session (Visitor OTP confirm, Staff login).
@@ -116,7 +117,30 @@ class StaffLoginView(APIView):
     permission_classes = [permissions.AllowAny]
     throttle_scope = "login"
 
-    @extend_schema(request=StaffLoginSerializer, responses=AuthResponseSerializer)
+    @extend_schema(
+        request=StaffLoginSerializer,
+        responses=AuthResponseSerializer,
+        examples=[
+            OpenApiExample(
+                "Staff login (mock)",
+                value={
+                    "access_token": "mock-access-token",
+                    "refresh_token": "mock-refresh-token",
+                    "user": {
+                        "id": "00000000-0000-0000-0000-000000000001",
+                        "email": "manager@sciencemuseum.et",
+                        "phone": None,
+                        "full_name": "Mock Museum Manager",
+                        "role": "museum_manager",
+                        "language_preference": "en",
+                        "active": True,
+                        "created_at": "2026-01-01T00:00:00Z",
+                    },
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         serializer = StaffLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
