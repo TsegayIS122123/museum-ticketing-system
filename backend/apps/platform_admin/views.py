@@ -3,7 +3,7 @@ HTTP concerns only: routing to a service call, permission checks, and
 response status codes. No business logic here (Design Spec Sec 3.1).
 """
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.response import Response
 
@@ -16,6 +16,27 @@ from . import services
 from .serializers import StaffCreateSerializer, StaffUpdateSerializer
 
 
+# NOTE on the `post=` schema override below: `ListCreateAPIView` (see
+# rest_framework.generics) defines `post()` itself --
+#   def post(self, request, *args, **kwargs):
+#       return self.create(request, *args, **kwargs)
+# -- and `StaffListCreateView` never overrides `post`, only `create`.
+# drf-spectacular's AutoSchema resolves each operation from the view's
+# actual HTTP-verb handler method (`post`, via getattr(view, "post")),
+# not from whatever internal method that handler happens to delegate to.
+# A `@extend_schema(...)` decorator placed on `create()` (as this used to
+# be) therefore has no attached `_spectacular_annotation` to find when
+# spectacular introspects `post` -- it silently falls back to
+# `get_serializer_class()`'s POST branch (`StaffCreateSerializer`) for
+# *both* request and response, even though `create()` genuinely returns
+# `AccountSerializer(account).data` at runtime. `extend_schema_view` at
+# the class level attaches the override to `post` directly, where
+# spectacular actually looks -- confirmed via `manage.py spectacular`
+# that operation `v1_admin_staff_create`'s 201 response now schemas as
+# `Account`, not `StaffCreate`.
+@extend_schema_view(
+    post=extend_schema(request=StaffCreateSerializer, responses=AccountSerializer),
+)
 class StaffListCreateView(generics.ListCreateAPIView):
     """`GET /admin/staff` and `POST /admin/staff` -- both Platform Admin
     only (FR-ACC-002)."""
@@ -31,7 +52,6 @@ class StaffListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         return services.list_staff()
 
-    @extend_schema(request=StaffCreateSerializer, responses=AccountSerializer)
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

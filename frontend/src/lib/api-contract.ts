@@ -59,21 +59,14 @@ export type BookingListResponse = Omit<components['schemas']['PaginatedBookingLi
   data: Booking[];
 };
 
-// ---------------------------------------------------------------------
-// ReportSummary.from_ vs the real wire field `from`
-//
-// apps/reporting/serializers.py can't name a field `from` (Python
-// keyword), so it declares `from_ = serializers.DateField(source="from")`
-// and then overrides `to_representation` to rename the output key back
-// to `"from"` before it's ever sent. drf-spectacular has no visibility
-// into that manual rename, so the generated schema says `from_` -- but
-// the real JSON key on the wire is `from`. Flagged for a backend fix
-// (a manual schema field annotation), not fixable on the frontend beyond
-// this override.
-// ---------------------------------------------------------------------
-export type ReportSummary = Omit<components['schemas']['ReportSummary'], 'from_'> & {
-  from: string;
-};
+// ReportSummary.from used to disagree with the generated `from_` (the
+// backend renamed the field in `to_representation`, invisible to
+// drf-spectacular). Fixed at the source: apps/reporting/serializers.py's
+// ReportSummarySerializer now renames the field in `get_fields()`
+// instead, so DRF's own field-name binding -- which drf-spectacular
+// reads too -- says `from` everywhere. No override needed here anymore;
+// `components["schemas"]["ReportSummary"]` is used directly.
+export type ReportSummary = components['schemas']['ReportSummary'];
 
 // ---------------------------------------------------------------------
 // TokenRefresh is one shared schema for both directions of
@@ -85,22 +78,15 @@ export type ReportSummary = Omit<components['schemas']['ReportSummary'], 'from_'
 export type TokenRefreshRequest = Pick<components['schemas']['TokenRefresh'], 'refresh'>;
 export type TokenRefreshResponse = components['schemas']['TokenRefresh'];
 
-// ---------------------------------------------------------------------
-// POST /admin/staff/ response schema bug
-//
-// apps/platform_admin/views.py's StaffListCreateView.create() has
-// `@extend_schema(request=StaffCreateSerializer, responses=AccountSerializer)`
-// and its runtime body is genuinely `Response(AccountSerializer(account).data, ...)`.
-// But `get_serializer_class()` overrides to `StaffCreateSerializer` for
-// POST, and drf-spectacular's schema resolution for this
-// `ListCreateAPIView` picks that up instead of honoring the
-// `@extend_schema` override -- so `api-types.ts`'s
-// `operations["v1_admin_staff_create"]["responses"][201]` is typed as
-// `StaffCreate` (email/phone/full_name/role only -- missing
-// id/active/created_at), not `Account`. Flagged for a backend/
-// drf-spectacular fix (restructure the view so schema resolution isn't
-// ambiguous, or add an explicit `@extend_schema` on the whole class).
-// Typed here via the schema directly, bypassing the operation's own
-// (buggy) declared response type.
-// ---------------------------------------------------------------------
+// POST /admin/staff/'s response used to be mistyped as `StaffCreate`
+// (missing id/active/created_at) instead of `Account`, because
+// drf-spectacular resolves each operation from the view's actual
+// HTTP-verb handler method (`post`, inherited un-overridden from
+// `ListCreateAPIView`), not from `create()`, which is what the
+// `@extend_schema` override used to sit on. Fixed at the source:
+// apps/platform_admin/views.py now attaches the override via
+// `@extend_schema_view(post=extend_schema(...))` at the class level,
+// where spectacular actually looks. No override needed here anymore;
+// `components["schemas"]["Account"]` is used directly, same as every
+// other place `Account` appears.
 export type StaffAccountResponse = components['schemas']['Account'];

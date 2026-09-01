@@ -61,7 +61,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StaffCreate'
+                $ref: '#/components/schemas/Account'
           description: ''
   /api/v1/admin/staff/{id}/:
     put:
@@ -2070,10 +2070,6 @@ components:
       properties:
         period:
           $ref: '#/components/schemas/PeriodEnum'
-        from_:
-          type: string
-          format: date
-          title: 'From '
         to:
           type: string
           format: date
@@ -2087,8 +2083,11 @@ components:
           type: object
           additionalProperties:
             type: integer
+        from:
+          type: string
+          format: date
       required:
-      - from_
+      - from
       - period
       - revenueByCategory
       - to

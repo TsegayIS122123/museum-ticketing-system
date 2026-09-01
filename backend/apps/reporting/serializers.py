@@ -48,7 +48,11 @@ class ReportSummarySerializer(serializers.Serializer):
     period = serializers.ChoiceField(
         choices=["daily", "weekly", "monthly", "yearly"]
     )
-    from_ = serializers.DateField(source="from")
+    # No explicit `source=` here: after `get_fields()` below renames this
+    # field's key to "from", DRF's default (source == field_name) already
+    # resolves to "from", and DRF asserts against a *redundant* explicit
+    # `source` that matches the bound field name.
+    from_ = serializers.DateField()
     to = serializers.DateField()
     revenueByCategory = serializers.DictField(
         source="revenue_by_category",
@@ -58,11 +62,21 @@ class ReportSummarySerializer(serializers.Serializer):
         source="visitor_counts_by_group", child=serializers.IntegerField()
     )
 
-    def to_representation(self, instance):
-        """`from` is a Python keyword, so it can't be a field name here --
-        the field above is declared as `from_` with `source="from"` (to
-        read the dict key) and renamed back to `from` on the way out, to
-        match Document 04's `ReportSummaryResponse.from` exactly."""
-        data = super().to_representation(instance)
-        data["from"] = data.pop("from_")
-        return data
+    def get_fields(self):
+        """`from` is a Python keyword, so it can't be a field's attribute
+        name in the class body above -- the field is declared as `from_`
+        with `source="from"` (so it still reads the right dict key from
+        the instance). But a field's *output* key comes from its dict key
+        in `get_fields()`'s return value (DRF's `Field.bind()` sets
+        `field_name` from that key when the serializer's `fields`
+        BindingDict is built), not from the Python attribute name it was
+        assigned to -- so renaming `from_` -> `from` here, rather than
+        post-processing the dict in `to_representation`, makes the field
+        genuinely named `from` end-to-end. drf-spectacular's schema
+        introspection reads this same bound `fields` dict, so this also
+        fixes the previously-wrong `from_` property name in the generated
+        contract (confirmed via `manage.py spectacular`) -- no frontend
+        override needed for this field anymore."""
+        fields = super().get_fields()
+        fields["from"] = fields.pop("from_")
+        return fields

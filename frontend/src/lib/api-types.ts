@@ -1158,11 +1158,6 @@ export interface components {
          */
         ReportSummary: {
             period: components["schemas"]["PeriodEnum"];
-            /**
-             * From
-             * Format: date
-             */
-            from_: string;
             /** Format: date */
             to: string;
             revenueByCategory: {
@@ -1171,6 +1166,8 @@ export interface components {
             visitorCountsByGroup: {
                 [key: string]: number;
             };
+            /** Format: date */
+            from: string;
         };
         /** @description `ResetPasswordRequest` -- Staff only (FR-ACC-006). */
         ResetPassword: {
@@ -1298,7 +1295,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StaffCreate"];
+                    "application/json": components["schemas"]["Account"];
                 };
             };
         };
