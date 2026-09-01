@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import type { Category } from '@/lib/constants/categories';
+import type { Category } from '../schemas';
 
 interface CategoryTableProps {
   categories: Category[];
@@ -49,7 +49,6 @@ export function CategoryTable({
   const headers = [
     t('category') || 'Category',
     t('price') || 'Price',
-    t('description') || 'Description',
     t('status') || 'Status',
     t('actions') || 'Actions',
   ];
@@ -57,17 +56,14 @@ export function CategoryTable({
   const rows = categories.map((category) => [
     <div key="name">
       <div className="font-medium text-stone-900">
-        {locale === 'en' ? category.nameEn : category.nameAm}
+        {locale === 'en' ? category.name_en : category.name_am}
       </div>
       <div className="text-xs text-stone-400">
-        {locale === 'en' ? category.nameAm : category.nameEn}
+        {locale === 'en' ? category.name_am : category.name_en}
       </div>
     </div>,
     <div key="price" className="font-bold text-amber-600 font-serif">
-      {category.isFree ? 'FREE' : `ETB ${category.priceEtb}`}
-    </div>,
-    <div key="desc" className="text-sm text-stone-500 max-w-xs">
-      {locale === 'en' ? category.descriptionEn : category.descriptionAm}
+      {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
     </div>,
     <div key="status">
       <StatusBadge status={category.active ? 'pending' : 'cancelled'} />

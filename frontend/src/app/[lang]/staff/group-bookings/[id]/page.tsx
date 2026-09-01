@@ -7,14 +7,14 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
 import { ApprovalDecisionPanel } from '@/features/group-bookings/components/ApprovalDecisionPanel';
-import { getGroupBooking, type GroupBookingRequest } from '@/features/group-bookings/api';
+import { getGroupBooking, type Booking } from '@/features/group-bookings/api';
 
 export default function GroupBookingDetailPage() {
   const { t, locale } = useTranslation();
   const params = useParams();
   const router = useRouter();
 
-  const [request, setRequest] = useState<GroupBookingRequest | null>(null);
+  const [request, setRequest] = useState<Booking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { getCategories } from '@/features/catalog/api';
+import type { Category } from '@/features/catalog/schemas';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import Link from 'next/link';
 import en from '@/lib/i18n/locales/en/common.json';
@@ -18,7 +19,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
   const { lang } = await params;
   const t = dictionary[lang] || dictionary.en;
   
-  let categories = [];
+  let categories: Category[] = [];
   let error = null;
   
   try {
@@ -82,18 +83,15 @@ export default async function LandingPage({ params }: LandingPageProps) {
                   <div className="flex flex-col h-full">
                     <div className="flex-1">
                       <h4 className="text-lg font-semibold text-stone-900">
-                        {lang === 'en' ? category.nameEn : category.nameAm}
+                        {lang === 'en' ? category.name_en : category.name_am}
                       </h4>
                       <p className="text-sm text-stone-500 mt-1">
-                        {lang === 'en' ? category.nameAm : category.nameEn}
-                      </p>
-                      <p className="text-xs text-stone-400 mt-2">
-                        {lang === 'en' ? category.descriptionEn : category.descriptionAm}
+                        {lang === 'en' ? category.name_am : category.name_en}
                       </p>
                     </div>
                     <div className="mt-4 pt-4 border-t border-stone-100">
                       <p className="text-2xl font-bold text-amber-600 font-serif">
-                        {category.isFree ? 'FREE' : `ETB ${category.priceEtb}`}
+                        {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
                       </p>
                       <Link href={`/${lang}/book`}>
                         <Button className="w-full mt-3 bg-amber-600 hover:bg-amber-700">

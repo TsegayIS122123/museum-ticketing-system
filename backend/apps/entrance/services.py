@@ -60,7 +60,10 @@ def lookup_booking_by_reference(*, reference):
         raise ValidationError({"reference": "This query parameter is required."})
 
     try:
-        return Booking.objects.get(reference=reference)
+        # select_related("visitor") -- BookingSerializer reads
+        # visitor.full_name/email/phone, needed here for the Cashier to
+        # confirm she has the right person at the gate.
+        return Booking.objects.select_related("visitor").get(reference=reference)
     except Booking.DoesNotExist:
         raise NotFound("No booking found for that reference.")
 

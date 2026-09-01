@@ -80,16 +80,23 @@ export default function GatePage() {
         </p>
         {user && (
           <div className="text-sm text-stone-400 mt-1">
-            {t('cashier')}: {user.fullName || user.email} · {new Date().toLocaleDateString()}
+            {t('cashier')}: {user.full_name || user.email} · {new Date().toLocaleDateString()}
           </div>
         )}
       </div>
 
       {state === 'idle' && (
         <div className="space-y-6">
+          {/* isLoading is always false here, not a placeholder --
+              this whole block only renders when state === 'idle', so
+              TypeScript correctly narrows state to the literal 'idle'
+              within it and flags `state === 'loading'` as impossible.
+              The separate `state === 'loading'` block below (a
+              full-page spinner) is what actually renders during a
+              lookup. */}
           <ReferenceLookupField
             onLookup={handleLookup}
-            isLoading={state === 'loading'}
+            isLoading={false}
             error={null}
           />
           <Card className="bg-stone-50 border-dashed border-2 border-stone-200">

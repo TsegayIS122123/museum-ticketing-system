@@ -7,14 +7,14 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { getSettlementTransfer, type SettlementTransfer } from '@/features/settlement/api';
+import { getReconciliation, type CashierReconciliation } from '@/features/settlement/api';
 
 export default function TransferDetailPage() {
   const { t, locale } = useTranslation();
   const params = useParams();
   const router = useRouter();
 
-  const [transfer, setTransfer] = useState<SettlementTransfer | null>(null);
+  const [transfer, setTransfer] = useState<CashierReconciliation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const transferId = params.id as string;
@@ -23,7 +23,9 @@ export default function TransferDetailPage() {
     const loadTransfer = async () => {
       setIsLoading(true);
       try {
-        const data = await getSettlementTransfer(transferId);
+        // No single-retrieve endpoint exists -- getReconciliation pages
+        // through the list client-side to find this id.
+        const data = await getReconciliation(transferId);
         setTransfer(data);
       } catch (error) {
         console.error('Failed to load transfer:', error);
@@ -37,7 +39,8 @@ export default function TransferDetailPage() {
     }
   }, [transferId]);
 
-  const formatDateTime = (dateStr: string) => {
+  const formatDateTime = (dateStr: string | null) => {
+    if (!dateStr) return '—';
     const date = new Date(dateStr);
     return date.toLocaleString(locale === 'en' ? 'en-US' : 'am-ET', {
       year: 'numeric',
@@ -68,7 +71,7 @@ export default function TransferDetailPage() {
             {t('transfer_not_found') || 'Transfer Not Found'}
           </h2>
           <p className="text-stone-500 mt-1">
-            {t('transfer_not_found_description') || 'The requested settlement transfer does not exist.'}
+            {t('transfer_not_found_description') || 'The requested settlement reconciliation does not exist.'}
           </p>
           <Button
             className="mt-4"
@@ -95,19 +98,19 @@ export default function TransferDetailPage() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-serif text-3xl text-stone-900">
-            {t('transfer_details') || 'Transfer Details'}
+            {t('transfer_details') || 'Reconciliation Details'}
           </h1>
           <p className="font-mono text-sm text-stone-400 mt-1">
-            {transfer.referenceNumber}
+            {transfer.chapaTransferReference || transfer.id}
           </p>
         </div>
-        <StatusBadge status={transfer.status === 'completed' ? 'visited' : 'pending'} />
+        <StatusBadge status={transfer.status === 'completed' ? 'visited' : transfer.status === 'failed' ? 'cancelled' : 'pending'} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <h3 className="font-semibold text-stone-900 mb-4">
-            {t('transfer_summary') || 'Transfer Summary'}
+            {t('transfer_summary') || 'Reconciliation Summary'}
           </h3>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b border-stone-100">
@@ -117,17 +120,19 @@ export default function TransferDetailPage() {
               </span>
             </div>
             <div className="flex justify-between py-2 border-b border-stone-100">
-              <span className="text-stone-500">{t('bookings_settled') || 'Bookings Settled'}</span>
-              <span className="font-medium">{transfer.bookingIds.length}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-stone-100">
-              <span className="text-stone-500">{t('initiated_by') || 'Initiated By'}</span>
-              <span className="font-medium">{transfer.initiatedByName}</span>
+              <span className="text-stone-500">{t('initiated_at') || 'Initiated At'}</span>
+              <span className="font-medium">{formatDateTime(transfer.initiatedAt)}</span>
             </div>
             <div className="flex justify-between py-2">
-              <span className="text-stone-500">{t('initiated_at') || 'Initiated At'}</span>
-              <span className="font-medium">{formatDateTime(transfer.createdAt)}</span>
+              <span className="text-stone-500">{t('completed_at') || 'Completed At'}</span>
+              <span className="font-medium">{formatDateTime(transfer.completedAt)}</span>
             </div>
+            {transfer.status === 'failed' && transfer.failureReason && (
+              <div className="flex justify-between py-2 border-t border-stone-100">
+                <span className="text-stone-500">{t('failure_reason') || 'Failure Reason'}</span>
+                <span className="font-medium text-red-600">{transfer.failureReason}</span>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -136,13 +141,12 @@ export default function TransferDetailPage() {
             {t('actions') || 'Actions'}
           </h3>
           <div className="space-y-3">
-            {transfer.receiptUrl && (
-              <Button
-                className="w-full bg-amber-600 hover:bg-amber-700"
-                onClick={() => window.open(transfer.receiptUrl, '_blank')}
-              >
-                📄 {t('download_transfer_receipt') || 'Download Transfer Receipt'}
-              </Button>
+            {transfer.transferReceiptUrl && (
+              <a href={transfer.transferReceiptUrl} target="_blank" rel="noreferrer">
+                <Button className="w-full bg-amber-600 hover:bg-amber-700">
+                  📄 {t('download_transfer_receipt') || 'Download Transfer Receipt'}
+                </Button>
+              </a>
             )}
             <Button
               variant="secondary"
@@ -151,13 +155,6 @@ export default function TransferDetailPage() {
             >
               🏦 {t('go_to_settlement') || 'Go to Settlement'}
             </Button>
-          </div>
-
-          <div className="mt-4 p-3 bg-stone-50 rounded-lg text-xs text-stone-500">
-            <span className="font-semibold">📌 {t('finance_note') || 'Finance Office Note'}</span>
-            <p className="mt-1">
-              {t('finance_receipt_instruction') || 'This receipt should be carried physically to the Finance Office alongside the manual-track cash deposit slip.'}
-            </p>
           </div>
         </Card>
       </div>

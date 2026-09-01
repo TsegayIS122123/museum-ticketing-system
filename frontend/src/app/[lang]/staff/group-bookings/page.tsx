@@ -9,21 +9,21 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
 import { ApprovalQueueTable } from '@/features/group-bookings/components/ApprovalQueueTable';
-import { getGroupBookings, type GroupBookingRequest } from '@/features/group-bookings/api';
+import { getGroupBookings, type Booking } from '@/features/group-bookings/api';
 
 export default function GroupBookingsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const router = useRouter();
 
-  const [requests, setRequests] = useState<GroupBookingRequest[]>([]);
+  const [requests, setRequests] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const loadRequests = async () => {
     setIsLoading(true);
     try {
-      const data = await getGroupBookings();
-      setRequests(data);
+      const response = await getGroupBookings();
+      setRequests(response.data);
     } catch (error: any) {
       setToast({
         message: error.message || t('failed_to_load') || 'Failed to load group bookings.',
@@ -38,12 +38,13 @@ export default function GroupBookingsPage() {
     loadRequests();
   }, []);
 
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
-  const approvedCount = requests.filter(r => r.status === 'approved').length;
-  const declinedCount = requests.filter(r => r.status === 'declined').length;
+  // Real backend model: pending review = approvalStatus still null.
+  const pendingCount = requests.filter(r => r.approvalStatus === null).length;
+  const approvedCount = requests.filter(r => r.approvalStatus === 'approved').length;
+  const declinedCount = requests.filter(r => r.approvalStatus === 'declined').length;
 
   const handleReview = (id: string) => {
-    router.push(`/${router.locale}/staff/group-bookings/${id}`);
+    router.push(`/${locale}/staff/group-bookings/${id}`);
   };
 
   return (

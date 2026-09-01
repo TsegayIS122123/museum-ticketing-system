@@ -76,7 +76,7 @@ class CheckInView(APIView):
         responses=CheckInResponseSerializer,
     )
     def post(self, request, id):
-        booking = get_object_or_404(Booking, id=id)
+        booking = get_object_or_404(Booking.objects.select_related("visitor"), id=id)
         serializer = CheckInRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         booking = services.check_in_booking(
@@ -103,7 +103,7 @@ class IfmisVoucherView(APIView):
         responses=BookingSerializer,
     )
     def patch(self, request, id):
-        booking = get_object_or_404(Booking, id=id)
+        booking = get_object_or_404(Booking.objects.select_related("visitor"), id=id)
         serializer = IfmisVoucherUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         booking = services.record_ifmis_voucher_reference(

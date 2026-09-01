@@ -6,8 +6,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { Toast } from '@/components/ui/Toast';
-import type { Category } from '@/lib/constants/categories';
-import { categorySchema, type CategoryFormInput } from '../schemas';
+import type { Category, CategoryFormInput } from '../schemas';
+import { categoryCreateSchema } from '../schemas';
 
 interface CategoryFormModalProps {
   isOpen: boolean;
@@ -27,12 +27,10 @@ export function CategoryFormModal({
   const { t } = useTranslation();
 
   const [formData, setFormData] = useState<CategoryFormInput>({
-    nameEn: '',
-    nameAm: '',
-    priceEtb: 0,
-    isFree: false,
-    descriptionEn: '',
-    descriptionAm: '',
+    name_en: '',
+    name_am: '',
+    price_etb: '0',
+    is_free: false,
     active: true,
   });
 
@@ -44,29 +42,25 @@ export function CategoryFormModal({
   useEffect(() => {
     if (initialData) {
       setFormData({
-        nameEn: initialData.nameEn,
-        nameAm: initialData.nameAm,
-        priceEtb: initialData.priceEtb,
-        isFree: initialData.isFree,
-        descriptionEn: initialData.descriptionEn || '',
-        descriptionAm: initialData.descriptionAm || '',
+        name_en: initialData.name_en,
+        name_am: initialData.name_am,
+        price_etb: initialData.price_etb,
+        is_free: initialData.is_free,
         active: initialData.active,
       });
     } else {
       setFormData({
-        nameEn: '',
-        nameAm: '',
-        priceEtb: 0,
-        isFree: false,
-        descriptionEn: '',
-        descriptionAm: '',
+        name_en: '',
+        name_am: '',
+        price_etb: '0',
+        is_free: false,
         active: true,
       });
     }
     setErrors({});
   }, [initialData, isOpen]);
 
-  const handleChange = (field: keyof CategoryFormInput, value: string | number | boolean) => {
+  const handleChange = (field: keyof CategoryFormInput, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => {
@@ -78,7 +72,7 @@ export function CategoryFormModal({
   };
 
   const validateForm = () => {
-    const result = categorySchema.safeParse(formData);
+    const result = categoryCreateSchema.safeParse(formData);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       result.error.errors.forEach((err) => {
@@ -123,7 +117,7 @@ export function CategoryFormModal({
     }
   };
 
-  const isFree = formData.isFree;
+  const isFree = formData.is_free;
 
   return (
     <Modal
@@ -142,20 +136,20 @@ export function CategoryFormModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <TextField
-            id="nameEn"
+            id="name_en"
             label={t('name_english') || 'Name (English)'}
-            value={formData.nameEn}
-            onChange={(e) => handleChange('nameEn', e.target.value)}
-            error={errors.nameEn}
+            value={formData.name_en}
+            onChange={(e) => handleChange('name_en', e.target.value)}
+            error={errors.name_en}
             required
             placeholder="e.g., Adult / Teacher"
           />
           <TextField
-            id="nameAm"
+            id="name_am"
             label={t('name_amharic') || 'Name (Amharic)'}
-            value={formData.nameAm}
-            onChange={(e) => handleChange('nameAm', e.target.value)}
-            error={errors.nameAm}
+            value={formData.name_am}
+            onChange={(e) => handleChange('name_am', e.target.value)}
+            error={errors.name_am}
             required
             placeholder="e.g., አዋቂ / መምህር"
           />
@@ -169,18 +163,18 @@ export function CategoryFormModal({
             <div className="flex items-center gap-3 mt-1">
               <input
                 type="number"
-                value={formData.priceEtb}
-                onChange={(e) => handleChange('priceEtb', parseFloat(e.target.value) || 0)}
+                value={formData.price_etb}
+                onChange={(e) => handleChange('price_etb', e.target.value)}
                 min={0}
                 step={1}
                 disabled={isFree}
                 className={`w-full px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                  errors.priceEtb ? 'border-red-400' : 'border-stone-300'
+                  errors.price_etb ? 'border-red-400' : 'border-stone-300'
                 } ${isFree ? 'bg-stone-100 text-stone-400' : ''}`}
               />
             </div>
-            {errors.priceEtb && (
-              <span className="text-xs text-red-500 mt-1">{errors.priceEtb}</span>
+            {errors.price_etb && (
+              <span className="text-xs text-red-500 mt-1">{errors.price_etb}</span>
             )}
           </div>
 
@@ -190,9 +184,9 @@ export function CategoryFormModal({
                 type="checkbox"
                 checked={isFree}
                 onChange={(e) => {
-                  handleChange('isFree', e.target.checked);
+                  handleChange('is_free', e.target.checked);
                   if (e.target.checked) {
-                    handleChange('priceEtb', 0);
+                    handleChange('price_etb', '0');
                   }
                 }}
                 className="w-4 h-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
@@ -202,25 +196,6 @@ export function CategoryFormModal({
               </span>
             </label>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <TextField
-            id="descriptionEn"
-            label={t('description_english') || 'Description (English)'}
-            value={formData.descriptionEn}
-            onChange={(e) => handleChange('descriptionEn', e.target.value)}
-            error={errors.descriptionEn}
-            placeholder="e.g., Standard adult admission"
-          />
-          <TextField
-            id="descriptionAm"
-            label={t('description_amharic') || 'Description (Amharic)'}
-            value={formData.descriptionAm}
-            onChange={(e) => handleChange('descriptionAm', e.target.value)}
-            error={errors.descriptionAm}
-            placeholder="e.g., መደበኛ የአዋቂ መግቢያ"
-          />
         </div>
 
         <div className="flex gap-3 pt-4 border-t border-stone-100">

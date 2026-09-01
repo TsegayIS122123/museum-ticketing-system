@@ -9,20 +9,20 @@ import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { getSettlementTransfers, type SettlementTransfer } from '@/features/settlement/api';
+import { listReconciliations, type CashierReconciliation } from '@/features/settlement/api';
 
 export default function SettlementTransfersPage() {
   const { t, locale } = useTranslation();
   const router = useRouter();
 
-  const [transfers, setTransfers] = useState<SettlementTransfer[]>([]);
+  const [transfers, setTransfers] = useState<CashierReconciliation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadTransfers = async () => {
     setIsLoading(true);
     try {
-      const data = await getSettlementTransfers();
-      setTransfers(data);
+      const response = await listReconciliations();
+      setTransfers(response.data);
     } catch (error) {
       console.error('Failed to load transfers:', error);
     } finally {
@@ -34,7 +34,8 @@ export default function SettlementTransfersPage() {
     loadTransfers();
   }, []);
 
-  const formatDateTime = (dateStr: string) => {
+  const formatDateTime = (dateStr: string | null) => {
+    if (!dateStr) return '—';
     const date = new Date(dateStr);
     return date.toLocaleString(locale === 'en' ? 'en-US' : 'am-ET', {
       year: 'numeric',
@@ -64,13 +65,13 @@ export default function SettlementTransfersPage() {
             {t('settlement_history') || 'Settlement History'}
           </h1>
           <p className="text-stone-500 mt-1">
-            {t('settlement_history_description') || 'View all past settlement transfers'}
+            {t('settlement_history_description') || 'View all past settlement reconciliations'}
           </p>
         </div>
         <EmptyState
           icon="📜"
-          title={t('no_transfers') || 'No Transfers Yet'}
-          description={t('no_transfers_description') || 'Settlement transfers will appear here once initiated.'}
+          title={t('no_transfers') || 'No Reconciliations Yet'}
+          description={t('no_transfers_description') || 'Settlement reconciliations will appear here once initiated.'}
           action={
             <Button
               className="bg-amber-600 hover:bg-amber-700"
@@ -87,8 +88,6 @@ export default function SettlementTransfersPage() {
   const headers = [
     t('reference') || 'Reference',
     t('amount') || 'Amount',
-    t('bookings') || 'Bookings',
-    t('initiated_by') || 'Initiated By',
     t('date') || 'Date',
     t('status') || 'Status',
     t('actions') || 'Actions',
@@ -96,18 +95,16 @@ export default function SettlementTransfersPage() {
 
   const rows = transfers.map((transfer) => [
     <span key="ref" className="font-mono text-sm font-medium text-stone-600">
-      {transfer.referenceNumber}
+      {transfer.chapaTransferReference || '—'}
     </span>,
     <div key="amount" className="font-bold text-amber-600">
       ETB {transfer.amountEtb}
     </div>,
-    <div key="bookings">{transfer.bookingIds.length}</div>,
-    <div key="initiator">{transfer.initiatedByName}</div>,
     <div key="date" className="text-sm text-stone-500">
-      {formatDateTime(transfer.createdAt)}
+      {formatDateTime(transfer.initiatedAt || transfer.createdAt)}
     </div>,
     <div key="status">
-      <StatusBadge status={transfer.status === 'completed' ? 'visited' : 'pending'} />
+      <StatusBadge status={transfer.status === 'completed' ? 'visited' : transfer.status === 'failed' ? 'cancelled' : 'pending'} />
     </div>,
     <div key="actions">
       <Button
@@ -128,14 +125,14 @@ export default function SettlementTransfersPage() {
             {t('settlement_history') || 'Settlement History'}
           </h1>
           <p className="text-stone-500 mt-1">
-            {t('settlement_history_description') || 'View all past settlement transfers'}
+            {t('settlement_history_description') || 'View all past settlement reconciliations'}
           </p>
         </div>
         <Button
           className="bg-amber-600 hover:bg-amber-700"
           onClick={() => router.push(`/${locale}/staff/settlement`)}
         >
-          🏦 {t('new_transfer') || 'New Transfer'}
+          🏦 {t('new_transfer') || 'New Reconciliation'}
         </Button>
       </div>
 

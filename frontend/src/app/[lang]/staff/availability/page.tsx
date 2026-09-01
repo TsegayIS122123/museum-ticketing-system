@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -8,33 +8,30 @@ import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { getAvailability, updateAvailability } from '@/features/availability/api';
 
-type AvailabilityStatus = 'available' | 'full' | 'closed';
+// The API only tracks a boolean isOpenForBooking -- there is no "full"
+// concept in the backend (capacity isn't calculated automatically), so
+// the calendar only has two real states.
+type AvailabilityStatus = 'available' | 'closed';
 
 interface DateStatus {
   date: string;
   status: AvailabilityStatus;
 }
 
-// Generate mock availability data
-const generateMockDates = (): DateStatus[] => {
-  const dates: DateStatus[] = [];
+// Build the current month's dates, defaulting to "available" for any
+// date the backend hasn't returned a record for yet.
+const buildMonthDates = (): string[] => {
+  const dates: string[] = [];
   const today = new Date();
   const startMonth = today.getMonth();
   const startYear = today.getFullYear();
+  const daysInMonth = new Date(startYear, startMonth + 1, 0).getDate();
 
-  for (let day = 1; day <= 31; day++) {
+  for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(startYear, startMonth, day);
-    if (date < today) continue;
-
-    const dateStr = date.toISOString().split('T')[0];
-    // Random status for demo
-    const rand = Math.random();
-    let status: AvailabilityStatus = 'available';
-    if (rand < 0.1) status = 'closed';
-    else if (rand < 0.15) status = 'full';
-
-    dates.push({ date: dateStr, status });
+    dates.push(date.toISOString().split('T')[0]);
   }
 
   return dates;
@@ -43,7 +40,8 @@ const generateMockDates = (): DateStatus[] => {
 export default function AvailabilityPage() {
   const { t, locale } = useTranslation();
 
-  const [dates, setDates] = useState<DateStatus[]>(generateMockDates());
+  const [dates, setDates] = useState<DateStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -52,16 +50,49 @@ export default function AvailabilityPage() {
     status: AvailabilityStatus;
   } | null>(null);
 
-  const handleStatusChange = (date: string, newStatus: AvailabilityStatus) => {
-    setDates((prev) =>
-      prev.map((d) =>
-        d.date === date ? { ...d, status: newStatus } : d
-      )
-    );
-    setToast({
-      message: `${newStatus === 'available' ? 'Opened' : newStatus === 'full' ? 'Marked as full' : 'Closed'} ${date} for booking.`,
-      type: 'success',
-    });
+  useEffect(() => {
+    let cancelled = false;
+    const monthDates = buildMonthDates();
+    const from = monthDates[0];
+    const to = monthDates[monthDates.length - 1];
+
+    getAvailability(from, to)
+      .then((records) => {
+        if (cancelled) return;
+        const byDate = new Map(records.map((r) => [r.date, r.isOpenForBooking]));
+        const merged = buildMonthDates().map((date) => ({
+          date,
+          status: (byDate.get(date) ?? true ? 'available' : 'closed') as AvailabilityStatus,
+        }));
+        setDates(merged);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setToast({ message: 'Failed to load availability.', type: 'error' });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleStatusChange = async (date: string, newStatus: AvailabilityStatus) => {
+    try {
+      await updateAvailability(date, newStatus === 'available');
+      setDates((prev) =>
+        prev.map((d) => (d.date === date ? { ...d, status: newStatus } : d))
+      );
+      setToast({
+        message: `${newStatus === 'available' ? 'Opened' : 'Closed'} ${date} for booking.`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setToast({ message: err.message || 'Failed to update availability.', type: 'error' });
+    }
     setSelectedDate(null);
   };
 
@@ -69,8 +100,6 @@ export default function AvailabilityPage() {
     switch (status) {
       case 'available':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'full':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'closed':
         return 'bg-stone-100 text-stone-500 border-stone-300';
     }
@@ -80,8 +109,6 @@ export default function AvailabilityPage() {
     switch (status) {
       case 'available':
         return t('available') || 'Available';
-      case 'full':
-        return t('full') || 'Full';
       case 'closed':
         return t('closed') || 'Closed';
     }
@@ -91,8 +118,6 @@ export default function AvailabilityPage() {
     switch (status) {
       case 'available':
         return <StatusBadge status="pending" />;
-      case 'full':
-        return <StatusBadge status="awaiting_payment" />;
       case 'closed':
         return <StatusBadge status="cancelled" />;
     }
@@ -136,6 +161,9 @@ export default function AvailabilityPage() {
         </p>
       </div>
 
+      {isLoading ? (
+        <div className="p-8 text-center text-stone-500">{t('loading') || 'Loading...'}</div>
+      ) : (
       <div className="grid md:grid-cols-3 gap-6">
         {/* Calendar */}
         <div className="md:col-span-2">
@@ -175,7 +203,7 @@ export default function AvailabilityPage() {
             </div>
 
             <div className="flex gap-4 mt-4 pt-4 border-t border-stone-200 text-xs flex-wrap">
-              {(['available', 'full', 'closed'] as AvailabilityStatus[]).map((status) => (
+              {(['available', 'closed'] as AvailabilityStatus[]).map((status) => (
                 <span
                   key={status}
                   className={`flex items-center gap-1.5 px-2 py-1 rounded-full border ${getStatusColor(status)}`}
@@ -218,15 +246,6 @@ export default function AvailabilityPage() {
                 </Button>
                 <Button
                   size="sm"
-                  className="w-full bg-amber-500 hover:bg-amber-600"
-                  onClick={() =>
-                    setConfirmDialog({ open: true, date: selectedDate, status: 'full' })
-                  }
-                >
-                  ⚠ {t('mark_as_full') || 'Mark as Full'}
-                </Button>
-                <Button
-                  size="sm"
                   variant="danger"
                   className="w-full"
                   onClick={() =>
@@ -250,6 +269,7 @@ export default function AvailabilityPage() {
           )}
         </div>
       </div>
+      )}
 
       <ConfirmDialog
         open={!!confirmDialog}

@@ -75,27 +75,23 @@ export function StaffAccountTable({
     t('email') || 'Email',
     t('role') || 'Role',
     t('status') || 'Status',
-    t('last_login') || 'Last Login',
     t('actions') || 'Actions',
   ];
 
   const rows = staff.map((account) => [
     <div key="name">
-      <div className="font-medium text-stone-900">{account.fullName}</div>
+      <div className="font-medium text-stone-900">{account.full_name}</div>
       <div className="text-xs text-stone-400">{account.phone || '—'}</div>
     </div>,
     <div key="email">
       <div className="text-sm text-stone-700">{account.email}</div>
       <div className="text-xs text-stone-400">
-        {t('created') || 'Created'}: {formatDate(account.createdAt)}
+        {t('created') || 'Created'}: {formatDate(account.created_at)}
       </div>
     </div>,
     <div key="role">{getRoleBadge(account.role)}</div>,
     <div key="status">
       <StatusBadge status={account.active ? 'pending' : 'cancelled'} />
-    </div>,
-    <div key="lastLogin" className="text-sm text-stone-500">
-      {formatDate(account.lastLogin)}
     </div>,
     <div key="actions" className="flex flex-wrap gap-2">
       <Button

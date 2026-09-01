@@ -1,57 +1,67 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
-import { Table } from '@/components/ui/Table';
-
-type Period = 'daily' | 'weekly' | 'monthly' | 'yearly';
+import {
+  getDashboard,
+  getReportSummary,
+  type DashboardResponse,
+  type ReportSummaryResponse,
+  type ReportPeriod,
+} from '@/features/reports/api';
 
 export default function ReportsPage() {
   const { t } = useTranslation();
-  const [period, setPeriod] = useState<Period>('daily');
+  const [period, setPeriod] = useState<ReportPeriod>('daily');
+  const [summary, setSummary] = useState<ReportSummaryResponse | null>(null);
+  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - in production, fetch from API
-  const stats = {
-    totalVisitors: 124,
-    totalRevenue: 3290,
-    onlineSales: 2180,
-    cancellations: 150,
-  };
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
 
-  const revenueByCategory = [
-    { name: 'Adult', amount: 1575, pct: 48 },
-    { name: 'Student', amount: 745, pct: 23 },
-    { name: 'Foreign Resident', amount: 520, pct: 16 },
-    { name: 'Non-Resident', amount: 450, pct: 13 },
-  ];
+    Promise.all([getReportSummary(period), getDashboard()])
+      .then(([summaryRes, dashboardRes]) => {
+        if (cancelled) return;
+        setSummary(summaryRes);
+        setDashboard(dashboardRes);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setError(err.message || 'Failed to load reports');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-  const bookingSummary = [
-    ['27 Dec 2024', '32', '124', '18', '14', 'ETB 3,290', '2'],
-    ['26 Dec 2024', '28', '108', '15', '13', 'ETB 2,840', '1'],
-    ['25 Dec 2024', '12', '48', '8', '4', 'ETB 1,200', '3'],
-    ['24 Dec 2024', '35', '140', '22', '13', 'ETB 3,580', '0'],
-    ['23 Dec 2024', '30', '118', '19', '11', 'ETB 2,960', '1'],
-  ];
+    return () => {
+      cancelled = true;
+    };
+  }, [period]);
 
-  const periodOptions: { value: Period; label: string }[] = [
+  const revenueByCategory = summary
+    ? Object.entries(summary.revenueByCategory).map(([name, amount]) => ({
+        name,
+        amount: parseFloat(amount),
+      }))
+    : [];
+  const revenueTotal = revenueByCategory.reduce((sum, c) => sum + c.amount, 0);
+
+  const totalVisitors = summary
+    ? Object.values(summary.visitorCountsByGroup).reduce((sum, n) => sum + n, 0)
+    : 0;
+
+  const periodOptions: { value: ReportPeriod; label: string }[] = [
     { value: 'daily', label: t('daily') || 'Daily' },
     { value: 'weekly', label: t('weekly') || 'Weekly' },
     { value: 'monthly', label: t('monthly') || 'Monthly' },
     { value: 'yearly', label: t('yearly') || 'Yearly' },
-  ];
-
-  const headers = [
-    t('date') || 'Date',
-    t('bookings') || 'Bookings',
-    t('visitors') || 'Visitors',
-    t('online') || 'Online',
-    t('counter') || 'Counter',
-    t('revenue') || 'Revenue',
-    t('cancellations') || 'Cancellations',
   ];
 
   return (
@@ -85,88 +95,73 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label={t('total_visitors') || 'Total Visitors'}
-          value={stats.totalVisitors}
-          sub="↑ 12% vs prior period"
-          color="green"
-        />
-        <StatCard
-          label={t('total_revenue') || 'Total Revenue'}
-          value={`ETB ${stats.totalRevenue}`}
-          sub="Online + Counter"
-          color="amber"
-        />
-        <StatCard
-          label={t('online_sales') || 'Online Sales'}
-          value={`ETB ${stats.onlineSales}`}
-          sub="66% of total"
-          color="blue"
-        />
-        <StatCard
-          label={t('cancellations') || 'Cancellations'}
-          value={`ETB ${stats.cancellations}`}
-          sub="Refunded"
-          color="red"
-        />
-      </div>
+      {isLoading ? (
+        <div className="p-8 text-center text-stone-500">{t('loading') || 'Loading...'}</div>
+      ) : error ? (
+        <div className="p-8 text-center text-red-600">{error}</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <StatCard
+              label={t('total_visitors') || 'Total Visitors'}
+              value={totalVisitors}
+              color="green"
+            />
+            <StatCard
+              label={t('total_revenue') || 'Total Revenue'}
+              value={`ETB ${revenueTotal}`}
+              sub={`${summary?.from ?? ''} - ${summary?.to ?? ''}`}
+              color="amber"
+            />
+            <StatCard
+              label={t('total_revenue_overall') || 'Total Revenue (overall)'}
+              value={`ETB ${dashboard?.revenueTotalEtb ?? 0}`}
+              color="blue"
+            />
+            <StatCard
+              label={t('cancellations') || 'Cancellations (overall)'}
+              value={dashboard?.statusMix.cancelled ?? 0}
+              color="red"
+            />
+          </div>
 
-      <div className="grid md:grid-cols-2 gap-5 mb-5">
-        <Card>
-          <div className="font-semibold text-stone-900 mb-5">
-            {t('revenue_by_category') || 'Revenue by Category'}
-          </div>
-          <div className="space-y-3">
-            {revenueByCategory.map((cat) => (
-              <div key={cat.name} className="flex items-center gap-3 text-sm">
-                <div className="w-24 text-stone-600 flex-shrink-0">{cat.name}</div>
-                <div className="flex-1 bg-stone-100 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="h-full bg-slate-800 rounded-full"
-                    style={{ width: `${cat.pct}%` }}
-                  />
+          <Card>
+            <div className="font-semibold text-stone-900 mb-5">
+              {t('revenue_by_category') || 'Revenue by Category'}
+            </div>
+            <div className="space-y-3">
+              {revenueByCategory.map((cat) => (
+                <div key={cat.name} className="flex items-center gap-3 text-sm">
+                  <div className="w-24 text-stone-600 flex-shrink-0">{cat.name}</div>
+                  <div className="flex-1 bg-stone-100 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="h-full bg-slate-800 rounded-full"
+                      style={{ width: revenueTotal ? `${(cat.amount / revenueTotal) * 100}%` : '0%' }}
+                    />
+                  </div>
+                  <div className="w-20 text-right text-stone-500 flex-shrink-0">
+                    ETB {cat.amount}
+                  </div>
                 </div>
-                <div className="w-20 text-right text-stone-500 flex-shrink-0">
-                  ETB {cat.amount}
+              ))}
+              {revenueByCategory.length === 0 && (
+                <div className="text-sm text-stone-400">
+                  {t('no_data') || 'No revenue data for this period'}
                 </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+              )}
+            </div>
+          </Card>
 
-        <Card>
-          <div className="font-semibold text-stone-900 mb-5">
-            {t('sales_channel') || 'Sales Channel Breakdown'}
-          </div>
-          <div className="space-y-3 text-sm">
-            {[
-              { label: t('online_fpx_card') || 'Online (FPX/Card)', amount: 1580, pct: 48, color: 'bg-slate-800' },
-              { label: t('e_wallet') || 'e-Wallet', amount: 600, pct: 18, color: 'bg-slate-600' },
-              { label: t('counter_cash') || 'Counter (Cash)', amount: 710, pct: 22, color: 'bg-amber-500' },
-              { label: t('counter_card') || 'Counter (Card)', amount: 400, pct: 12, color: 'bg-amber-300' },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center gap-3">
-                <div className="w-28 text-stone-600 flex-shrink-0">{item.label}</div>
-                <div className="flex-1 bg-stone-100 rounded-full h-3 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${item.color}`}
-                    style={{ width: `${item.pct}%` }}
-                  />
-                </div>
-                <div className="w-20 text-right text-stone-500">ETB {item.amount}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <Card padding={false}>
-        <div className="p-5 border-b border-stone-200 font-semibold text-stone-900">
-          {t('booking_summary') || 'Booking Summary'}
-        </div>
-        <Table headers={headers} rows={bookingSummary} />
-      </Card>
+          {/*
+            The mock version of this page also showed a "Sales Channel Breakdown"
+            (online/e-wallet/counter split) and a day-by-day "Booking Summary"
+            table. Neither is backed by an endpoint in contracts/openapi.yaml --
+            /reports/summary and /reports/dashboard only return aggregate totals,
+            not a per-day or per-channel breakdown. Add those sections back once
+            the backend exposes that data.
+          */}
+        </>
+      )}
     </PageContainer>
   );
 }

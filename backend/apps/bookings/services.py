@@ -297,7 +297,7 @@ def reschedule_booking(*, booking, visitor, new_visit_date):
 def list_my_bookings(*, visitor, status=None):
     """Implements `GET /users/me/bookings` (FR-ACC-004) -- a Visitor's own
     booking history, whether they've booked once or many times."""
-    queryset = Booking.objects.filter(visitor=visitor)
+    queryset = Booking.objects.select_related("visitor").filter(visitor=visitor)
     if status:
         queryset = queryset.filter(status=status)
     return queryset
@@ -307,7 +307,9 @@ def list_bookings_for_staff(*, status=None, visit_date=None, booking_type=None):
     """Implements `GET /bookings` (Staff only). Visitors use
     `list_my_bookings` above -- this has no ownership scoping at all,
     matching the single-venue, flat-role authorization model (Sec 4.3)."""
-    queryset = Booking.objects.all()
+    # select_related("visitor") -- BookingSerializer reads
+    # visitor.full_name/email/phone for every row in this list.
+    queryset = Booking.objects.select_related("visitor")
     if status:
         queryset = queryset.filter(status=status)
     if visit_date:

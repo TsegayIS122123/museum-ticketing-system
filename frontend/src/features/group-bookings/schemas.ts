@@ -1,30 +1,23 @@
 import { z } from 'zod';
 
+// Real BookingCreateRequest fields for a group booking (contracts/
+// openapi.yaml). There is no organizationName/contactPerson/
+// contactEmail/visitTime/category(enum)/specialRequests on the backend
+// -- visitor identity comes from the authenticated session, and there's
+// no time-of-day concept at all. groupName/groupContactPhone are both
+// genuinely optional on the backend.
 export const groupVisitRequestSchema = z.object({
-  organizationName: z.string()
-    .min(2, 'Organization/School name is required')
-    .max(100, 'Organization name is too long'),
-  contactPerson: z.string()
-    .min(2, 'Contact person name is required')
-    .max(50, 'Contact person name is too long'),
-  contactPhone: z.string()
-    .min(10, 'Please enter a valid phone number')
-    .regex(/^(\+251|0)?[7-9][0-9]{8}$/, 'Please enter a valid Ethiopian phone number'),
-  contactEmail: z.string()
-    .email('Please enter a valid email address'),
+  categoryId: z.string().min(1, 'Please select a ticket category'),
   visitDate: z.string()
-    .date('Please select a valid date')
-    .refine((date) => new Date(date) >= new Date(), 'Visit date must be in the future'),
-  visitTime: z.string()
-    .regex(/^([0-9]{1,2}):([0-9]{2})\s?(AM|PM)$/i, 'Please select a valid time'),
-  groupSize: z.number()
+    .refine((date) => new Date(date) >= new Date(new Date().toDateString()), 'Visit date must be today or later'),
+  quantity: z.number()
     .int('Group size must be a whole number')
-    .min(10, 'Minimum group size is 10')
-    .max(200, 'Maximum group size is 200'),
-  category: z.enum(['student', 'adult_teacher', 'foreign_resident', 'non_resident', 'exempt']),
-  specialRequests: z.string()
-    .max(500, 'Special requests are too long')
-    .optional(),
+    .min(1, 'Group size must be at least 1'),
+  groupName: z.string().max(100, 'Group name is too long').optional(),
+  groupContactPhone: z.string()
+    .regex(/^(\+251|0)?[7-9][0-9]{8}$/, 'Please enter a valid Ethiopian phone number')
+    .optional()
+    .or(z.literal('')),
 });
 
 export type GroupVisitRequestInput = z.infer<typeof groupVisitRequestSchema>;

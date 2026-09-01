@@ -1,23 +1,27 @@
 import { z } from 'zod';
 
-export const staffAccountSchema = z.object({
-  id: z.string().uuid().optional(),
+// StaffCreateRequest (contracts/openapi.yaml) -- Platform Admin only.
+export const staffCreateSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   phone: z.string()
     .regex(/^(\+251|0)?[7-9][0-9]{8}$/, 'Please enter a valid Ethiopian phone number')
-    .optional(),
-  fullName: z.string()
+    .optional()
+    .default(''),
+  full_name: z.string()
     .min(2, 'Full name must be at least 2 characters')
-    .max(50, 'Full name must be less than 50 characters'),
+    .max(255, 'Full name must be less than 255 characters'),
   role: z.enum(['cashier', 'museum_manager'], {
     errorMap: () => ({ message: 'Please select a valid role' }),
   }),
-  active: z.boolean().default(true),
 });
 
-export const staffCreateSchema = staffAccountSchema.omit({ id: true, active: true });
-export const staffUpdateSchema = staffAccountSchema.partial();
+// StaffUpdateRequest -- deliberately much narrower than create. The
+// backend only ever accepts `role` and/or `active` here; email/phone/
+// full_name cannot be changed through this endpoint (see api.ts).
+export const staffUpdateSchema = z.object({
+  role: z.enum(['cashier', 'museum_manager']).optional(),
+  active: z.boolean().optional(),
+});
 
-export type StaffAccount = z.infer<typeof staffAccountSchema>;
 export type StaffCreateInput = z.infer<typeof staffCreateSchema>;
 export type StaffUpdateInput = z.infer<typeof staffUpdateSchema>;

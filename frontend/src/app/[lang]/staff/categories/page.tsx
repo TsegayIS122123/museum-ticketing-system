@@ -8,9 +8,8 @@ import { Toast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CategoryTable } from '@/features/catalog/components/CategoryTable';
 import { CategoryFormModal } from '@/features/catalog/components/CategoryFormModal';
-import { getAllCategories, createCategory, updateCategory, retireCategory, activateCategory } from '@/features/catalog/api';
-import type { Category } from '@/lib/constants/categories';
-import type { CategoryFormInput } from '@/features/catalog/schemas';
+import { getCategories, createCategory, updateCategory, retireCategory, activateCategory } from '@/features/catalog/api';
+import type { Category, CategoryFormInput } from '@/features/catalog/schemas';
 
 export default function CategoriesPage() {
   const { t } = useTranslation();
@@ -34,7 +33,10 @@ export default function CategoriesPage() {
   const loadCategories = async () => {
     setIsLoading(true);
     try {
-      const data = await getAllCategories();
+      // Museum Manager-only `?active=all` -- includes retired categories
+      // so "Activate" works on rows retired in an earlier session, not
+      // just ones retired moments ago in this one.
+      const data = await getCategories({ includeInactive: true });
       setCategories(data);
     } catch (error: any) {
       setToast({

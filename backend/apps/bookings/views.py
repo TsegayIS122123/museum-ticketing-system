@@ -131,7 +131,12 @@ class BookingDetailView(generics.RetrieveAPIView):
     """GET /bookings/{id} -- the owning Visitor or any Staff member."""
 
     permission_classes = [permissions.IsAuthenticated]
-    queryset = Booking.objects.all()
+    # select_related("visitor") -- BookingSerializer now reads
+    # visitor.full_name/email/phone (visitorName/visitorEmail/
+    # visitorPhone) for every row, so this avoids an extra query per
+    # request that would otherwise go unnoticed (this view returns one
+    # row at a time).
+    queryset = Booking.objects.select_related("visitor")
     lookup_field = "id"
     serializer_class = BookingSerializer
 

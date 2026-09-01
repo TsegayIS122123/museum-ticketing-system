@@ -35,9 +35,34 @@ class BookingSerializer(serializers.ModelSerializer):
 
     visitorId = serializers.UUIDField(source="visitor_id", read_only=True)
     categoryId = serializers.UUIDField(source="category_id", read_only=True)
+    # Bilingual name *snapshot* taken at booking time (see `models.Booking`
+    # -- never a live join to `catalog.Category`), so a since-retired or
+    # renamed category still displays correctly against a historical
+    # booking. Previously stored on the model but never serialized --
+    # every UI that needs a human-readable category name (the visitor's
+    # own booking detail page, the Cashier's gate check-in screen) had no
+    # way to get one from this endpoint.
+    categoryNameEn = serializers.CharField(source="category_name_en", read_only=True)
+    categoryNameAm = serializers.CharField(source="category_name_am", read_only=True)
     visitDate = serializers.DateField(source="visit_date", read_only=True)
     bookingType = serializers.CharField(source="booking_type", read_only=True)
     groupName = serializers.CharField(source="group_name", read_only=True, allow_null=True)
+    # The number a Cashier can call/SMS to reach a group's requester
+    # (FR-BOOK-003's `groupContactPhone`, collected at booking time but
+    # never surfaced back out before now). Null for an individual
+    # booking -- see `visitorPhone`/`visitorEmail` below for that case.
+    groupContactPhone = serializers.CharField(
+        source="group_contact_phone", read_only=True, allow_null=True
+    )
+    # The booking's own Visitor -- who a Cashier reaches for an
+    # *individual* booking (a group booking instead has its own
+    # `groupContactPhone` above, since the requester need not be one of
+    # the attendees). Visible to the owning Visitor too, which is
+    # harmless: it's just their own account's contact details reflected
+    # back to them.
+    visitorName = serializers.CharField(source="visitor.full_name", read_only=True)
+    visitorEmail = serializers.CharField(source="visitor.email", read_only=True)
+    visitorPhone = serializers.CharField(source="visitor.phone", read_only=True, allow_null=True)
     bookedQuantity = serializers.IntegerField(source="booked_quantity", read_only=True)
     attendedQuantity = serializers.IntegerField(
         source="attended_quantity", read_only=True, allow_null=True
@@ -74,9 +99,15 @@ class BookingSerializer(serializers.ModelSerializer):
             "reference",
             "visitorId",
             "categoryId",
+            "categoryNameEn",
+            "categoryNameAm",
             "visitDate",
             "bookingType",
             "groupName",
+            "groupContactPhone",
+            "visitorName",
+            "visitorEmail",
+            "visitorPhone",
             "bookedQuantity",
             "attendedQuantity",
             "status",

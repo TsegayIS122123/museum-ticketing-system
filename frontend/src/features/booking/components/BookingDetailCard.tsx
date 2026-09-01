@@ -37,8 +37,8 @@ export function BookingDetailCard({
   const { t, locale } = useTranslation();
   const isPending = booking.status === 'pending';
   const canCancelOrReschedule = isPending;
-  const hasShortfall = booking.attendedQuantity !== null && 
-                       booking.attendedQuantity < booking.bookedQuantity;
+  const hasShortfall =
+    booking.attendedQuantity != null && booking.attendedQuantity < booking.bookedQuantity;
 
   const formatDate = (dateStr: string) => {
     return format(new Date(dateStr), 'PPP', {

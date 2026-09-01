@@ -9,7 +9,9 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
 import { CancelRescheduleControls } from '@/features/booking/components/CancelRescheduleControls';
-import { getBooking } from '@/features/booking/api';
+import { getBooking, type BookingResponse } from '@/features/booking/api';
+import { requestPartialRefund } from '@/features/refunds/api';
+import { ApiError } from '@/lib/api/errors';
 import { Toast } from '@/components/ui/Toast';
 import { QRCodeSVG } from '@/components/ui/QRCodeSVG';
 
@@ -19,9 +21,11 @@ export default function BookingDetailPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const [booking, setBooking] = useState<any>(null);
+  const [booking, setBooking] = useState<BookingResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isRequestingRefund, setIsRequestingRefund] = useState(false);
+  const [refundRequested, setRefundRequested] = useState(false);
 
   const bookingId = params.id as string;
 
@@ -37,6 +41,39 @@ export default function BookingDetailPage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRequestRefund = async () => {
+    if (!booking) return;
+    setIsRequestingRefund(true);
+    try {
+      await requestPartialRefund(booking.id);
+      setRefundRequested(true);
+      setToast({
+        message: t('refund_requested') || 'Refund requested. It will be processed shortly.',
+        type: 'success',
+      });
+    } catch (error: any) {
+      if (error instanceof ApiError && error.code === 'conflict') {
+        // Already requested (or no eligible shortfall anymore) --
+        // services.request_partial_shortfall_refund's per-booking
+        // uniqueness guard. Treat it as "already in progress" rather
+        // than a hard failure so a duplicate click/tab doesn't look
+        // broken to the visitor.
+        setRefundRequested(true);
+        setToast({
+          message: t('refund_already_requested') || 'A refund for this booking has already been requested.',
+          type: 'success',
+        });
+      } else {
+        setToast({
+          message: error instanceof ApiError ? error.message : 'Failed to request refund',
+          type: 'error',
+        });
+      }
+    } finally {
+      setIsRequestingRefund(false);
     }
   };
 
@@ -180,7 +217,7 @@ export default function BookingDetailPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => window.open(booking.receiptUrl, '_blank')}
+                onClick={() => window.open(booking.receiptUrl!, '_blank')}
               >
                 📄 {t('download_receipt')}
               </Button>
@@ -218,7 +255,7 @@ export default function BookingDetailPage() {
             <Card className="mb-6 bg-amber-50 border-amber-200">
               <div className="flex items-start gap-3">
                 <span className="text-2xl">⚠️</span>
-                <div>
+                <div className="flex-1">
                   <div className="font-semibold text-amber-800">
                     {t('partial_attendance') || 'Partial Attendance Recorded'}
                   </div>
@@ -230,6 +267,26 @@ export default function BookingDetailPage() {
                       </span>
                     )}
                   </p>
+                  {booking.status === 'visited' && (
+                    <div className="mt-3">
+                      {refundRequested ? (
+                        <div className="text-sm font-medium text-amber-800">
+                          ✓ {t('refund_requested') || 'Refund requested. It will be processed shortly.'}
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="bg-amber-600 hover:bg-amber-700"
+                          onClick={handleRequestRefund}
+                          disabled={isRequestingRefund}
+                        >
+                          {isRequestingRefund
+                            ? t('processing') || 'Processing...'
+                            : t('request_refund') || 'Request Refund'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>

@@ -113,7 +113,7 @@ export function StaffSidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-white truncate">
-              {user.fullName || info.name}
+              {user.full_name || info.name}
             </div>
             <span className={cn('text-xs px-1.5 py-0.5 rounded font-medium', info.badgeColor)}>
               {info.badge}

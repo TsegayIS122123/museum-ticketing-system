@@ -8,7 +8,13 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toast } from '@/components/ui/Toast';
 import { QRCodeSVG } from '@/components/ui/QRCodeSVG';
-import { checkInBooking, type BookingLookupResponse } from '../api';
+import { TextField } from '@/components/ui/TextField';
+import {
+  checkInBooking,
+  recordIfmisVoucherReference,
+  type BookingLookupResponse,
+  type CheckInResponse,
+} from '../api';
 
 interface AttendanceEntryFormProps {
   booking: BookingLookupResponse;
@@ -29,9 +35,20 @@ export function AttendanceEntryForm({
   const [showConfirm, setShowConfirm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const isCheckedIn = booking.isCheckedIn || booking.status === 'visited';
-  const isPending = booking.status === 'pending';
-  const canCheckIn = isPending && !isCheckedIn;
+  // Just-completed check-in, still on screen so the Cashier can key the
+  // IFMIS voucher fields in below -- CheckInResponse (not the plain
+  // Booking) is what carries payerName/amountFigures/amountWords/
+  // ifmisPurpose.
+  const [justCheckedIn, setJustCheckedIn] = useState<CheckInResponse | null>(null);
+  const [voucherReference, setVoucherReference] = useState('');
+  const [isSavingVoucher, setIsSavingVoucher] = useState(false);
+  const [voucherSaved, setVoucherSaved] = useState(false);
+
+  // There is no separate "checked in" flag or timestamp in the API --
+  // `status === 'visited'` IS the check-in signal (services.
+  // check_in_booking transitions the booking straight to Visited).
+  const isCheckedIn = booking.status === 'visited';
+  const canCheckIn = booking.status === 'pending';
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -50,21 +67,15 @@ export function AttendanceEntryForm({
 
     try {
       const result = await checkInBooking(booking.id, attendedQuantity);
-      
+
       const shortfall = booking.bookedQuantity - attendedQuantity;
       let message = t('check_in_success') || 'Check-in successful!';
       if (shortfall > 0) {
         message = t('partial_check_in') || `${attendedQuantity} of ${booking.bookedQuantity} checked in. ${shortfall} did not attend.`;
       }
 
-      setToast({
-        message,
-        type: 'success',
-      });
-
-      setTimeout(() => {
-        onCheckInComplete();
-      }, 1500);
+      setToast({ message, type: 'success' });
+      setJustCheckedIn(result);
     } catch (err: any) {
       setError(err.message || t('check_in_failed') || 'Failed to check in. Please try again.');
       setToast({
@@ -73,6 +84,29 @@ export function AttendanceEntryForm({
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleSaveVoucher = async () => {
+    if (!justCheckedIn || !voucherReference.trim()) return;
+    setIsSavingVoucher(true);
+    try {
+      await recordIfmisVoucherReference(justCheckedIn.id, voucherReference.trim());
+      setVoucherSaved(true);
+      setToast({
+        message: t('voucher_saved') || 'IFMIS voucher reference saved.',
+        type: 'success',
+      });
+      setTimeout(() => {
+        onCheckInComplete();
+      }, 1200);
+    } catch (err: any) {
+      setToast({
+        message: err.message || t('voucher_save_failed') || 'Failed to save voucher reference.',
+        type: 'error',
+      });
+    } finally {
+      setIsSavingVoucher(false);
     }
   };
 
@@ -88,7 +122,86 @@ export function AttendanceEntryForm({
 
   const shortfall = booking.bookedQuantity - attendedQuantity;
 
-  // Already checked in
+  // Just checked in this booking -- show the IFMIS voucher-prep step
+  // (payer name / amount in figures & words / purpose string) and let
+  // the Cashier key the real Document No/Ref No back in once she's
+  // entered the transaction into IFMIS herself.
+  if (justCheckedIn) {
+    return (
+      <Card className="bg-green-50 border-green-200">
+        <div className="py-2">
+          <div className="text-center mb-4">
+            <div className="text-3xl mb-2">✅</div>
+            <div className="font-semibold text-green-800">
+              {t('check_in_success') || 'Check-in successful!'}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-green-200 p-4 text-sm space-y-2">
+            <div className="font-semibold text-stone-900 mb-2">
+              {t('ifmis_voucher_details') || 'IFMIS Voucher Details'}
+            </div>
+            <div className="flex justify-between">
+              <span className="text-stone-500">{t('payer_name') || 'Payer Name'}</span>
+              <span className="font-medium text-stone-900">{justCheckedIn.payerName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-stone-500">{t('amount_figures') || 'Amount (figures)'}</span>
+              <span className="font-medium text-stone-900">ETB {justCheckedIn.amountFigures}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-stone-500">{t('amount_words') || 'Amount (words)'}</span>
+              <span className="font-medium text-stone-900 text-right">{justCheckedIn.amountWords}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-stone-500">{t('purpose') || 'Purpose'}</span>
+              <span className="font-medium text-stone-900 text-right">{justCheckedIn.ifmisPurpose}</span>
+            </div>
+          </div>
+
+          {voucherSaved ? (
+            <div className="mt-4 text-center text-sm font-medium text-green-800">
+              ✓ {t('voucher_saved') || 'IFMIS voucher reference saved.'}
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              <TextField
+                id="voucher-reference"
+                label={t('ifmis_voucher_reference') || 'IFMIS Document No / Ref No'}
+                placeholder={t('ifmis_voucher_placeholder') || 'Enter the reference IFMIS gave you'}
+                value={voucherReference}
+                onChange={(e) => setVoucherReference(e.target.value)}
+              />
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={onCheckInComplete}
+                  disabled={isSavingVoucher}
+                >
+                  {t('do_later') || 'Do this later'}
+                </Button>
+                <Button
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={handleSaveVoucher}
+                  disabled={isSavingVoucher || !voucherReference.trim()}
+                >
+                  {isSavingVoucher ? t('saving') || 'Saving...' : t('save_voucher') || 'Save Reference'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {toast && (
+          <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        )}
+      </Card>
+    );
+  }
+
+  // Already checked in on a previous visit to this page (not the
+  // check-in this component itself just performed).
   if (isCheckedIn) {
     return (
       <Card className="bg-green-50 border-green-200">
@@ -97,11 +210,8 @@ export function AttendanceEntryForm({
           <div className="font-semibold text-green-800">
             {t('already_checked_in') || 'Already Checked In'}
           </div>
-          <div className="text-sm text-green-600 mt-1">
-            {t('checked_in_at') || 'Checked in at'}: {booking.checkedInAt ? new Date(booking.checkedInAt).toLocaleString() : 'N/A'}
-          </div>
           {booking.attendedQuantity !== null && (
-            <div className="text-sm text-green-600">
+            <div className="text-sm text-green-600 mt-1">
               {t('attended')}: {booking.attendedQuantity} / {booking.bookedQuantity}
             </div>
           )}
@@ -127,10 +237,10 @@ export function AttendanceEntryForm({
             {t('cannot_check_in') || 'Cannot Check In'}
           </div>
           <div className="text-sm text-yellow-600 mt-1">
-            {booking.status === 'cancelled' && t('booking_cancelled') || 'Booking has been cancelled'}
-            {booking.status === 'refunded' && t('booking_refunded') || 'Booking has been refunded'}
-            {booking.status === 'awaiting_payment' && t('payment_pending') || 'Payment is still pending'}
-            {booking.status === 'pending_approval' && t('awaiting_approval') || 'Awaiting group approval'}
+            {booking.status === 'cancelled' && (t('booking_cancelled') || 'Booking has been cancelled')}
+            {booking.status === 'refunded' && (t('booking_refunded') || 'Booking has been refunded')}
+            {booking.status === 'awaiting_payment' && (t('payment_pending') || 'Payment is still pending')}
+            {booking.status === 'pending_approval' && (t('awaiting_approval') || 'Awaiting group approval')}
           </div>
           <Button
             variant="secondary"
@@ -143,6 +253,15 @@ export function AttendanceEntryForm({
       </Card>
     );
   }
+
+  // Who the Cashier is looking at: the group's own name for a group
+  // booking (no single "visitor" represents the whole party), otherwise
+  // the individual Visitor's name/email/phone.
+  const displayName = booking.bookingType === 'group' ? booking.groupName : booking.visitorName;
+  const contactLine =
+    booking.bookingType === 'group'
+      ? booking.groupContactPhone
+      : [booking.visitorEmail, booking.visitorPhone].filter(Boolean).join(' · ');
 
   return (
     <div className="space-y-6">
@@ -171,11 +290,13 @@ export function AttendanceEntryForm({
               <StatusBadge status={booking.status} />
             </div>
             <h3 className="text-xl font-semibold text-stone-900 mt-2">
-              {booking.visitorName}
+              {displayName}
             </h3>
-            <div className="text-sm text-stone-500 mt-1">
-              {booking.visitorEmail} · {booking.visitorPhone}
-            </div>
+            {contactLine && (
+              <div className="text-sm text-stone-500 mt-1">
+                {contactLine}
+              </div>
+            )}
           </div>
           <div className="bg-white p-2 rounded-xl shadow-inner border border-stone-200">
             <QRCodeSVG
@@ -295,7 +416,7 @@ export function AttendanceEntryForm({
         title={t('confirm_check_in') || 'Confirm Check-in'}
         message={
           shortfall === 0
-            ? `${t('confirm_check_in_message') || 'Confirm check-in for'} ${booking.visitorName} (${attendedQuantity} ${t('visitors') || 'visitors'})?`
+            ? `${t('confirm_check_in_message') || 'Confirm check-in for'} ${displayName} (${attendedQuantity} ${t('visitors') || 'visitors'})?`
             : `${t('partial_check_in_confirmation') || 'Only'} ${attendedQuantity} ${t('out_of') || 'out of'} ${booking.bookedQuantity} ${t('visitors_attending') || 'visitors are attending'}. ${shortfall} ${t('will_not_attend') || 'will not attend'}. ${t('refund_available_on_request_confirm') || 'A refund for the shortfall is available on request.'}`
         }
         confirmLabel={t('confirm') || 'Confirm'}

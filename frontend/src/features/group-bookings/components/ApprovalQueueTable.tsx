@@ -6,10 +6,10 @@ import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import type { GroupBookingRequest } from '../api';
+import type { Booking } from '../api';
 
 interface ApprovalQueueTableProps {
-  requests: GroupBookingRequest[];
+  requests: Booking[];
   isLoading?: boolean;
   onReview: (id: string) => void;
   onRefresh?: () => void;
@@ -32,17 +32,14 @@ export function ApprovalQueueTable({
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <StatusBadge status="pending_approval" />;
-      case 'approved':
-        return <StatusBadge status="pending" />;
-      case 'declined':
-        return <StatusBadge status="cancelled" />;
-      default:
-        return <StatusBadge status="pending_approval" />;
-    }
+  // Real backend model: pending review = status 'pending_approval' with
+  // approvalStatus still null. Once a Museum Manager decides,
+  // approvalStatus becomes 'approved'/'declined' (status moves on to
+  // awaiting_payment or cancelled accordingly).
+  const getStatusBadge = (booking: Booking) => {
+    if (booking.approvalStatus === 'approved') return <StatusBadge status="pending" />;
+    if (booking.approvalStatus === 'declined') return <StatusBadge status="cancelled" />;
+    return <StatusBadge status="pending_approval" />;
   };
 
   if (isLoading) {
@@ -64,8 +61,8 @@ export function ApprovalQueueTable({
   }
 
   const headers = [
-    t('organization') || 'Organization',
-    t('contact') || 'Contact',
+    t('reference') || 'Reference',
+    t('group_name') || 'Group',
     t('visit_date') || 'Visit Date',
     t('group_size') || 'Size',
     t('status') || 'Status',
@@ -73,23 +70,26 @@ export function ApprovalQueueTable({
   ];
 
   const rows = requests.map((request) => [
-    <div key="org" className="font-medium text-stone-900">
-      {request.organizationName}
+    <div key="ref" className="font-mono text-sm text-stone-700">
+      {request.reference}
     </div>,
-    <div key="contact">
-      <div className="text-sm font-medium">{request.contactPerson}</div>
-      <div className="text-xs text-stone-400">{request.contactPhone}</div>
+    <div key="group" className="text-sm font-medium">
+      {/* No contact phone/email/person is ever returned on a Booking --
+          only what was submitted at create time (groupName), which
+          itself is optional. To actually reach the requester, staff
+          would need a way to look up the visitor account by visitorId,
+          which the contract doesn't expose either -- a real gap. */}
+      {request.groupName || '—'}
     </div>,
     <div key="date" className="text-sm">
       {formatDate(request.visitDate)}
-      <div className="text-xs text-stone-400">{request.visitTime}</div>
     </div>,
     <div key="size" className="font-semibold text-stone-900">
-      {request.groupSize}
+      {request.bookedQuantity}
     </div>,
-    getStatusBadge(request.status),
+    getStatusBadge(request),
     <div key="actions">
-      {request.status === 'pending' ? (
+      {request.approvalStatus === null ? (
         <Button
           size="sm"
           onClick={() => onReview(request.id)}

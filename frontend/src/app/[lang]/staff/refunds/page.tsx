@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -8,41 +8,32 @@ import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { StatCard } from '@/components/ui/StatCard';
-
-// Mock refund data - in production, fetch from API
-const mockRefunds = [
-  {
-    id: 'REF-001',
-    bookingId: 'BK-20241227-0089',
-    visitor: 'Ahmad Razif',
-    amount: 15.0,
-    reason: 'cancellation',
-    status: 'completed',
-    createdAt: '2024-12-26T18:42:00',
-  },
-  {
-    id: 'REF-002',
-    bookingId: 'BK-20241230-0085',
-    visitor: 'Priya Nair',
-    amount: 65.0,
-    reason: 'partial_shortfall',
-    status: 'pending',
-    createdAt: '2024-12-25T09:15:00',
-  },
-  {
-    id: 'REF-003',
-    bookingId: 'BK-20241220-0071',
-    visitor: 'Tan Wei Lin',
-    amount: 25.0,
-    reason: 'cancellation',
-    status: 'completed',
-    createdAt: '2024-12-19T11:00:00',
-  },
-];
+import { getRefunds, type Refund } from '@/features/refunds/api';
 
 export default function RefundsPage() {
   const { t } = useTranslation();
-  const [refunds] = useState(mockRefunds);
+  const [refunds, setRefunds] = useState<Refund[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getRefunds()
+      .then((res) => {
+        if (!cancelled) setRefunds(res.data);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setError(err.message || 'Failed to load refunds');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const getReasonLabel = (reason: string) => {
     switch (reason) {
@@ -81,14 +72,13 @@ export default function RefundsPage() {
     });
   };
 
-  const totalAmount = refunds.reduce((sum, r) => sum + r.amount, 0);
+  const totalAmount = refunds.reduce((sum, r) => sum + parseFloat(r.amountEtb || '0'), 0);
   const pendingCount = refunds.filter(r => r.status === 'pending').length;
   const completedCount = refunds.filter(r => r.status === 'completed').length;
 
   const headers = [
     t('reference') || 'Reference',
     t('booking') || 'Booking',
-    t('visitor') || 'Visitor',
     t('amount') || 'Amount',
     t('reason') || 'Reason',
     t('status') || 'Status',
@@ -102,11 +92,8 @@ export default function RefundsPage() {
     <span key="booking" className="font-mono text-sm text-stone-500">
       {refund.bookingId}
     </span>,
-    <div key="visitor" className="font-medium text-stone-900">
-      {refund.visitor}
-    </div>,
     <div key="amount" className="font-bold text-amber-600">
-      ETB {refund.amount}
+      ETB {refund.amountEtb}
     </div>,
     <div key="reason" className="text-sm text-stone-500">
       {getReasonLabel(refund.reason)}
@@ -156,7 +143,13 @@ export default function RefundsPage() {
             ⬇ {t('export') || 'Export'}
           </Button>
         </div>
-        <Table headers={headers} rows={rows} />
+        {isLoading ? (
+          <div className="p-8 text-center text-stone-500">{t('loading') || 'Loading...'}</div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-600">{error}</div>
+        ) : (
+          <Table headers={headers} rows={rows} />
+        )}
       </Card>
     </PageContainer>
   );

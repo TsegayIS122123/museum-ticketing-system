@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { Toast } from '@/components/ui/Toast';
 import type { StaffAccountResponse } from '../api';
-import { staffAccountSchema, type StaffCreateInput, type StaffUpdateInput } from '../schemas';
+import { staffCreateSchema, staffUpdateSchema, type StaffCreateInput, type StaffUpdateInput } from '../schemas';
 
 interface ProvisionStaffModalProps {
   isOpen: boolean;
@@ -29,9 +29,13 @@ export function ProvisionStaffModal({
   const [formData, setFormData] = useState<StaffCreateInput>({
     email: '',
     phone: '',
-    fullName: '',
+    full_name: '',
     role: 'cashier',
   });
+  // Edit mode only ever changes role -- StaffUpdateRequest has no
+  // email/phone/full_name fields at all (see api.ts). Tracked separately
+  // so the create-mode zod schema above doesn't need role to be optional.
+  const [editRole, setEditRole] = useState<'cashier' | 'museum_manager'>('cashier');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -43,14 +47,22 @@ export function ProvisionStaffModal({
       setFormData({
         email: initialData.email,
         phone: initialData.phone || '',
-        fullName: initialData.fullName,
-        role: initialData.role === 'platform_admin' ? 'museum_manager' : initialData.role,
+        full_name: initialData.full_name,
+        role:
+          initialData.role === 'platform_admin' || initialData.role === 'visitor'
+            ? 'museum_manager'
+            : initialData.role,
       });
+      setEditRole(
+        initialData.role === 'platform_admin' || initialData.role === 'visitor'
+          ? 'museum_manager'
+          : initialData.role
+      );
     } else {
       setFormData({
         email: '',
         phone: '',
-        fullName: '',
+        full_name: '',
         role: 'cashier',
       });
     }
@@ -69,7 +81,13 @@ export function ProvisionStaffModal({
   };
 
   const validateForm = () => {
-    const result = staffAccountSchema.safeParse(formData);
+    if (isEditing) {
+      // Nothing to validate client-side for edit mode -- editRole is
+      // always one of the two valid enum values from the <select>.
+      setErrors({});
+      return true;
+    }
+    const result = staffCreateSchema.safeParse(formData);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       result.error.errors.forEach((err) => {
@@ -96,7 +114,10 @@ export function ProvisionStaffModal({
     }
 
     try {
-      await onSubmit(formData);
+      // Edit mode can only ever send `role` -- see the StaffUpdateInput
+      // note above and in api.ts. `active` is handled by the separate
+      // activate/deactivate buttons in StaffAccountTable, not this form.
+      await onSubmit(isEditing ? { role: editRole } : formData);
       setToast({
         message: isEditing
           ? t('staff_updated') || 'Staff account updated successfully!'
@@ -129,13 +150,21 @@ export function ProvisionStaffModal({
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {isEditing && (
+          <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 text-xs text-stone-500">
+            {t('staff_edit_limited') ||
+              'Only the role can be changed here. Name, email, and phone are read-only after an account is created.'}
+          </div>
+        )}
+
         <TextField
-          id="fullName"
+          id="full_name"
           label={t('full_name') || 'Full Name'}
-          value={formData.fullName}
-          onChange={(e) => handleChange('fullName', e.target.value)}
-          error={errors.fullName}
-          required
+          value={formData.full_name}
+          onChange={(e) => handleChange('full_name', e.target.value)}
+          error={errors.full_name}
+          required={!isEditing}
+          disabled={isEditing}
           placeholder="e.g., Nurul Hana"
         />
 
@@ -146,7 +175,8 @@ export function ProvisionStaffModal({
           value={formData.email}
           onChange={(e) => handleChange('email', e.target.value)}
           error={errors.email}
-          required
+          required={!isEditing}
+          disabled={isEditing}
           placeholder="staff@museum.et"
         />
 
@@ -156,6 +186,7 @@ export function ProvisionStaffModal({
           value={formData.phone}
           onChange={(e) => handleChange('phone', e.target.value)}
           error={errors.phone}
+          disabled={isEditing}
           placeholder="+251 912 345 678"
         />
 
@@ -164,8 +195,12 @@ export function ProvisionStaffModal({
             {t('role') || 'Role'}
           </label>
           <select
-            value={formData.role}
-            onChange={(e) => handleChange('role', e.target.value)}
+            value={isEditing ? editRole : formData.role}
+            onChange={(e) =>
+              isEditing
+                ? setEditRole(e.target.value as 'cashier' | 'museum_manager')
+                : handleChange('role', e.target.value)
+            }
             className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
           >
             <option value="cashier">{t('cashier') || 'Cashier'}</option>
@@ -178,9 +213,9 @@ export function ProvisionStaffModal({
 
         {!isEditing && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
-            <span className="font-semibold">📌 {t('temp_password_note') || 'Temporary Password'}</span>
+            <span className="font-semibold">📌 {t('set_password_note') || 'Set-Password Link'}</span>
             <p className="mt-1">
-              {t('temp_password_description') || 'A temporary password will be sent to the staff email address upon account creation. The staff member can reset it on first login.'}
+              {t('set_password_description') || 'The new account has no password yet. A link to set one will be sent to the staff email address; there is no temporary password to reset.'}
             </p>
           </div>
         )}

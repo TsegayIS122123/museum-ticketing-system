@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils/cn';
+import { forwardRef } from 'react';
 import type { InputHTMLAttributes } from 'react';
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -6,7 +7,16 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
-export function TextField({ label, error, className, id, ...props }: TextFieldProps) {
+// forwardRef -- ReferenceLookupField (entrance/gate) attaches a ref here
+// to auto-focus the reference input on mount for a Cashier scanning
+// booking after booking. A plain function component can't accept `ref`
+// (it's not a prop), so without forwardRef that ref silently does
+// nothing and TypeScript flags the `ref={inputRef}` call site as a type
+// error.
+export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
+  { label, error, className, id, ...props },
+  ref
+) {
   return (
     <div className="flex flex-col gap-1">
       {label && (
@@ -15,6 +25,7 @@ export function TextField({ label, error, className, id, ...props }: TextFieldPr
         </label>
       )}
       <input
+        ref={ref}
         id={id}
         aria-invalid={!!error}
         aria-describedby={error ? `${id}-error` : undefined}
@@ -33,4 +44,4 @@ export function TextField({ label, error, className, id, ...props }: TextFieldPr
       )}
     </div>
   );
-}
+});

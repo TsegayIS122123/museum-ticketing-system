@@ -23,8 +23,8 @@ export default function MyBookingsPage() {
   const loadBookings = async () => {
     setIsLoading(true);
     try {
-      const data = await getMyBookings();
-      setBookings(data);
+      const response = await getMyBookings();
+      setBookings(response.data);
     } catch (error: any) {
       setToast({
         message: error.message || 'Failed to load bookings',

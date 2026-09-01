@@ -42,6 +42,16 @@ def list_active_categories():
     return categories
 
 
+def list_all_categories_for_manager():
+    """`GET /categories?active=all`, Museum Manager only. Unlike
+    `list_active_categories` above this is uncached and includes retired
+    rows, so a Manager can find a category's id again after retiring it
+    and reactivate it (`update_category(..., active=True)` below already
+    supported the write side of this; there was previously no way to see
+    a retired row again to get its id back)."""
+    return list(Category.objects.all().order_by("name_en"))
+
+
 def create_category(*, name_en, name_am, price_etb, is_free=False):
     """Implements FR-CAT-002's creation path."""
     category = Category.objects.create(

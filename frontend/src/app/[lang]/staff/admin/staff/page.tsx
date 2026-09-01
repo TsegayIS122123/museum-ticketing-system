@@ -34,8 +34,8 @@ export default function StaffManagementPage() {
   const loadStaff = async () => {
     setIsLoading(true);
     try {
-      const data = await getStaffAccounts();
-      setStaff(data);
+      const response = await getStaffAccounts();
+      setStaff(response.data);
     } catch (error: any) {
       setToast({
         message: error.message || t('failed_to_load') || 'Failed to load staff accounts.',

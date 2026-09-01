@@ -130,6 +130,7 @@ services:
       context: ./frontend
     volumes:
       - ./frontend:/app
+      - ./contracts:/contracts
       - /app/node_modules
       - /app/.next
       - .:/workspace

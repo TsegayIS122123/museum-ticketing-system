@@ -686,6 +686,12 @@ paths:
       description: |-
         GET /categories (FR-CAT-001, public, no auth) and POST /categories
         (FR-CAT-002, Museum Manager only).
+
+        GET also accepts `?active=all` -- Museum Manager only (silently
+        ignored for anyone else, rather than erroring, so a stale link
+        doesn't break for a Visitor) -- to include retired categories, so a
+        Manager can find one again to reactivate it. Default behavior
+        (active-only, cached) is unchanged for every other caller.
       parameters:
       - name: limit
         required: false
@@ -716,6 +722,12 @@ paths:
       description: |-
         GET /categories (FR-CAT-001, public, no auth) and POST /categories
         (FR-CAT-002, Museum Manager only).
+
+        GET also accepts `?active=all` -- Museum Manager only (silently
+        ignored for anyone else, rather than erroring, so a stale link
+        doesn't break for a Visitor) -- to include retired categories, so a
+        Manager can find one again to reactivate it. Default behavior
+        (active-only, cached) is unchanged for every other caller.
       tags:
       - v1
       requestBody:
@@ -1175,6 +1187,12 @@ components:
           type: string
           format: uuid
           readOnly: true
+        categoryNameEn:
+          type: string
+          readOnly: true
+        categoryNameAm:
+          type: string
+          readOnly: true
         visitDate:
           type: string
           format: date
@@ -1183,6 +1201,20 @@ components:
           type: string
           readOnly: true
         groupName:
+          type: string
+          readOnly: true
+          nullable: true
+        groupContactPhone:
+          type: string
+          readOnly: true
+          nullable: true
+        visitorName:
+          type: string
+          readOnly: true
+        visitorEmail:
+          type: string
+          readOnly: true
+        visitorPhone:
           type: string
           readOnly: true
           nullable: true
@@ -1241,8 +1273,11 @@ components:
       - bookedQuantity
       - bookingType
       - categoryId
+      - categoryNameAm
+      - categoryNameEn
       - checkoutUrl
       - createdAt
+      - groupContactPhone
       - groupName
       - id
       - ifmisVoucherReference
@@ -1254,7 +1289,10 @@ components:
       - status
       - totalAmountEtb
       - visitDate
+      - visitorEmail
       - visitorId
+      - visitorName
+      - visitorPhone
     BookingApproval:
       type: object
       description: '`BookingApprovalRequest` -- Museum Manager only (FR-BOOK-003).'
@@ -1575,6 +1613,12 @@ components:
           type: string
           format: uuid
           readOnly: true
+        categoryNameEn:
+          type: string
+          readOnly: true
+        categoryNameAm:
+          type: string
+          readOnly: true
         visitDate:
           type: string
           format: date
@@ -1583,6 +1627,20 @@ components:
           type: string
           readOnly: true
         groupName:
+          type: string
+          readOnly: true
+          nullable: true
+        groupContactPhone:
+          type: string
+          readOnly: true
+          nullable: true
+        visitorName:
+          type: string
+          readOnly: true
+        visitorEmail:
+          type: string
+          readOnly: true
+        visitorPhone:
           type: string
           readOnly: true
           nullable: true
@@ -1657,8 +1715,11 @@ components:
       - bookedQuantity
       - bookingType
       - categoryId
+      - categoryNameAm
+      - categoryNameEn
       - checkoutUrl
       - createdAt
+      - groupContactPhone
       - groupName
       - id
       - ifmisPurpose
@@ -1672,7 +1733,10 @@ components:
       - status
       - totalAmountEtb
       - visitDate
+      - visitorEmail
       - visitorId
+      - visitorName
+      - visitorPhone
     Dashboard:
       type: object
       description: '`GET /reports/dashboard` response shape (FR-REPORT-001).'
@@ -1790,9 +1854,7 @@ components:
         data:
           type: array
           items:
-            type: array
-            items:
-              $ref: '#/components/schemas/Account'
+            $ref: '#/components/schemas/Account'
         meta:
           type: object
           properties:
@@ -1808,9 +1870,7 @@ components:
         data:
           type: array
           items:
-            type: array
-            items:
-              $ref: '#/components/schemas/Booking'
+            $ref: '#/components/schemas/Booking'
         meta:
           type: object
           properties:
@@ -1826,9 +1886,7 @@ components:
         data:
           type: array
           items:
-            type: array
-            items:
-              $ref: '#/components/schemas/CashierReconciliation'
+            $ref: '#/components/schemas/CashierReconciliation'
         meta:
           type: object
           properties:
@@ -1844,9 +1902,7 @@ components:
         data:
           type: array
           items:
-            type: array
-            items:
-              $ref: '#/components/schemas/Category'
+            $ref: '#/components/schemas/Category'
         meta:
           type: object
           properties:
@@ -1862,9 +1918,7 @@ components:
         data:
           type: array
           items:
-            type: array
-            items:
-              $ref: '#/components/schemas/Refund'
+            $ref: '#/components/schemas/Refund'
         meta:
           type: object
           properties:

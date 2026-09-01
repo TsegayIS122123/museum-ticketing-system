@@ -29,7 +29,7 @@ export default function StaffDashboardPage() {
           Welcome back
         </div>
         <h1 className="font-serif text-4xl text-stone-900">
-          {user?.fullName || 'Staff'}
+          {user?.full_name || 'Staff'}
         </h1>
         <p className="text-stone-500 mt-1">
           {new Date().toLocaleDateString('en-US', {

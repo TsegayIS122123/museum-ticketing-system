@@ -21,7 +21,14 @@ from .serializers import (
 
 class CategoryListCreateView(generics.ListCreateAPIView):
     """GET /categories (FR-CAT-001, public, no auth) and POST /categories
-    (FR-CAT-002, Museum Manager only)."""
+    (FR-CAT-002, Museum Manager only).
+
+    GET also accepts `?active=all` -- Museum Manager only (silently
+    ignored for anyone else, rather than erroring, so a stale link
+    doesn't break for a Visitor) -- to include retired categories, so a
+    Manager can find one again to reactivate it. Default behavior
+    (active-only, cached) is unchanged for every other caller.
+    """
 
     pagination_class = EnvelopeLimitOffsetPagination
 
@@ -38,6 +45,10 @@ class CategoryListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         # Cached, active-only list (services.py) -- retired categories
         # never appear here; they still exist for `booking` FK integrity.
+        # Exception: `?active=all` from an authenticated Museum Manager.
+        wants_all = self.request.query_params.get("active") == "all"
+        if wants_all and IsMuseumManager().has_permission(self.request, self):
+            return services.list_all_categories_for_manager()
         return services.list_active_categories()
 
     @extend_schema(request=CategoryCreateSerializer, responses=CategorySerializer)

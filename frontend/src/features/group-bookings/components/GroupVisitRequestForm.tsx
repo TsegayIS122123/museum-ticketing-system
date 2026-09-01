@@ -1,14 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { Toast } from '@/components/ui/Toast';
 import { submitGroupBooking } from '../api';
 import { groupVisitRequestSchema } from '../schemas';
+import { getCategories } from '@/features/catalog/api';
+import type { Category } from '@/features/catalog/schemas';
 
 interface GroupVisitRequestFormProps {
   onSuccess?: () => void;
@@ -17,17 +20,30 @@ interface GroupVisitRequestFormProps {
 export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps) {
   const { t, locale } = useTranslation();
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // POST /bookings/ requires the visitor to already be logged in/OTP
+  // verified -- there is no anonymous path. Redirect rather than let the
+  // submit silently 401.
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push(`/${locale}/verify?next=/${locale}/group-visits/new`);
+    }
+  }, [authLoading, isAuthenticated, locale, router]);
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
 
   const [formData, setFormData] = useState({
-    organizationName: '',
-    contactPerson: '',
-    contactPhone: '',
-    contactEmail: '',
+    categoryId: '',
     visitDate: '',
-    visitTime: '',
-    groupSize: 10,
-    category: 'student' as const,
-    specialRequests: '',
+    quantity: 10,
+    groupName: '',
+    groupContactPhone: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +52,6 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
 
   const handleChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error for this field
     if (errors[field]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -75,7 +90,13 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
 
     setIsSubmitting(true);
     try {
-      const booking = await submitGroupBooking(formData);
+      await submitGroupBooking({
+        categoryId: formData.categoryId,
+        visitDate: formData.visitDate,
+        quantity: formData.quantity,
+        groupName: formData.groupName || null,
+        groupContactPhone: formData.groupContactPhone || null,
+      });
       setToast({
         message: t('group_request_submitted') || 'Group visit request submitted successfully! You will be notified once approved.',
         type: 'success',
@@ -84,7 +105,6 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
       if (onSuccess) {
         onSuccess();
       } else {
-        // Redirect to bookings page after short delay
         setTimeout(() => {
           router.push(`/${locale}/bookings`);
         }, 3000);
@@ -114,50 +134,31 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
       <Card>
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-stone-900">
-            {t('organization_details') || 'Organization Details'}
+            {t('group_details') || 'Group Details'}
           </h3>
 
           <TextField
-            id="organizationName"
-            label={t('organization_school_name') || 'Organization / School Name'}
+            id="groupName"
+            label={t('group_name') || 'Group / School Name (optional)'}
             placeholder="e.g., Addis Ababa University"
-            value={formData.organizationName}
-            onChange={(e) => handleChange('organizationName', e.target.value)}
-            error={errors.organizationName}
-            required
+            value={formData.groupName}
+            onChange={(e) => handleChange('groupName', e.target.value)}
+            error={errors.groupName}
           />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <TextField
-              id="contactPerson"
-              label={t('contact_person') || 'Contact Person'}
-              placeholder="e.g., Dr. Tadesse"
-              value={formData.contactPerson}
-              onChange={(e) => handleChange('contactPerson', e.target.value)}
-              error={errors.contactPerson}
-              required
-            />
-            <TextField
-              id="contactPhone"
-              label={t('phone')}
-              placeholder="+251 912 345 678"
-              value={formData.contactPhone}
-              onChange={(e) => handleChange('contactPhone', e.target.value)}
-              error={errors.contactPhone}
-              required
-            />
-          </div>
 
           <TextField
-            id="contactEmail"
-            label={t('email')}
-            type="email"
-            placeholder="contact@school.edu.et"
-            value={formData.contactEmail}
-            onChange={(e) => handleChange('contactEmail', e.target.value)}
-            error={errors.contactEmail}
-            required
+            id="groupContactPhone"
+            label={t('group_contact_phone') || 'Group Contact Phone (optional)'}
+            placeholder="+251 912 345 678"
+            value={formData.groupContactPhone}
+            onChange={(e) => handleChange('groupContactPhone', e.target.value)}
+            error={errors.groupContactPhone}
           />
+
+          {/* No organization/contact-person/email/visit-time/special-requests
+              fields here -- none of them exist on the backend
+              (BookingCreateRequest). Your account's own email/phone are
+              used for any notifications. */}
         </div>
       </Card>
 
@@ -188,109 +189,68 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
 
             <div>
               <label className="text-sm font-medium text-stone-700">
-                {t('visit_time') || 'Visit Time'} *
-              </label>
-              <select
-                value={formData.visitTime}
-                onChange={(e) => handleChange('visitTime', e.target.value)}
-                className={`w-full mt-1 px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                  errors.visitTime ? 'border-red-400' : 'border-stone-300'
-                }`}
-              >
-                <option value="">{t('select_time') || 'Select time'}</option>
-                {['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'].map((time) => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
-              {errors.visitTime && (
-                <span className="text-xs text-red-500 mt-1">{errors.visitTime}</span>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-stone-700">
-                {t('group_size') || 'Group Size'} *
-              </label>
-              <div className="flex items-center gap-3 mt-1">
-                <button
-                  type="button"
-                  onClick={() => handleChange('groupSize', Math.max(10, formData.groupSize - 5))}
-                  className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50"
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  value={formData.groupSize}
-                  onChange={(e) => handleChange('groupSize', parseInt(e.target.value) || 10)}
-                  min={10}
-                  max={200}
-                  className={`w-20 text-center px-2 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                    errors.groupSize ? 'border-red-400' : 'border-stone-300'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleChange('groupSize', Math.min(200, formData.groupSize + 5))}
-                  className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50"
-                >
-                  +
-                </button>
-                <span className="text-sm text-stone-500">(min 10, max 200)</span>
-              </div>
-              {errors.groupSize && (
-                <span className="text-xs text-red-500 mt-1">{errors.groupSize}</span>
-              )}
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-stone-700">
                 {t('category')} *
               </label>
               <select
-                value={formData.category}
-                onChange={(e) => handleChange('category', e.target.value)}
-                className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                value={formData.categoryId}
+                onChange={(e) => handleChange('categoryId', e.target.value)}
+                className={`w-full mt-1 px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                  errors.categoryId ? 'border-red-400' : 'border-stone-300'
+                }`}
               >
-                <option value="student">{t('student')}</option>
-                <option value="adult_teacher">{t('adult_teacher')}</option>
-                <option value="foreign_resident">{t('foreign_resident')}</option>
-                <option value="non_resident">{t('non_resident')}</option>
-                <option value="exempt">{t('exempt')}</option>
+                <option value="">{t('select_category') || 'Select category'}</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {locale === 'en' ? c.name_en : c.name_am}
+                    {c.is_free ? ` (${t('free') || 'Free'})` : ` (ETB ${c.price_etb})`}
+                  </option>
+                ))}
               </select>
+              {errors.categoryId && (
+                <span className="text-xs text-red-500 mt-1">{errors.categoryId}</span>
+              )}
             </div>
           </div>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-stone-900">
-            {t('additional_info') || 'Additional Information'}
-          </h3>
 
           <div>
             <label className="text-sm font-medium text-stone-700">
-              {t('special_requests') || 'Special Requests'}
+              {t('group_size') || 'Group Size'} *
             </label>
-            <textarea
-              value={formData.specialRequests}
-              onChange={(e) => handleChange('specialRequests', e.target.value)}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-              rows={3}
-              placeholder={t('special_requests_placeholder') || 'Any special needs or requests? (e.g., wheelchair access, specific time requirements)'}
-            />
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                type="button"
+                onClick={() => handleChange('quantity', Math.max(1, formData.quantity - 5))}
+                className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                value={formData.quantity}
+                onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 1)}
+                min={1}
+                className={`w-20 text-center px-2 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                  errors.quantity ? 'border-red-400' : 'border-stone-300'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => handleChange('quantity', formData.quantity + 5)}
+                className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50"
+              >
+                +
+              </button>
+            </div>
+            {errors.quantity && (
+              <span className="text-xs text-red-500 mt-1">{errors.quantity}</span>
+            )}
           </div>
 
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
             <span className="font-semibold">📌 {t('group_booking_note') || 'Important Information'}</span>
             <ul className="mt-1 list-disc list-inside space-y-0.5 text-xs">
               <li>{t('group_booking_note_1') || 'Group bookings require Manager approval before payment'}</li>
-              <li>{t('group_booking_note_2') || 'You will be notified via email once your request is reviewed'}</li>
-              <li>{t('group_booking_note_3') || 'A minimum of 10 visitors is required for group bookings'}</li>
-              <li>{t('group_booking_note_4') || 'Please submit your request at least 3 business days in advance'}</li>
+              <li>{t('group_booking_note_2') || 'You will be notified once your request is reviewed'}</li>
             </ul>
           </div>
         </div>

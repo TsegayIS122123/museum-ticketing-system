@@ -1,25 +1,31 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { setAccessToken, clearAccessToken, getAccessToken } from '@/lib/api/client';
+import { setAccessToken, setRefreshToken, clearAuthTokens, getAccessToken } from '@/lib/api/client';
 import { apiClient } from '@/lib/api/client';
 
+// Matches the real `Account` schema (contracts/openapi.yaml) returned by
+// GET /users/me/ and nested in AuthResponse.user -- snake_case, because
+// AccountSerializer is a plain DRF ModelSerializer, unlike most of the
+// rest of this API which uses the camelCase renderer.
 interface User {
   id: string;
   email: string;
-  phone: string;
-  fullName?: string;
+  phone: string | null;
+  full_name: string;
   role: 'visitor' | 'cashier' | 'museum_manager' | 'platform_admin';
-  languagePreference: 'en' | 'am';
+  language_preference: 'en' | 'am';
   active: boolean;
-  createdAt?: string;
+  created_at: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (tokens: { accessToken: string; refreshToken: string }, userData: User) => void;
+  // Matches AuthResponse's real field names (access_token/refresh_token,
+  // not accessToken/refreshToken).
+  login: (tokens: { access_token: string; refresh_token: string }, userData: User) => void;
   logout: () => void;
   setUser: (user: User | null) => void;
 }
@@ -35,13 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getAccessToken();
     if (token) {
       apiClient
-        .get<User>('/users/me')
+        .get<User>('/users/me/')
         .then((userData) => {
           setUser(userData);
           setIsAuthenticated(true);
         })
         .catch(() => {
-          clearAccessToken();
+          clearAuthTokens();
           setIsAuthenticated(false);
         })
         .finally(() => {
@@ -52,14 +58,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = (tokens: { accessToken: string; refreshToken: string }, userData: User) => {
-    setAccessToken(tokens.accessToken);
+  const login = (tokens: { access_token: string; refresh_token: string }, userData: User) => {
+    setAccessToken(tokens.access_token);
+    // apiClient (lib/api/client.ts) now uses this to silently refresh
+    // the access token on a 401 -- SIMPLE_JWT's ACCESS_TOKEN_LIFETIME is
+    // only 15 minutes, so without a refresh token stashed here every
+    // Staff member would otherwise get logged out mid-shift on the
+    // access token's first expiry, roughly every 15 minutes.
+    setRefreshToken(tokens.refresh_token);
     setUser(userData);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
-    clearAccessToken();
+    clearAuthTokens();
     setUser(null);
     setIsAuthenticated(false);
   };

@@ -5,7 +5,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { QuantityInput } from '@/components/ui/QuantityInput';
-import { SEEDED_CATEGORIES, type Category } from '@/lib/constants/categories';
+import type { Category } from '@/features/catalog/schemas';
 import { getCategories } from '@/features/catalog/api';
 
 interface DateCategoryPickerProps {
@@ -26,22 +26,26 @@ export function DateCategoryPicker({
   const { t, locale } = useTranslation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadCategories = async () => {
       try {
         const data = await getCategories();
         setCategories(data);
-      } catch (error) {
+        setLoadError(null);
+      } catch (error: any) {
+        // No fake fallback data here -- surfacing the real error is more
+        // useful than silently showing categories that may not match
+        // what the backend will actually accept at booking time.
         console.error('Failed to load categories:', error);
-        // Fallback to seeded data
-        setCategories(SEEDED_CATEGORIES);
+        setLoadError(error?.message || t('failed_to_load') || 'Failed to load categories.');
       } finally {
         setIsLoading(false);
       }
     };
     loadCategories();
-  }, []);
+  }, [t]);
 
   const isSelected = (categoryId: string) => selectedCategoryId === categoryId;
 
@@ -52,6 +56,16 @@ export function DateCategoryPicker({
           <div className="text-center py-12 text-stone-500">
             {t('loading')}
           </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <div className="text-center py-12 text-red-600">{loadError}</div>
         </Card>
       </div>
     );
@@ -78,16 +92,13 @@ export function DateCategoryPicker({
               `}
             >
               <div className="font-semibold text-stone-900">
-                {locale === 'en' ? category.nameEn : category.nameAm}
+                {locale === 'en' ? category.name_en : category.name_am}
               </div>
               <div className="text-sm text-stone-500 mt-1">
-                {locale === 'en' ? category.nameAm : category.nameEn}
-              </div>
-              <div className="text-xs text-stone-400 mt-1">
-                {locale === 'en' ? category.descriptionEn : category.descriptionAm}
+                {locale === 'en' ? category.name_am : category.name_en}
               </div>
               <div className="mt-2 text-lg font-bold text-amber-600">
-                {category.isFree ? 'FREE' : `ETB ${category.priceEtb}`}
+                {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
               </div>
             </button>
           ))}

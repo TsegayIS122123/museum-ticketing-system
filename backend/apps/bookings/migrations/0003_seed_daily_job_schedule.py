@@ -75,7 +75,17 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("bookings", "0002_remove_booking_booking_unsettled_visited_idx_and_more"),
-        ("django_celery_beat", "0001_initial"),
+        # NOT 0001_initial: CrontabSchedule.timezone (used by
+        # seed_schedule below) doesn't exist until django_celery_beat's
+        # own 0010_auto_20190429_0326 migration. Depending on 0001_initial
+        # here means Django builds the historical CrontabSchedule model
+        # state as of *that* migration -- pre-timezone-field -- so
+        # get_or_create(..., timezone=...) below fails with "Cannot
+        # resolve keyword 'timezone' into field" the moment this
+        # migration actually runs against a real django_celery_beat
+        # install. Depending on 0010 (or later) instead gives this
+        # migration the model state it actually needs.
+        ("django_celery_beat", "0010_auto_20190429_0326"),
     ]
 
     operations = [

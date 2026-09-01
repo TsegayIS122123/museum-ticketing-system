@@ -8,29 +8,34 @@ import { Toast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { PendingSettlementTable } from '@/features/settlement/components/PendingSettlementTable';
 import { TransferConfirmationCard } from '@/features/settlement/components/TransferConfirmationCard';
-import { getPendingSettlement, createSettlementTransfer, type PendingBooking, type SettlementTransfer } from '@/features/settlement/api';
+import {
+  getMyOutstandingBalance,
+  initiateReconciliation,
+  type OutstandingBalance,
+  type CashierReconciliation,
+} from '@/features/settlement/api';
 
-type ViewState = 'idle' | 'loading' | 'confirming' | 'processing' | 'complete';
+type ViewState = 'idle' | 'loading' | 'processing' | 'complete';
 
 export default function SettlementPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
 
   const [state, setState] = useState<ViewState>('idle');
-  const [bookings, setBookings] = useState<PendingBooking[]>([]);
-  const [transfer, setTransfer] = useState<SettlementTransfer | null>(null);
+  const [balance, setBalance] = useState<OutstandingBalance | null>(null);
+  const [reconciliation, setReconciliation] = useState<CashierReconciliation | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const loadPendingBookings = async () => {
+  const loadBalance = async () => {
     setState('loading');
     try {
-      const data = await getPendingSettlement();
-      setBookings(data);
+      const data = await getMyOutstandingBalance();
+      setBalance(data);
       setState('idle');
     } catch (error: any) {
       setToast({
-        message: error.message || t('failed_to_load') || 'Failed to load pending bookings.',
+        message: error.message || t('failed_to_load') || 'Failed to load your balance.',
         type: 'error',
       });
       setState('idle');
@@ -38,7 +43,7 @@ export default function SettlementPage() {
   };
 
   useEffect(() => {
-    loadPendingBookings();
+    loadBalance();
   }, []);
 
   const handleInitiateTransfer = async () => {
@@ -46,35 +51,29 @@ export default function SettlementPage() {
     setState('processing');
 
     try {
-      const result = await createSettlementTransfer();
-      setTransfer(result);
+      // No parameters -- this locks and reconciles the cashier's whole
+      // outstanding balance in one call, there's nothing to select.
+      const result = await initiateReconciliation();
+      setReconciliation(result);
       setState('complete');
       setToast({
-        message: t('transfer_success') || 'Settlement transfer completed successfully!',
+        message: t('transfer_success') || 'Settlement reconciliation initiated successfully!',
         type: 'success',
       });
     } catch (error: any) {
       setToast({
-        message: error.message || t('transfer_failed') || 'Failed to create settlement transfer.',
+        message: error.message || t('transfer_failed') || 'Failed to initiate reconciliation.',
         type: 'error',
       });
       setState('idle');
     }
   };
 
-  const handleDownloadReceipt = () => {
-    if (transfer?.receiptUrl) {
-      window.open(transfer.receiptUrl, '_blank');
-    }
-  };
-
   const handleDone = () => {
     setState('idle');
-    setTransfer(null);
-    loadPendingBookings();
+    setReconciliation(null);
+    loadBalance();
   };
-
-  const totalAmount = bookings.reduce((sum, b) => sum + b.totalAmountEtb, 0);
 
   return (
     <PageContainer maxWidth="xl">
@@ -91,26 +90,25 @@ export default function SettlementPage() {
           {t('settlement') || 'Settlement'}
         </h1>
         <p className="text-stone-500 mt-1">
-          {t('settlement_description') || 'Batch transfer visited booking revenue to the Finance Office'}
+          {t('settlement_description') || 'Reconcile your outstanding digital revenue with the Finance Office'}
         </p>
         {user && (
           <div className="text-sm text-stone-400 mt-1">
-            {t('cashier')}: {user.fullName || user.email} · {new Date().toLocaleDateString()}
+            {t('cashier')}: {user.full_name || user.email} · {new Date().toLocaleDateString()}
           </div>
         )}
       </div>
 
-      {state === 'complete' && transfer ? (
+      {state === 'complete' && reconciliation ? (
         <TransferConfirmationCard
-          transfer={transfer}
-          onDownloadReceipt={handleDownloadReceipt}
+          reconciliation={reconciliation}
           onDone={handleDone}
         />
       ) : (
         <PendingSettlementTable
-          bookings={bookings}
+          balance={balance}
           isLoading={state === 'loading'}
-          onRefresh={loadPendingBookings}
+          onRefresh={loadBalance}
           onTransfer={() => setShowConfirm(true)}
           isTransferring={state === 'processing'}
         />
@@ -120,14 +118,12 @@ export default function SettlementPage() {
         open={showConfirm}
         onClose={() => setShowConfirm(false)}
         onConfirm={handleInitiateTransfer}
-        title={t('initiate_transfer') || 'Initiate Settlement Transfer'}
+        title={t('initiate_transfer') || 'Initiate Settlement Reconciliation'}
         message={
-          bookings.length === 0
-            ? t('no_bookings_to_settle') || 'No bookings to settle. Please check in visitors first.'
-            : t('transfer_confirmation_message') || 
-              `You are about to transfer ${bookings.length} booking(s) totalling ETB ${totalAmount}. This action creates a Transfer Receipt for the Finance Office and cannot be undone.`
+          t('transfer_confirmation_message') ||
+          `You are about to reconcile your full outstanding balance of ETB ${balance?.balanceEtb ?? '0.00'}. This action cannot be undone.`
         }
-        confirmLabel={t('confirm_transfer') || 'Confirm Transfer'}
+        confirmLabel={t('confirm_transfer') || 'Confirm'}
         danger={false}
       />
     </PageContainer>

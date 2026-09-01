@@ -1,19 +1,29 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { SEEDED_CATEGORIES } from '@/lib/constants/categories';
+import { getCategories } from '@/features/catalog/api';
+import type { Category } from '@/features/catalog/schemas';
 
 interface BookingSummaryProps {
   categoryId: string;
   quantity: number;
   visitDate: string;
-  visitTime: string;
+  // Shown read-only for the visitor's own confirmation, sourced from her
+  // authenticated account -- NOT form fields, and never sent as part of
+  // the booking request. BookingCreateRequest has no visitor-identity
+  // fields at all (identity comes from the session token); there's also
+  // no time-of-day or special-requests concept anywhere in the contract.
+  // A previous version of this step collected all of these (plus a time
+  // picker and a special-requests textarea) as editable inputs that were
+  // silently discarded on submit -- decided to strip them rather than
+  // add unneeded backend fields, since a Visitor's booking is already
+  // fully described by category + quantity + date.
   visitorName: string;
   visitorEmail: string;
-  visitorPhone: string;
-  specialRequests?: string;
+  visitorPhone: string | null;
   onBack: () => void;
   onConfirm: () => void;
   isProcessing?: boolean;
@@ -23,19 +33,34 @@ export function BookingSummary({
   categoryId,
   quantity,
   visitDate,
-  visitTime,
   visitorName,
   visitorEmail,
   visitorPhone,
-  specialRequests,
   onBack,
   onConfirm,
   isProcessing = false,
 }: BookingSummaryProps) {
   const { t, locale } = useTranslation();
-  
-  const category = SEEDED_CATEGORIES.find(c => c.id === categoryId);
-  const totalAmount = category ? category.priceEtb * quantity : 0;
+
+  const [category, setCategory] = useState<Category | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCategories()
+      .then((categories) => {
+        if (!cancelled) {
+          setCategory(categories.find((c) => c.id === categoryId) ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCategory(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryId]);
+
+  const totalAmount = category ? (parseFloat(category.price_etb) * quantity).toFixed(2) : '0.00';
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -59,36 +84,32 @@ export function BookingSummary({
           <div className="grid grid-cols-2 gap-2 pb-3">
             <div className="text-stone-500">{t('category')}</div>
             <div className="font-medium text-stone-900 text-right">
-              {locale === 'en' ? category?.nameEn : category?.nameAm}
+              {locale === 'en' ? category?.name_en : category?.name_am}
             </div>
             <div className="text-stone-500">{t('quantity')}</div>
             <div className="font-medium text-stone-900 text-right">{quantity}</div>
           </div>
 
-          {/* Date & Time */}
+          {/* Date */}
           <div className="grid grid-cols-2 gap-2 py-3">
             <div className="text-stone-500">{t('date') || 'Date'}</div>
             <div className="font-medium text-stone-900 text-right">{formatDate(visitDate)}</div>
-            <div className="text-stone-500">{t('time') || 'Time'}</div>
-            <div className="font-medium text-stone-900 text-right">{visitTime}</div>
           </div>
 
-          {/* Visitor Details */}
+          {/* Visitor identity, read-only from the account -- not part of
+              the booking request, see the prop-level note above. */}
           <div className="grid grid-cols-2 gap-2 py-3">
             <div className="text-stone-500">{t('name') || 'Name'}</div>
             <div className="font-medium text-stone-900 text-right">{visitorName}</div>
             <div className="text-stone-500">{t('email')}</div>
             <div className="font-medium text-stone-900 text-right">{visitorEmail}</div>
-            <div className="text-stone-500">{t('phone')}</div>
-            <div className="font-medium text-stone-900 text-right">{visitorPhone}</div>
+            {visitorPhone && (
+              <>
+                <div className="text-stone-500">{t('phone')}</div>
+                <div className="font-medium text-stone-900 text-right">{visitorPhone}</div>
+              </>
+            )}
           </div>
-
-          {specialRequests && (
-            <div className="pt-3">
-              <div className="text-stone-500 text-sm">{t('special_requests') || 'Special Requests'}</div>
-              <div className="text-stone-700 text-sm mt-1">{specialRequests}</div>
-            </div>
-          )}
 
           {/* Total */}
           <div className="pt-4 flex justify-between items-center border-t-2 border-stone-200">

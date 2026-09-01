@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -9,59 +9,70 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { getBooking, type BookingResponse } from '@/features/booking/api';
 
+// `useSearchParams()` opts a page out of static prerendering unless it's
+// wrapped in a Suspense boundary (Next.js requires this so it can render
+// a fallback for the statically-generated shell while the actual search
+// params are only known client-side) -- without this wrapper `next build`
+// fails outright on this route with "useSearchParams() should be wrapped
+// in a suspense boundary". The actual `?id=` read and data fetch stay in
+// ConfirmationPageContent below; this component only provides the
+// boundary and fallback.
 export default function ConfirmationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col" data-surface="visitor">
+          <PublicHeader />
+          <main className="flex-1 flex items-center justify-center">
+            <div className="text-stone-500">Loading…</div>
+          </main>
+        </div>
+      }
+    >
+      <ConfirmationPageContent />
+    </Suspense>
+  );
+}
+
+function ConfirmationPageContent() {
   const { t, locale } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reference = searchParams.get('reference');
-  
+  // NOTE: this now reads the booking id, not the reference code. The only
+  // "fetch by reference" endpoint in the contract (GET /bookings/lookup) is
+  // Cashier-only, so a public visitor page can't use it. createBooking()
+  // already returns the id, so whatever page navigates here after booking
+  // should pass ?id=<booking.id> rather than ?reference=<booking.reference>.
+  const id = searchParams.get('id');
+
   const [booking, setBooking] = useState<BookingResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadBooking = async () => {
-      if (!reference) {
-        setError('No booking reference provided');
-        setIsLoading(false);
-        return;
-      }
+    if (!id) {
+      setError('No booking id provided');
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        // In production, we'd fetch the booking by reference
-        // For now, we'll simulate a successful booking
-        setIsLoading(false);
-        // const data = await getBookingByReference(reference);
-        // setBooking(data);
-        
-        // Mock data for demonstration
-        setBooking({
-          id: 'mock-id',
-          reference: reference,
-          visitorId: 'mock-visitor',
-          categoryId: 'mock-category',
-          visitDate: new Date().toISOString().split('T')[0],
-          bookingType: 'individual',
-          groupName: null,
-          bookedQuantity: 2,
-          attendedQuantity: null,
-          status: 'pending',
-          approvalStatus: null,
-          rescheduledCount: 0,
-          noticeSentAt: null,
-          checkoutUrl: null,
-          receiptUrl: null,
-          totalAmountEtb: 100,
-          createdAt: new Date().toISOString(),
-        });
-      } catch (err: any) {
-        setError(err.message || 'Failed to load booking');
-        setIsLoading(false);
-      }
+    let cancelled = false;
+
+    getBooking(id)
+      .then((data) => {
+        if (!cancelled) setBooking(data);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setError(err.message || 'Failed to load booking');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
-
-    loadBooking();
-  }, [reference]);
+  }, [id]);
 
   if (isLoading) {
     return (

@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toast } from '@/components/ui/Toast';
-import { decideGroupBooking, type GroupBookingRequest } from '../api';
+import { decideGroupBooking, type Booking } from '../api';
+import { getCategories } from '@/features/catalog/api';
+import type { Category } from '@/features/catalog/schemas';
 
 interface ApprovalDecisionPanelProps {
-  request: GroupBookingRequest;
+  request: Booking;
   onDecisionComplete?: () => void;
 }
 
@@ -27,6 +29,23 @@ export function ApprovalDecisionPanel({
   }>({ open: false, decision: 'approve' });
 
   const [declineNote, setDeclineNote] = useState('');
+
+  // categoryId on Booking isn't a name -- look it up against the real
+  // category list to show something readable.
+  const [category, setCategory] = useState<Category | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getCategories()
+      .then((categories) => {
+        if (!cancelled) setCategory(categories.find((c) => c.id === request.categoryId) ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setCategory(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [request.categoryId]);
 
   const handleDecision = async (decision: 'approve' | 'decline') => {
     if (decision === 'decline' && !declineNote.trim()) {
@@ -78,29 +97,23 @@ export function ApprovalDecisionPanel({
     });
   };
 
-  if (request.status !== 'pending') {
+  // Real backend model: a decided request has approvalStatus
+  // 'approved'/'declined' -- there is no declinedReason/approvedAt/
+  // approvedBy field on Booking at all (the decline note sent in the
+  // approval call isn't echoed back anywhere), so we can't show who
+  // decided it or why past the moment of deciding.
+  if (request.approvalStatus !== null) {
     return (
       <Card>
         <div className="text-center py-4">
           <div className="text-2xl mb-2">
-            {request.status === 'approved' ? '✅' : '❌'}
+            {request.approvalStatus === 'approved' ? '✅' : '❌'}
           </div>
           <div className="font-semibold text-stone-900">
-            {request.status === 'approved'
+            {request.approvalStatus === 'approved'
               ? t('request_approved') || 'Request Approved'
               : t('request_declined') || 'Request Declined'}
           </div>
-          {request.declinedReason && (
-            <div className="mt-2 text-sm text-stone-500">
-              {t('reason') || 'Reason'}: {request.declinedReason}
-            </div>
-          )}
-          {request.approvedAt && (
-            <div className="text-xs text-stone-400 mt-1">
-              {request.approvedBy && `${request.approvedBy} · `}
-              {new Date(request.approvedAt).toLocaleString()}
-            </div>
-          )}
         </div>
       </Card>
     );
@@ -122,38 +135,31 @@ export function ApprovalDecisionPanel({
         </h3>
 
         <div className="space-y-3 text-sm">
+          <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 text-xs text-stone-500">
+            {t('group_contact_unavailable') ||
+              "No contact name, phone, or email is stored on the booking itself. Reaching the requester requires a separate visitor lookup, which isn't available yet."}
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="text-stone-500">{t('organization') || 'Organization'}</div>
-            <div className="font-medium text-stone-900">{request.organizationName}</div>
-            <div className="text-stone-500">{t('contact') || 'Contact'}</div>
-            <div className="font-medium text-stone-900">{request.contactPerson}</div>
-            <div className="text-stone-500">{t('phone')}</div>
-            <div className="font-medium text-stone-900">{request.contactPhone}</div>
-            <div className="text-stone-500">{t('email')}</div>
-            <div className="font-medium text-stone-900">{request.contactEmail}</div>
+            <div className="text-stone-500">{t('reference') || 'Reference'}</div>
+            <div className="font-mono font-medium text-stone-900">{request.reference}</div>
+            <div className="text-stone-500">{t('group_name') || 'Group'}</div>
+            <div className="font-medium text-stone-900">{request.groupName || '—'}</div>
             <div className="text-stone-500">{t('visit_date') || 'Visit Date'}</div>
-            <div className="font-medium text-stone-900">
-              {formatDate(request.visitDate)} at {request.visitTime}
-            </div>
+            <div className="font-medium text-stone-900">{formatDate(request.visitDate)}</div>
             <div className="text-stone-500">{t('group_size') || 'Group Size'}</div>
-            <div className="font-bold text-amber-600">{request.groupSize}</div>
+            <div className="font-bold text-amber-600">{request.bookedQuantity}</div>
             <div className="text-stone-500">{t('category')}</div>
             <div className="font-medium text-stone-900">
-              {t(request.category) || request.category}
+              {category ? (locale === 'en' ? category.name_en : category.name_am) : '…'}
             </div>
+            <div className="text-stone-500">{t('total_amount') || 'Total'}</div>
+            <div className="font-medium text-stone-900">ETB {request.totalAmountEtb}</div>
           </div>
-
-          {request.specialRequests && (
-            <div className="mt-3 pt-3 border-t border-stone-100">
-              <div className="text-stone-500">{t('special_requests') || 'Special Requests'}</div>
-              <div className="text-stone-700 mt-1">{request.specialRequests}</div>
-            </div>
-          )}
 
           <div className="mt-3 pt-3 border-t border-stone-100">
             <div className="text-stone-500">{t('submitted') || 'Submitted'}</div>
             <div className="text-stone-700 text-sm">
-              {new Date(request.submittedAt).toLocaleString()}
+              {new Date(request.createdAt).toLocaleString()}
             </div>
           </div>
         </div>

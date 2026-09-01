@@ -43,10 +43,10 @@ export function VisitorVerifyForm() {
       const response = await startVisitorVerification({
         email,
         phone,
-        fullName: fullName || undefined,
-        languagePreference: locale as 'en' | 'am',
+        full_name: fullName || undefined,
+        language_preference: locale as 'en' | 'am',
       });
-      setVerificationId(response.verificationId);
+      setVerificationId(response.verification_id);
       setStep('otp');
     } catch (err: any) {
       setError(err.message || 'Failed to send verification code. Please try again.');
@@ -66,9 +66,9 @@ export function VisitorVerifyForm() {
 
     setIsLoading(true);
     try {
-      const response = await confirmVisitorVerification({ verificationId, otpCode });
+      const response = await confirmVisitorVerification({ verification_id: verificationId, otp_code: otpCode });
       login(
-        { accessToken: response.accessToken, refreshToken: response.refreshToken },
+        { access_token: response.access_token, refresh_token: response.refresh_token },
         response.user
       );
       router.push(`/${locale}/bookings`);

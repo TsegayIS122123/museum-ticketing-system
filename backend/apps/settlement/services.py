@@ -109,6 +109,15 @@ def get_outstanding_balance(*, cashier):
     decision). Read-only: takes no lock, so the figure can move between
     this call and a subsequent `initiate_reconciliation` -- that function
     recomputes it under a lock rather than trusting this value.
+
+    DECIDED (contract-audit finding, docs/ifmis-decision-summary.md): no
+    itemized bookings/refunds breakdown endpoint is planned alongside
+    this aggregate. The Cashier's own IFMIS vouchers -- handed out one
+    per visitor at check-in, `apps.entrance` -- are already her itemized
+    record for Finance; this endpoint only needs to give her the one
+    number she's about to send in one click (`initiate_reconciliation`
+    below), not a line-by-line reproduction of a paper trail she already
+    keeps.
     """
     booked_total = _outstanding_bookings_queryset(cashier=cashier).aggregate(
         total=Sum("total_amount_etb")

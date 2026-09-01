@@ -34,7 +34,7 @@ export function StaffLoginForm() {
       const response = await staffLogin({ email, password });
       
       login(
-        { accessToken: response.accessToken, refreshToken: response.refreshToken },
+        { access_token: response.access_token, refresh_token: response.refresh_token },
         response.user
       );
 

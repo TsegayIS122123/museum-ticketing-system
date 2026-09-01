@@ -28,7 +28,11 @@ export function QRCodeSVG({ value, size = 160, className = '' }: QRCodeSVGProps)
 
     // Generate a simple pattern based on the value
     const seed = value.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const pattern = [];
+    // Typed explicitly -- `const pattern = []` with no annotation infers
+    // `never[]`, so `pattern[i] = []` widens to `never[][]` and the
+    // `pattern[i][j] = val === 0 || val === 1` boolean assignment two
+    // lines down fails to typecheck against `never`.
+    const pattern: boolean[][] = [];
     for (let i = 0; i < 21; i++) {
       pattern[i] = [];
       for (let j = 0; j < 21; j++) {
