@@ -149,7 +149,7 @@ services:
   # default; requires --profile mock (see usage note above).
   mock-api:
     image: stoplight/prism:5
-    command: mock -h 0.0.0.0 /contracts/openapi.yaml
+    command: mock -h 0.0.0.0 --multiprocess=false /contracts/openapi.yaml
     volumes:
       - ./contracts:/contracts
     ports:
