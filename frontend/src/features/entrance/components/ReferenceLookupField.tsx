@@ -74,7 +74,7 @@ export function ReferenceLookupField({
           <Button
             type="submit"
             size="lg"
-            className="bg-amber-600 hover:bg-amber-700 h-[42px]"
+            className="bg-primary-600 hover:bg-primary-700 h-[42px]"
             disabled={isLoading || !reference.trim()}
           >
             {isLoading ? t('searching') || 'Searching...' : t('lookup') || 'Lookup'}
@@ -84,7 +84,7 @@ export function ReferenceLookupField({
 
       {isLoading && (
         <div className="flex items-center gap-2 text-sm text-stone-500">
-          <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
           {t('looking_up') || 'Looking up booking...'}
         </div>
       )}

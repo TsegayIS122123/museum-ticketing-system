@@ -178,7 +178,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
                 value={formData.visitDate}
                 onChange={(e) => handleChange('visitDate', e.target.value)}
                 min={today}
-                className={`w-full mt-1 px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                className={`w-full mt-1 px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 ${
                   errors.visitDate ? 'border-red-400' : 'border-stone-300'
                 }`}
               />
@@ -194,7 +194,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
               <select
                 value={formData.categoryId}
                 onChange={(e) => handleChange('categoryId', e.target.value)}
-                className={`w-full mt-1 px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                className={`w-full mt-1 px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 ${
                   errors.categoryId ? 'border-red-400' : 'border-stone-300'
                 }`}
               >
@@ -229,7 +229,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
                 value={formData.quantity}
                 onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 1)}
                 min={1}
-                className={`w-20 text-center px-2 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                className={`w-20 text-center px-2 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 ${
                   errors.quantity ? 'border-red-400' : 'border-stone-300'
                 }`}
               />
@@ -246,7 +246,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
             )}
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
+          <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-3 text-sm text-secondary-700">
             <span className="font-semibold">📌 {t('group_booking_note') || 'Important Information'}</span>
             <ul className="mt-1 list-disc list-inside space-y-0.5 text-xs">
               <li>{t('group_booking_note_1') || 'Group bookings require Manager approval before payment'}</li>
@@ -270,7 +270,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
         <Button
           type="submit"
           size="lg"
-          className="flex-1 bg-amber-600 hover:bg-amber-700"
+          className="flex-1 bg-primary-600 hover:bg-primary-700"
           disabled={isSubmitting}
         >
           {isSubmitting ? t('submitting') || 'Submitting...' : t('submit_request') || 'Submit Request →'}

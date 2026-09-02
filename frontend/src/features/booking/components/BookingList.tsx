@@ -57,7 +57,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
         description={t('no_bookings_description') || 'Book your first museum visit today!'}
         action={
           <Link href={`/${locale}/book`}>
-            <Button className="bg-amber-600 hover:bg-amber-700">
+            <Button className="bg-primary-600 hover:bg-primary-700">
               {t('book_now')}
             </Button>
           </Link>
@@ -94,7 +94,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
                   <span>
                     {t('quantity')}: {booking.bookedQuantity}
                   </span>
-                  <span className="font-medium text-amber-600">
+                  <span className="font-medium text-primary-600">
                     ETB {booking.totalAmountEtb}
                   </span>
                 </div>

@@ -92,7 +92,7 @@ export default function RefundsPage() {
     <span key="booking" className="font-mono text-sm text-stone-500">
       {refund.bookingId}
     </span>,
-    <div key="amount" className="font-bold text-amber-600">
+    <div key="amount" className="font-bold text-primary-600">
       ETB {refund.amountEtb}
     </div>,
     <div key="reason" className="text-sm text-stone-500">
@@ -120,7 +120,7 @@ export default function RefundsPage() {
           label={t('total_refunds') || 'Total Refunds'}
           value={`ETB ${totalAmount}`}
           sub={`${refunds.length} requests`}
-          color="amber"
+          color="primary"
         />
         <StatCard
           label={t('pending') || 'Pending'}

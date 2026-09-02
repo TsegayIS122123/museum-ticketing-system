@@ -114,7 +114,7 @@ export function BookingSummary({
           {/* Total */}
           <div className="pt-4 flex justify-between items-center border-t-2 border-stone-200">
             <span className="text-lg font-semibold text-stone-900">{t('total')}</span>
-            <span className="text-2xl font-bold text-amber-600 font-serif">
+            <span className="text-2xl font-bold text-primary-600 font-serif">
               ETB {totalAmount}
             </span>
           </div>
@@ -133,7 +133,7 @@ export function BookingSummary({
         </Button>
         <Button
           size="lg"
-          className="flex-1 bg-amber-600 hover:bg-amber-700"
+          className="flex-1 bg-primary-600 hover:bg-primary-700"
           onClick={onConfirm}
           disabled={isProcessing}
         >

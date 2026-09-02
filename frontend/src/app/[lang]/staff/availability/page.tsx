@@ -192,7 +192,7 @@ export default function AvailabilityPage() {
                     className={`
                       text-sm py-2.5 rounded-lg font-medium border-2 transition-all cursor-pointer
                       ${cellStyle}
-                      ${isSelected ? 'ring-2 ring-amber-500 ring-offset-1' : ''}
+                      ${isSelected ? 'ring-2 ring-secondary-500 ring-offset-1' : ''}
                       ${isPast ? 'line-through' : ''}
                     `}
                   >

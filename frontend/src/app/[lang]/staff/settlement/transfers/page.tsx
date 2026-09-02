@@ -74,7 +74,7 @@ export default function SettlementTransfersPage() {
           description={t('no_transfers_description') || 'Settlement reconciliations will appear here once initiated.'}
           action={
             <Button
-              className="bg-amber-600 hover:bg-amber-700"
+              className="bg-primary-600 hover:bg-primary-700"
               onClick={() => router.push(`/${locale}/staff/settlement`)}
             >
               {t('go_to_settlement') || 'Go to Settlement'}
@@ -97,7 +97,7 @@ export default function SettlementTransfersPage() {
     <span key="ref" className="font-mono text-sm font-medium text-stone-600">
       {transfer.chapaTransferReference || '—'}
     </span>,
-    <div key="amount" className="font-bold text-amber-600">
+    <div key="amount" className="font-bold text-primary-600">
       ETB {transfer.amountEtb}
     </div>,
     <div key="date" className="text-sm text-stone-500">
@@ -129,7 +129,7 @@ export default function SettlementTransfersPage() {
           </p>
         </div>
         <Button
-          className="bg-amber-600 hover:bg-amber-700"
+          className="bg-primary-600 hover:bg-primary-700"
           onClick={() => router.push(`/${locale}/staff/settlement`)}
         >
           🏦 {t('new_transfer') || 'New Reconciliation'}

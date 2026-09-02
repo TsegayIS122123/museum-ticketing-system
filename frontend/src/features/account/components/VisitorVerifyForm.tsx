@@ -114,7 +114,7 @@ export function VisitorVerifyForm() {
           <Button
             type="submit"
             size="lg"
-            className="w-full bg-amber-600 hover:bg-amber-700"
+            className="w-full bg-primary-600 hover:bg-primary-700"
             disabled={isLoading}
           >
             {isLoading ? t('loading') : t('verify')}
@@ -140,7 +140,7 @@ export function VisitorVerifyForm() {
   return (
     <Card className="max-w-md mx-auto">
       <div className="text-center mb-6">
-        <div className="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+        <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
           <span className="text-white font-bold text-xl">SM</span>
         </div>
         <h2 className="text-2xl font-serif font-bold text-stone-900">
@@ -186,7 +186,7 @@ export function VisitorVerifyForm() {
         <Button
           type="submit"
           size="lg"
-          className="w-full bg-amber-600 hover:bg-amber-700"
+          className="w-full bg-primary-600 hover:bg-primary-700"
           disabled={isLoading}
         >
           {isLoading ? t('loading') : t('continue')}

@@ -52,7 +52,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-4">
             <Link href={`/${lang}/book`}>
-              <Button size="lg" className="bg-amber-600 hover:bg-amber-700">
+              <Button size="lg" className="bg-primary-600 hover:bg-primary-700">
                 {t.book_now}
               </Button>
             </Link>
@@ -90,11 +90,11 @@ export default async function LandingPage({ params }: LandingPageProps) {
                       </p>
                     </div>
                     <div className="mt-4 pt-4 border-t border-stone-100">
-                      <p className="text-2xl font-bold text-amber-600 font-serif">
+                      <p className="text-2xl font-bold text-primary-600 font-serif">
                         {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
                       </p>
                       <Link href={`/${lang}/book`}>
-                        <Button className="w-full mt-3 bg-amber-600 hover:bg-amber-700">
+                        <Button className="w-full mt-3 bg-primary-600 hover:bg-primary-700">
                           {t.book_now}
                         </Button>
                       </Link>

@@ -25,7 +25,7 @@ export function LanguageToggle() {
           className={cn(
             'px-3 py-1.5 text-xs font-medium rounded transition-colors',
             currentLang === lang
-              ? 'bg-amber-600 text-white'
+              ? 'bg-primary-600 text-white'
               : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50'
           )}
           aria-label={lang === 'en' ? 'Switch to English' : 'Switch to Amharic'}

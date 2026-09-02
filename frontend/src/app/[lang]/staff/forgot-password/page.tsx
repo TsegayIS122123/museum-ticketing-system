@@ -90,7 +90,7 @@ export default function ForgotPasswordPage() {
             <Button
               type="submit"
               size="lg"
-              className="w-full bg-amber-600 hover:bg-amber-700"
+              className="w-full bg-primary-600 hover:bg-primary-700"
               disabled={isLoading}
             >
               {isLoading ? t('loading') : t('send_reset_link') || 'Send Reset Link'}

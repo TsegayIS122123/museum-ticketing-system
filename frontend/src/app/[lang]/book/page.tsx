@@ -126,7 +126,7 @@ export default function BookPage() {
                   value={visitDate}
                   onChange={(e) => setVisitDate(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500"
                 />
               </div>
             </Card>
@@ -135,7 +135,7 @@ export default function BookPage() {
                 ← {t('back') || 'Back'}
               </Button>
               <Button
-                className="bg-amber-600 hover:bg-amber-700"
+                className="bg-primary-600 hover:bg-primary-700"
                 disabled={!visitDate}
                 onClick={handleDateTimeNext}
               >

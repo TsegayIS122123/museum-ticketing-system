@@ -62,7 +62,7 @@ export function CategoryTable({
         {locale === 'en' ? category.name_am : category.name_en}
       </div>
     </div>,
-    <div key="price" className="font-bold text-amber-600 font-serif">
+    <div key="price" className="font-bold text-primary-600 font-serif">
       {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
     </div>,
     <div key="status">

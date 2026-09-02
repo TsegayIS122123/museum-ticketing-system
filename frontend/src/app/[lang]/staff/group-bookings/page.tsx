@@ -83,7 +83,7 @@ export default function GroupBookingsPage() {
         <StatCard
           label={t('pending') || 'Pending'}
           value={pendingCount}
-          color="amber"
+          color="secondary"
         />
         <StatCard
           label={t('approved') || 'Approved'}

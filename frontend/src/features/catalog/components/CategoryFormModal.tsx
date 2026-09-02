@@ -168,7 +168,7 @@ export function CategoryFormModal({
                 min={0}
                 step={1}
                 disabled={isFree}
-                className={`w-full px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                className={`w-full px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 ${
                   errors.price_etb ? 'border-red-400' : 'border-stone-300'
                 } ${isFree ? 'bg-stone-100 text-stone-400' : ''}`}
               />
@@ -189,7 +189,7 @@ export function CategoryFormModal({
                     handleChange('price_etb', '0');
                   }
                 }}
-                className="w-4 h-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                className="w-4 h-4 rounded border-stone-300 text-secondary-600 focus:ring-secondary-500"
               />
               <span className="text-sm font-medium text-stone-700">
                 {t('free_category') || 'Free Category (Exempt/AAU Staff)'}
@@ -210,7 +210,7 @@ export function CategoryFormModal({
           </Button>
           <Button
             type="submit"
-            className="flex-1 bg-amber-600 hover:bg-amber-700"
+            className="flex-1 bg-primary-600 hover:bg-primary-700"
             disabled={isSubmitting}
           >
             {isSubmitting ? (

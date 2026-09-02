@@ -52,7 +52,7 @@ export default function StaffDashboardPage() {
           label="Visitors Today"
           value={stats.visitorsToday}
           sub="Total check-ins"
-          color="amber"
+          color="primary"
         />
         <StatCard
           label="Check-ins"
@@ -106,7 +106,7 @@ export default function StaffDashboardPage() {
             ) : (
               <>
                 <Button
-                  className="w-full justify-start bg-amber-600 hover:bg-amber-700"
+                  className="w-full justify-start bg-primary-600 hover:bg-primary-700"
                   onClick={() => router.push(`/${locale}/staff/gate`)}
                 >
                   🚪 Gate Check-in
@@ -140,7 +140,7 @@ export default function StaffDashboardPage() {
             </div>
             <div className="flex justify-between py-2 font-bold text-lg">
               <span>Net Revenue</span>
-              <span className="text-amber-600">ETB 3,140</span>
+              <span className="text-primary-600">ETB 3,140</span>
             </div>
           </div>
         </Card>

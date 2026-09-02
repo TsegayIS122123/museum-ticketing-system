@@ -88,7 +88,7 @@ export default function MyBookingsPage() {
           <StatCard
             label={t('upcoming') || 'Upcoming'}
             value={upcomingBookings}
-            color="amber"
+            color="primary"
           />
           <StatCard
             label={t('completed') || 'Completed'}

@@ -196,7 +196,7 @@ export default function BookingDetailPage() {
             </div>
             <div>
               <div className="text-stone-500">{t('total')}</div>
-              <div className="font-bold text-lg text-amber-600 font-serif">
+              <div className="font-bold text-lg text-primary-600 font-serif">
                 ETB {booking.totalAmountEtb}
               </div>
             </div>
@@ -252,14 +252,14 @@ export default function BookingDetailPage() {
         {booking.attendedQuantity !== null &&
           booking.attendedQuantity !== undefined &&
           booking.attendedQuantity < booking.bookedQuantity && (
-            <Card className="mb-6 bg-amber-50 border-amber-200">
+            <Card className="mb-6 bg-secondary-50 border-secondary-200">
               <div className="flex items-start gap-3">
                 <span className="text-2xl">⚠️</span>
                 <div className="flex-1">
-                  <div className="font-semibold text-amber-800">
+                  <div className="font-semibold text-secondary-800">
                     {t('partial_attendance') || 'Partial Attendance Recorded'}
                   </div>
-                  <p className="text-sm text-amber-700">
+                  <p className="text-sm text-secondary-700">
                     {booking.bookedQuantity - booking.attendedQuantity} of {booking.bookedQuantity} did not attend.
                     {booking.status === 'visited' && (
                       <span className="block mt-1">
@@ -270,13 +270,13 @@ export default function BookingDetailPage() {
                   {booking.status === 'visited' && (
                     <div className="mt-3">
                       {refundRequested ? (
-                        <div className="text-sm font-medium text-amber-800">
+                        <div className="text-sm font-medium text-secondary-800">
                           ✓ {t('refund_requested') || 'Refund requested. It will be processed shortly.'}
                         </div>
                       ) : (
                         <Button
                           size="sm"
-                          className="bg-amber-600 hover:bg-amber-700"
+                          className="bg-primary-600 hover:bg-primary-700"
                           onClick={handleRequestRefund}
                           disabled={isRequestingRefund}
                         >

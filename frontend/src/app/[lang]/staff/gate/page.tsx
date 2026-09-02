@@ -119,7 +119,7 @@ export default function GatePage() {
       {state === 'loading' && (
         <Card>
           <div className="text-center py-12">
-            <div className="w-12 h-12 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-stone-500 mt-4">{t('searching') || 'Searching for booking...'}</p>
           </div>
         </Card>

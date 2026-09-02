@@ -81,7 +81,7 @@ export function BookingDetailCard({
         )}
         <div>
           <p className="text-stone-500">{t('total')}</p>
-          <p className="font-bold text-lg text-amber-600 font-serif">
+          <p className="font-bold text-lg text-primary-600 font-serif">
             ETB {booking.totalAmountEtb}
           </p>
         </div>
@@ -89,14 +89,14 @@ export function BookingDetailCard({
 
       {/* Shortfall Notice */}
       {hasShortfall && (
-        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-700">
+        <div className="mt-4 p-3 bg-secondary-50 border border-secondary-200 rounded-lg">
+          <p className="text-sm text-secondary-700">
             {booking.bookedQuantity - booking.attendedQuantity!} of {booking.bookedQuantity} did not attend.
             {onRefund && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="ml-2 text-amber-700 hover:text-amber-900"
+                className="ml-2 text-secondary-700 hover:text-secondary-900"
                 onClick={onRefund}
               >
                 {t('request_refund') || 'Request Refund'}

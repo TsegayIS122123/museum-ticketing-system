@@ -41,13 +41,13 @@ export function PendingSettlementTable({
   const amount = balance ? parseFloat(balance.balanceEtb) : 0;
 
   return (
-    <Card className="bg-amber-50 border-amber-200">
+    <Card className="bg-secondary-50 border-secondary-200">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="text-xs text-amber-700 uppercase tracking-wider">
+          <div className="text-xs text-secondary-700 uppercase tracking-wider">
             {t('outstanding_balance') || 'Your Outstanding Balance'}
           </div>
-          <div className="font-bold text-3xl text-amber-800 font-serif">
+          <div className="font-bold text-3xl text-secondary-800 font-serif">
             ETB {balance?.balanceEtb ?? '0.00'}
           </div>
         </div>
@@ -65,7 +65,7 @@ export function PendingSettlementTable({
           {onTransfer && (
             <Button
               size="lg"
-              className="bg-amber-600 hover:bg-amber-700"
+              className="bg-primary-600 hover:bg-primary-700"
               onClick={onTransfer}
               disabled={isTransferring || amount <= 0}
             >
@@ -82,7 +82,7 @@ export function PendingSettlementTable({
         </div>
       </div>
       {amount <= 0 && (
-        <p className="mt-3 text-sm text-amber-700">
+        <p className="mt-3 text-sm text-secondary-700">
           {t('nothing_to_settle') || 'Nothing to settle right now.'}
         </p>
       )}

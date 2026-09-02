@@ -179,7 +179,7 @@ export function CancelRescheduleControls({
               value={newVisitDate}
               onChange={(e) => setNewVisitDate(e.target.value)}
               min={today}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500"
             />
             <p className="text-xs text-stone-400 mt-1">
               {t('reschedule_note') || 'You can only reschedule once. Please choose a new available date.'}
@@ -196,7 +196,7 @@ export function CancelRescheduleControls({
               {t('cancel') || 'Cancel'}
             </Button>
             <Button
-              className="flex-1 bg-amber-600 hover:bg-amber-700"
+              className="flex-1 bg-primary-600 hover:bg-primary-700"
               onClick={handleReschedule}
               disabled={isProcessing || !newVisitDate}
             >

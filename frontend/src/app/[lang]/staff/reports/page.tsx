@@ -111,7 +111,7 @@ export default function ReportsPage() {
               label={t('total_revenue') || 'Total Revenue'}
               value={`ETB ${revenueTotal}`}
               sub={`${summary?.from ?? ''} - ${summary?.to ?? ''}`}
-              color="amber"
+              color="primary"
             />
             <StatCard
               label={t('total_revenue_overall') || 'Total Revenue (overall)'}

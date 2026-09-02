@@ -5,13 +5,14 @@ interface StatCardProps {
   label: string;
   value: string | number;
   sub?: string;
-  color?: 'slate' | 'amber' | 'green' | 'red' | 'blue';
+  color?: 'slate' | 'primary' | 'secondary' | 'green' | 'red' | 'blue';
   className?: string;
 }
 
 const colors: Record<NonNullable<StatCardProps['color']>, string> = {
   slate: 'text-stone-800',
-  amber: 'text-amber-600',
+  primary: 'text-primary-600',
+  secondary: 'text-secondary-600',
   green: 'text-emerald-700',
   red: 'text-red-600',
   blue: 'text-blue-600',

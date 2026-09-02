@@ -86,7 +86,7 @@ export function DateCategoryPicker({
               className={`
                 p-4 rounded-lg border-2 text-left transition-all
                 ${isSelected(category.id)
-                  ? 'border-amber-600 bg-amber-50 ring-2 ring-amber-200'
+                  ? 'border-secondary-600 bg-secondary-50 ring-2 ring-secondary-200'
                   : 'border-stone-200 hover:border-stone-400 hover:bg-stone-50'
                 }
               `}
@@ -97,7 +97,7 @@ export function DateCategoryPicker({
               <div className="text-sm text-stone-500 mt-1">
                 {locale === 'en' ? category.name_am : category.name_en}
               </div>
-              <div className="mt-2 text-lg font-bold text-amber-600">
+              <div className="mt-2 text-lg font-bold text-primary-600">
                 {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
               </div>
             </button>
@@ -120,7 +120,7 @@ export function DateCategoryPicker({
       <div className="flex justify-end">
         <Button
           size="lg"
-          className="bg-amber-600 hover:bg-amber-700"
+          className="bg-primary-600 hover:bg-primary-700"
           disabled={!selectedCategoryId}
           onClick={onNext}
         >

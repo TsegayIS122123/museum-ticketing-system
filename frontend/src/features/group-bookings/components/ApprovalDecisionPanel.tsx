@@ -147,7 +147,7 @@ export function ApprovalDecisionPanel({
             <div className="text-stone-500">{t('visit_date') || 'Visit Date'}</div>
             <div className="font-medium text-stone-900">{formatDate(request.visitDate)}</div>
             <div className="text-stone-500">{t('group_size') || 'Group Size'}</div>
-            <div className="font-bold text-amber-600">{request.bookedQuantity}</div>
+            <div className="font-bold text-primary-600">{request.bookedQuantity}</div>
             <div className="text-stone-500">{t('category')}</div>
             <div className="font-medium text-stone-900">
               {category ? (locale === 'en' ? category.name_en : category.name_am) : '…'}
@@ -178,7 +178,7 @@ export function ApprovalDecisionPanel({
             <textarea
               value={declineNote}
               onChange={(e) => setDeclineNote(e.target.value)}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500"
               rows={3}
               placeholder={t('decline_reason_placeholder') || 'Please explain why this request is being declined...'}
             />

@@ -42,7 +42,7 @@ export function TransferConfirmationCard({
           ? 'border-green-200 bg-green-50/50'
           : isFailed
           ? 'border-red-200 bg-red-50/50'
-          : 'border-amber-200 bg-amber-50/50'
+          : 'border-secondary-200 bg-secondary-50/50'
       }
     >
       <div className="text-center mb-6">
@@ -70,7 +70,7 @@ export function TransferConfirmationCard({
         </div>
         <div>
           <div className="text-stone-500">{t('amount') || 'Amount'}</div>
-          <div className="font-bold text-xl text-amber-600 font-serif">
+          <div className="font-bold text-xl text-primary-600 font-serif">
             ETB {reconciliation.amountEtb}
           </div>
         </div>
@@ -98,7 +98,7 @@ export function TransferConfirmationCard({
             rel="noreferrer"
             className="flex-1"
           >
-            <Button className="w-full bg-amber-600 hover:bg-amber-700">
+            <Button className="w-full bg-primary-600 hover:bg-primary-700">
               📄 {t('download_receipt') || 'Download Transfer Receipt'}
             </Button>
           </a>

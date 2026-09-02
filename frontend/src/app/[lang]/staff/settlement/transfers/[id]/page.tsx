@@ -115,7 +115,7 @@ export default function TransferDetailPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b border-stone-100">
               <span className="text-stone-500">{t('amount') || 'Amount'}</span>
-              <span className="font-bold text-xl text-amber-600 font-serif">
+              <span className="font-bold text-xl text-primary-600 font-serif">
                 ETB {transfer.amountEtb}
               </span>
             </div>
@@ -143,7 +143,7 @@ export default function TransferDetailPage() {
           <div className="space-y-3">
             {transfer.transferReceiptUrl && (
               <a href={transfer.transferReceiptUrl} target="_blank" rel="noreferrer">
-                <Button className="w-full bg-amber-600 hover:bg-amber-700">
+                <Button className="w-full bg-primary-600 hover:bg-primary-700">
                   📄 {t('download_transfer_receipt') || 'Download Transfer Receipt'}
                 </Button>
               </a>

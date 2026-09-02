@@ -150,7 +150,7 @@ function ConfirmationPageContent() {
                 {booking.bookedQuantity}
               </div>
               <div className="text-stone-500">{t('total')}</div>
-              <div className="font-bold text-amber-600 text-right">
+              <div className="font-bold text-primary-600 text-right">
                 ETB {booking.totalAmountEtb}
               </div>
               <div className="text-stone-500">{t('status')}</div>
@@ -161,7 +161,7 @@ function ConfirmationPageContent() {
 
             <div className="flex flex-col gap-3">
               <Button
-                className="w-full bg-amber-600 hover:bg-amber-700"
+                className="w-full bg-primary-600 hover:bg-primary-700"
                 onClick={() => router.push(`/${locale}/bookings/${booking.id}`)}
               >
                 {t('view_booking') || 'View Booking'}

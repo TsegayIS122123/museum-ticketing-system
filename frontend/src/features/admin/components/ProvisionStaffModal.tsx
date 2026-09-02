@@ -201,7 +201,7 @@ export function ProvisionStaffModal({
                 ? setEditRole(e.target.value as 'cashier' | 'museum_manager')
                 : handleChange('role', e.target.value)
             }
-            className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500"
           >
             <option value="cashier">{t('cashier') || 'Cashier'}</option>
             <option value="museum_manager">{t('museum_manager') || 'Museum Manager'}</option>
@@ -212,7 +212,7 @@ export function ProvisionStaffModal({
         </div>
 
         {!isEditing && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+          <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-3 text-xs text-secondary-700">
             <span className="font-semibold">📌 {t('set_password_note') || 'Set-Password Link'}</span>
             <p className="mt-1">
               {t('set_password_description') || 'The new account has no password yet. A link to set one will be sent to the staff email address; there is no temporary password to reset.'}
@@ -232,7 +232,7 @@ export function ProvisionStaffModal({
           </Button>
           <Button
             type="submit"
-            className="flex-1 bg-amber-600 hover:bg-amber-700"
+            className="flex-1 bg-primary-600 hover:bg-primary-700"
             disabled={isSubmitting}
           >
             {isSubmitting ? (

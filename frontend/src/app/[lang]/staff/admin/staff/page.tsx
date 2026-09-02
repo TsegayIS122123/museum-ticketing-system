@@ -149,7 +149,7 @@ export default function StaffManagementPage() {
         </div>
         <Button
           size="lg"
-          className="bg-amber-600 hover:bg-amber-700"
+          className="bg-primary-600 hover:bg-primary-700"
           onClick={handleCreate}
         >
           + {t('create_staff') || 'Create Staff Account'}

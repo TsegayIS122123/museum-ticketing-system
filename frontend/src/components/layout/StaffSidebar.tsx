@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
@@ -37,7 +38,7 @@ const navByRole: Record<UserRole, NavItem[]> = {
 const roleInfo: Record<UserRole, { name: string; badge: string; initials: string; badgeColor: string }> = {
   visitor: { name: 'Visitor', badge: 'Visitor', initials: 'V', badgeColor: 'bg-blue-500/20 text-blue-200' },
   cashier: { name: 'Cashier', badge: 'Cashier', initials: 'C', badgeColor: 'bg-emerald-500/20 text-emerald-200' },
-  museum_manager: { name: 'Manager', badge: 'Museum Manager', initials: 'M', badgeColor: 'bg-amber-500/20 text-amber-200' },
+  museum_manager: { name: 'Manager', badge: 'Museum Manager', initials: 'M', badgeColor: 'bg-primary-500/20 text-primary-200' },
   platform_admin: { name: 'Admin', badge: 'Platform Admin', initials: 'A', badgeColor: 'bg-purple-500/20 text-purple-200' },
 };
 
@@ -68,9 +69,13 @@ export function StaffSidebar() {
       {/* Logo */}
       <div className="p-5 border-b border-slate-700/60">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-amber-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-xs leading-none text-center">SM</span>
-          </div>
+          <Image
+            src="/aau-logo.png"
+            alt="Addis Ababa University"
+            width={36}
+            height={36}
+            className="rounded-lg flex-shrink-0"
+          />
           <div>
             <div className="text-white font-semibold text-sm leading-tight">
               Science Museum
@@ -94,7 +99,7 @@ export function StaffSidebar() {
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all text-left cursor-pointer rounded-none',
                 active
-                  ? 'bg-amber-600 text-white'
+                  ? 'bg-primary-600 text-white'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               )}
             >

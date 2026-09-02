@@ -13,16 +13,36 @@
   --color-stone-800: #40362e;
   --color-stone-900: #1c1917;
 
-  --color-amber-50: #fffbeb;
-  --color-amber-100: #fef3c7;
-  --color-amber-200: #fde68a;
-  --color-amber-300: #fcd34d;
-  --color-amber-400: #fbbf24;
-  --color-amber-500: #f59e0b;
-  --color-amber-600: #d97706;
-  --color-amber-700: #b45309;
-  --color-amber-800: #92400e;
-  --color-amber-900: #78350f;
+  /* AAU brand primary — blue (#015484). Drives every Book/Pay/Approve
+     action and the staff sidebar's active-nav-state (see
+     docs/06-ui-ux-specification.md §3.2, color-primary). */
+  --color-primary-50: #f1f7fb;
+  --color-primary-100: #dfeff8;
+  --color-primary-200: #b6dff7;
+  --color-primary-300: #6ec5f7;
+  --color-primary-400: #06a0f9;
+  --color-primary-500: #0374b5;
+  --color-primary-600: #015484;
+  --color-primary-700: #014268;
+  --color-primary-800: #02324d;
+  --color-primary-900: #032133;
+
+  /* AAU brand secondary — same blue family as primary, just a different
+     intensity plane. The design only uses two colors (blue + white), so
+     "secondary" is an alias of the primary scale rather than a separate
+     gold hue. Kept as its own token set so every existing secondary
+     utility class (bg-secondary-N, text-secondary-N, ring-secondary-N,
+     etc.) still works, it now simply renders in blue instead of gold. */
+  --color-secondary-50: var(--color-primary-50);
+  --color-secondary-100: var(--color-primary-100);
+  --color-secondary-200: var(--color-primary-200);
+  --color-secondary-300: var(--color-primary-300);
+  --color-secondary-400: var(--color-primary-400);
+  --color-secondary-500: var(--color-primary-500);
+  --color-secondary-600: var(--color-primary-600);
+  --color-secondary-700: var(--color-primary-700);
+  --color-secondary-800: var(--color-primary-800);
+  --color-secondary-900: var(--color-primary-900);
 
   --color-slate-50: #f8fafc;
   --color-slate-100: #f1f5f9;
@@ -41,15 +61,22 @@
   --color-red-600: #dc2626;
 
   /* Semantic Tokens */
-  --color-primary: var(--color-amber-600);
-  --color-primary-hover: var(--color-amber-700);
+  --color-primary: var(--color-primary-600);
+  --color-primary-hover: var(--color-primary-700);
+  --color-secondary: var(--color-secondary-500);
+  --color-secondary-hover: var(--color-secondary-600);
   --color-surface: #ffffff;
   --color-surface-alt: var(--color-stone-50);
   --color-text: var(--color-stone-900);
   --color-text-muted: var(--color-stone-500);
   --color-success: var(--color-emerald-500);
+  --color-warning: var(--color-secondary-500);
   --color-danger: var(--color-red-600);
-  --color-focus: var(--color-amber-600);
+  /* Was color-secondary-600 (gold) — every input already draws its own
+     blue focus ring via focus:ring-secondary-*, so the global outline
+     showed as a second, gold ring around it. Using the same primary
+     blue here means focus states are a single, consistent blue. */
+  --color-focus: var(--color-primary-600);
 
   /* Typography - Figma fonts */
   --font-serif: 'DM Serif Display', Georgia, 'Times New Roman', serif;
