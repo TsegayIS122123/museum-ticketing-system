@@ -1,12 +1,11 @@
 import { ApiError, type ApiErrorPayload } from './errors';
 
-const API_BASE = (
+const API_BASE =
   typeof window === 'undefined'
     ? process.env.API_INTERNAL_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       'http://localhost:8000/api/v1'
-    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
-).replace(/\/+$/, '');
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 // In-memory token storage (Option A - safest against XSS)
 let accessToken: string | null = null;
@@ -130,18 +129,10 @@ async function request<T>(
   }
   headers['Accept-Language'] = locale;
 
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE}${normalizedPath}`, {
-      ...options,
-      headers,
-      cache: 'no-store',
-    });
-  } catch {
-    throw new Error(
-      'Network error — could not reach the server. Please check your connection and try again.'
-    );
-  }
+  const response = await fetch(`${API_BASE}${normalizedPath}`, {
+    ...options,
+    headers,
+  });
 
   // A 401 on an authenticated request means the 15-minute access token
   // has expired (or was never valid) -- try exactly one silent refresh
@@ -161,11 +152,24 @@ async function request<T>(
     }
   }
 
-  let data;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error('Invalid response from server');
+  // A 204 (e.g. DELETE /categories/{id}/'s retire) or any other
+  // genuinely empty body has nothing to parse -- `response.json()`
+  // throws on empty input, which used to be indistinguishable from an
+  // actually malformed response. Checked via status + Content-Length
+  // rather than an empty-string read, since consuming the body here
+  // would leave nothing for `.json()` below on the non-empty path.
+  const hasNoBody =
+    response.status === 204 ||
+    response.status === 205 ||
+    response.headers.get('content-length') === '0';
+
+  let data: unknown = undefined;
+  if (!hasNoBody) {
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error('Invalid response from server');
+    }
   }
 
   if (!response.ok) {

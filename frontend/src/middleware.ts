@@ -37,7 +37,7 @@ export function middleware(request: NextRequest) {
   
   // Build new URL with locale
   const cleanPath = pathname === '/' ? '' : pathname;
-  const newUrl = new URL(`/${locale}${cleanPath}`, request.url);
+  const newUrl = new URL(`/${locale}${cleanPath}${request.nextUrl.search}`, request.url);
   const response = NextResponse.redirect(newUrl);
   response.cookies.set('NEXT_LOCALE', locale, { 
     maxAge: 60 * 60 * 24 * 365, 

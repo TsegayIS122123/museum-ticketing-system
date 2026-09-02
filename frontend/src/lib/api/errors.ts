@@ -10,10 +10,10 @@ export class ApiError extends Error {
   code: string;
   fieldErrors?: Record<string, string>;
 
-  constructor(payload: ApiErrorPayload) {
-    super(payload.error?.message || 'An unexpected error occurred');
-    this.code = payload.error?.code || 'UNKNOWN_ERROR';
-    this.fieldErrors = payload.error?.fieldErrors;
+  constructor(payload: ApiErrorPayload | undefined) {
+    super(payload?.error?.message || 'An unexpected error occurred');
+    this.code = payload?.error?.code || 'UNKNOWN_ERROR';
+    this.fieldErrors = payload?.error?.fieldErrors;
   }
 }
 

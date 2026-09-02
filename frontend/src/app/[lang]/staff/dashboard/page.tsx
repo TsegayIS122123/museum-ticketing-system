@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
@@ -7,20 +8,76 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useRouter } from 'next/navigation';
+import { getDashboard, getReportSummary, type DashboardResponse } from '@/features/reports/api';
+import type { ReportSummary } from '@/lib/api-contract';
+import { getGroupBookings } from '@/features/group-bookings/api';
 
 export default function StaffDashboardPage() {
   const { t, locale } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
 
-  const stats = {
-    totalRevenue: 3290,
-    visitorsToday: 124,
-    checkIns: 98,
-    pendingRequests: 2,
-  };
-
   const isManager = user?.role === 'museum_manager';
+  const isAdmin = user?.role === 'platform_admin';
+
+  // GET /reports/dashboard and /reports/summary are Museum Manager /
+  // Platform Admin only (backend/apps/reporting/views.py) -- the same
+  // endpoints ReportsPage already uses. Cashier never has a "Dashboard"
+  // sidebar link (StaffSidebar's navByRole), so this only ever runs for
+  // a role the backend will actually authorize.
+  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [todaySummary, setTodaySummary] = useState<ReportSummary | null>(null);
+  const [pendingGroupRequests, setPendingGroupRequests] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(isManager || isAdmin);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isManager && !isAdmin) return;
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    Promise.all([
+      getDashboard(),
+      getReportSummary('daily'),
+      getGroupBookings({ status: 'pending_approval', limit: 1 }),
+    ])
+      .then(([dashboardRes, summaryRes, groupRes]) => {
+        if (cancelled) return;
+        setDashboard(dashboardRes);
+        setTodaySummary(summaryRes);
+        setPendingGroupRequests(groupRes.meta.total);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setError(err.message || 'Failed to load dashboard data');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManager, isAdmin]);
+
+  const revenueToday = todaySummary
+    ? Object.values(todaySummary.revenueByCategory).reduce(
+        (sum, amount) => sum + parseFloat(amount),
+        0
+      )
+    : 0;
+  const transactionsToday = todaySummary
+    ? Object.values(todaySummary.visitorCountsByGroup).reduce((sum, n) => sum + n, 0)
+    : 0;
+  const visitorsToday = transactionsToday;
+
+  const statusMix = dashboard?.statusMix;
+  const totalBookings = statusMix
+    ? statusMix.pending + statusMix.visited + statusMix.cancelled + statusMix.refunded
+    : 0;
+  const checkedIn = statusMix?.visited ?? 0;
+  const checkedInPct = totalBookings > 0 ? Math.round((checkedIn / totalBookings) * 100) : 0;
 
   return (
     <PageContainer>
@@ -41,32 +98,42 @@ export default function StaffDashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label="Today's Revenue"
-          value={`ETB ${stats.totalRevenue}`}
-          sub="32 transactions"
-          color="green"
-        />
-        <StatCard
-          label="Visitors Today"
-          value={stats.visitorsToday}
-          sub="Total check-ins"
-          color="primary"
-        />
-        <StatCard
-          label="Check-ins"
-          value={stats.checkIns}
-          sub="79% of expected"
-          color="blue"
-        />
-        <StatCard
-          label="Pending Requests"
-          value={stats.pendingRequests}
-          sub="Group bookings"
-          color="red"
-        />
-      </div>
+      {(isManager || isAdmin) && (
+        <>
+          {isLoading ? (
+            <div className="mb-8 text-stone-500">{t('loading') || 'Loading...'}</div>
+          ) : error ? (
+            <div className="mb-8 text-red-600">{error}</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <StatCard
+                label="Today's Revenue"
+                value={`ETB ${revenueToday}`}
+                sub={`${transactionsToday} bookings today`}
+                color="green"
+              />
+              <StatCard
+                label="Visitors Today"
+                value={visitorsToday}
+                sub="Booked quantity today"
+                color="primary"
+              />
+              <StatCard
+                label="Checked In"
+                value={checkedIn}
+                sub={totalBookings > 0 ? `${checkedInPct}% of all bookings` : 'No bookings yet'}
+                color="blue"
+              />
+              <StatCard
+                label="Pending Requests"
+                value={pendingGroupRequests ?? 0}
+                sub="Group bookings"
+                color="red"
+              />
+            </div>
+          )}
+        </>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
@@ -123,28 +190,37 @@ export default function StaffDashboardPage() {
           </div>
         </Card>
 
-        <Card>
-          <h3 className="font-semibold text-stone-900 mb-4">Today's Summary</h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between py-2 border-b border-stone-100">
-              <span className="text-stone-500">Online Sales</span>
-              <span className="font-medium">ETB 2,180</span>
+        {(isManager || isAdmin) && !isLoading && !error && statusMix && (
+          <Card>
+            <h3 className="font-semibold text-stone-900 mb-4">Booking Status (All Time)</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between py-2 border-b border-stone-100">
+                <span className="text-stone-500">Pending</span>
+                <span className="font-medium">{statusMix.pending}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-stone-100">
+                <span className="text-stone-500">Visited</span>
+                <span className="font-medium">{statusMix.visited}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-stone-100">
+                <span className="text-stone-500">Cancelled</span>
+                <span className="font-medium text-red-500">{statusMix.cancelled}</span>
+              </div>
+              <div className="flex justify-between py-2 font-bold text-lg">
+                <span>Total Revenue</span>
+                <span className="text-primary-600">ETB {dashboard?.revenueTotalEtb ?? 0}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b border-stone-100">
-              <span className="text-stone-500">Counter Sales</span>
-              <span className="font-medium">ETB 1,110</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-stone-100">
-              <span className="text-stone-500">Cancellations</span>
-              <span className="font-medium text-red-500">-ETB 150</span>
-            </div>
-            <div className="flex justify-between py-2 font-bold text-lg">
-              <span>Net Revenue</span>
-              <span className="text-primary-600">ETB 3,140</span>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        )}
       </div>
+      {/*
+        The mock version of this page also showed a per-channel (Online/
+        Counter) sales breakdown with a computed "Net Revenue" line. Same
+        as ReportsPage: /reports/dashboard and /reports/summary don't
+        expose a sales-channel split, so it isn't reproduced here --
+        only real, backend-sourced numbers are shown above.
+      */}
     </PageContainer>
   );
 }
