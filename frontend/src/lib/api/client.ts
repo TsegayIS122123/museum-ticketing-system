@@ -1,11 +1,12 @@
 import { ApiError, type ApiErrorPayload } from './errors';
 
-const API_BASE =
+const API_BASE = (
   typeof window === 'undefined'
     ? process.env.API_INTERNAL_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       'http://localhost:8000/api/v1'
-    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+).replace(/\/+$/, '');
 
 // In-memory token storage (Option A - safest against XSS)
 let accessToken: string | null = null;
@@ -129,10 +130,18 @@ async function request<T>(
   }
   headers['Accept-Language'] = locale;
 
-  const response = await fetch(`${API_BASE}${normalizedPath}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${normalizedPath}`, {
+      ...options,
+      headers,
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error(
+      'Network error — could not reach the server. Please check your connection and try again.'
+    );
+  }
 
   // A 401 on an authenticated request means the 15-minute access token
   // has expired (or was never valid) -- try exactly one silent refresh
