@@ -3,7 +3,7 @@ HTTP concerns only: routing to a service call, permission checks, and
 response status codes. No business logic here (Design Spec Sec 3.1).
 """
 
-from drf_spectacular.utils import extend_schema, inline_serializer
+from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializer
 from rest_framework import permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,7 +18,6 @@ from .serializers import (
     VisitorVerifyConfirmSerializer,
     VisitorVerifyStartSerializer,
 )
-from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializer
 
 # `AuthResponse` (Document 04) -- the token pair + profile shape shared by
 # every flow that ends in a session (Visitor OTP confirm, Staff login).
