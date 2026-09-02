@@ -23,12 +23,14 @@ export default function GroupBookingsPage() {
     setIsLoading(true);
     try {
       const response = await getGroupBookings();
-      setRequests(response.data);
+      const nextRequests = Array.isArray(response?.data) ? response.data : [];
+      setRequests(nextRequests);
     } catch (error: any) {
       setToast({
         message: error.message || t('failed_to_load') || 'Failed to load group bookings.',
         type: 'error',
       });
+      setRequests([]);
     } finally {
       setIsLoading(false);
     }
@@ -38,10 +40,12 @@ export default function GroupBookingsPage() {
     loadRequests();
   }, []);
 
+  const safeRequests = Array.isArray(requests) ? requests : [];
+
   // Real backend model: pending review = approvalStatus still null.
-  const pendingCount = requests.filter(r => r.approvalStatus === null).length;
-  const approvedCount = requests.filter(r => r.approvalStatus === 'approved').length;
-  const declinedCount = requests.filter(r => r.approvalStatus === 'declined').length;
+  const pendingCount = safeRequests.filter(r => r.approvalStatus === null).length;
+  const approvedCount = safeRequests.filter(r => r.approvalStatus === 'approved').length;
+  const declinedCount = safeRequests.filter(r => r.approvalStatus === 'declined').length;
 
   const handleReview = (id: string) => {
     router.push(`/${locale}/staff/group-bookings/${id}`);
@@ -94,7 +98,7 @@ export default function GroupBookingsPage() {
       </div>
 
       <ApprovalQueueTable
-        requests={requests}
+        requests={safeRequests}
         isLoading={isLoading}
         onReview={handleReview}
         onRefresh={loadRequests}
