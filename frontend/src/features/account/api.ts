@@ -30,6 +30,13 @@ export async function confirmVisitorVerification(
   return apiClient.post<AuthResponse>('/auth/visitor/verify/confirm/', input);
 }
 
+// GET /auth/visitor/verify/email/{token}/ -- the secondary/fallback
+// verification channel (opening the emailed link). Only marks
+// email_verified_at; it never issues a session (see VerifyMagicLinkView).
+export async function confirmEmailVerification(token: string): Promise<{ detail: string }> {
+  return apiClient.get<{ detail: string }>(`/auth/visitor/verify/email/${encodeURIComponent(token)}/`);
+}
+
 // POST /auth/login/ -- Staff only (password-based).
 export async function staffLogin(input: components['schemas']['StaffLogin']): Promise<AuthResponse> {
   return apiClient.post<AuthResponse>('/auth/login/', input);

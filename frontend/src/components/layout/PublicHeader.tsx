@@ -25,9 +25,7 @@ export function PublicHeader() {
           </h1>
         </Link>
         <div className="flex items-center gap-4">
-          <Link href={`/${locale}/verify`} className="text-sm text-stone-600 hover:text-stone-900">
-            {t('verify_visitor')}
-          </Link>
+          
           <LanguageToggle />
         </div>
       </div>

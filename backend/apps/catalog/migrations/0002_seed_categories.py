@@ -1,4 +1,4 @@
-# Seeds the five categories from current policy (Document 02 FR-CAT-001,
+# Seeds the four categories from current policy (Document 02 FR-CAT-001,
 # Document 05 Sec 3.2). Data migrations are the standard, environment-
 # independent way to ship required rows -- every environment (dev,
 # staging, production) runs the same `migrate`, so this never depends on
@@ -10,24 +10,23 @@ from django.db import migrations
 SEED_CATEGORIES = [
     {"name_en": "Student", "name_am": "ተማሪ", "price_etb": "50.00", "is_free": False},
     {
-        "name_en": "Adult / Teacher",
-        "name_am": "ጎልማሳ / መምህር",
+        "name_en": "Adult",
+        "name_am": "ጎልማሳ",
         "price_etb": "100.00",
         "is_free": False,
     },
     {
         "name_en": "Foreign Resident",
-        "name_am": "የውጭ ዜጋ ነዋሪ",
+        "name_am": "የውጭ ዜጋ, ነዋሪ",
         "price_etb": "300.00",
         "is_free": False,
     },
     {
         "name_en": "Non-Resident",
-        "name_am": "የውጭ ዜጋ ጎብኚ",
+        "name_am": "የውጭ ዜጋ, ጎብኚ",
         "price_etb": "500.00",
         "is_free": False,
     },
-    {"name_en": "Exempt / Free", "name_am": "ነፃ", "price_etb": "0.00", "is_free": True},
 ]
 
 

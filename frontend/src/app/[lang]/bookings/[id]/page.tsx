@@ -225,6 +225,38 @@ export default function BookingDetailPage() {
           )}
         </Card>
 
+        {/* Pay Now */}
+        {booking.status === 'awaiting_payment' && (
+          <Card className="mb-6 bg-primary-50 border-primary-200">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">💳</span>
+              <div className="flex-1">
+                <div className="font-semibold text-stone-900">
+                  {t('payment_required') || 'Payment Required'}
+                </div>
+                <p className="text-sm text-stone-600 mt-1">
+                  {t('payment_required_description') ||
+                    'This booking is not confirmed until payment is complete.'}
+                </p>
+                {booking.checkoutUrl ? (
+                  <Button
+                    size="sm"
+                    className="mt-3 bg-primary-600 hover:bg-primary-700"
+                    onClick={() => window.open(booking.checkoutUrl!, '_blank')}
+                  >
+                    {t('pay_now') || 'Pay Now'}
+                  </Button>
+                ) : (
+                  <p className="text-sm text-secondary-700 mt-2">
+                    {t('checkout_unavailable') ||
+                      "We couldn't open checkout for this booking. Please contact support or try booking again."}
+                  </p>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* QR Code */}
         {booking.status === 'pending' && (
           <Card className="mb-6 text-center">
