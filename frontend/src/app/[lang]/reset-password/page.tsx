@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { TextField } from '@/components/ui/TextField';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { PasswordField } from '@/components/ui/PasswordField';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { staffResetPassword } from '@/features/account/api';
 
@@ -70,10 +70,9 @@ function ResetPasswordPageContent() {
     try {
       await staffResetPassword({ token, new_password: newPassword });
       setIsDone(true);
-    } catch (err: any) {
+    } catch {
       setError(
-        err.message ||
-          t('reset_password_failed') ||
+        t('reset_password_failed') ||
           'This link is invalid or has expired. Request a new one and try again.'
       );
     } finally {
@@ -113,10 +112,9 @@ function ResetPasswordPageContent() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <TextField
+              <PasswordField
                 id="new-password"
                 label={t('new_password') || 'New Password'}
-                type="password"
                 placeholder="••••••••"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -124,10 +122,9 @@ function ResetPasswordPageContent() {
                 autoComplete="new-password"
               />
 
-              <TextField
+              <PasswordField
                 id="confirm-password"
                 label={t('confirm_password') || 'Confirm Password'}
-                type="password"
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -142,6 +139,15 @@ function ResetPasswordPageContent() {
                 disabled={isLoading}
               >
                 {isLoading ? t('loading') : t('set_password') || 'Set Password'}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={() => router.push(`/${locale}/staff/login`)}
+                disabled={isLoading}
+              >
+                {t('cancel') || 'Cancel'}
               </Button>
             </form>
           )}

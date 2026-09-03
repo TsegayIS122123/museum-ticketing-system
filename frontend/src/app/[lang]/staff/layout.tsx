@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { StaffSidebar } from '@/components/layout/StaffSidebar';
+import { SiteHeader } from '@/components/layout/SiteHeader';
 import { isStaff } from '@/lib/auth/roles';
 
 interface StaffLayoutProps {
@@ -43,11 +44,12 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-stone-50" data-surface="staff">
-      <StaffSidebar />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+    <div className="min-h-screen bg-stone-50" data-surface="staff">
+      <SiteHeader />
+      <div className="flex min-h-[calc(100vh-4rem)]">
+        <StaffSidebar />
+        <main className="flex-1 overflow-auto">{children}</main>
+      </div>
     </div>
   );
 }

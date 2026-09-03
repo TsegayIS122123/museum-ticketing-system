@@ -30,9 +30,9 @@ export default function ForgotPasswordPage() {
         message: t('password_reset_sent') || 'Password reset link has been sent to your email.',
         type: 'success',
       });
-    } catch (error: any) {
+    } catch {
       setToast({
-        message: error.message || t('password_reset_failed') || 'Failed to send reset link. Please try again.',
+        message: t('password_reset_failed') || 'Unable to send the request. Please try again.',
         type: 'error',
       });
     } finally {
@@ -95,6 +95,10 @@ export default function ForgotPasswordPage() {
             >
               {isLoading ? t('loading') : t('send_reset_link') || 'Send Reset Link'}
             </Button>
+
+            <p className="text-center text-sm text-stone-500">
+              {t('reset_link_help') || 'If the address is registered, you will receive reset instructions.'}
+            </p>
 
             <Button
               type="button"

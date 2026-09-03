@@ -18,20 +18,22 @@ interface NavItem {
 const navByRole: Record<UserRole, NavItem[]> = {
   visitor: [],
   cashier: [
-    { view: 'gate', label: 'Gate Check-in', icon: '🚪', path: '/staff/gate' },
+    { view: 'gate', label: 'Gate Check-In', icon: '🚪', path: '/staff/gate' },
     { view: 'settlement', label: 'Settlement', icon: '🏦', path: '/staff/settlement' },
+    { view: 'profile', label: 'Profile', icon: '👤', path: '/staff/profile' },
   ],
   museum_manager: [
     { view: 'dashboard', label: 'Dashboard', icon: '📊', path: '/staff/dashboard' },
-    { view: 'categories', label: 'Ticket Categories', icon: '💲', path: '/staff/categories' },
+    { view: 'categories', label: 'Ticket Categories & Pricing', icon: '💲', path: '/staff/categories' },
     { view: 'availability', label: 'Availability', icon: '📅', path: '/staff/availability' },
-    { view: 'group-bookings', label: 'Group Bookings', icon: '👥', path: '/staff/group-bookings' },
+    { view: 'group-bookings', label: 'Group Booking Approvals', icon: '👥', path: '/staff/group-bookings' },
     { view: 'refunds', label: 'Refunds', icon: '💰', path: '/staff/refunds' },
     { view: 'reports', label: 'Reports', icon: '📈', path: '/staff/reports' },
+    { view: 'profile', label: 'Profile', icon: '👤', path: '/staff/profile' },
   ],
   platform_admin: [
-    { view: 'dashboard', label: 'Dashboard', icon: '📊', path: '/staff/dashboard' },
     { view: 'staff', label: 'Staff Accounts', icon: '👤', path: '/staff/admin/staff' },
+    { view: 'profile', label: 'Profile', icon: '👤', path: '/staff/profile' },
   ],
 };
 
@@ -65,9 +67,9 @@ export function StaffSidebar() {
   };
 
   return (
-    <aside className="w-60 bg-slate-900 flex flex-col flex-shrink-0 h-full">
+    <aside className="w-60 bg-brand-primary flex flex-col flex-shrink-0 h-full">
       {/* Logo */}
-      <div className="p-5 border-b border-slate-700/60">
+      <div className="p-5 border-b border-white/20">
         <div className="flex items-center gap-3">
           <Image
             src="/aau-logo.png"
@@ -80,14 +82,14 @@ export function StaffSidebar() {
             <div className="text-white font-semibold text-sm leading-tight">
               Science Museum
             </div>
-            <div className="text-slate-400 text-xs">Staff Portal</div>
+            <div className="text-white/65 text-xs">Staff Portal</div>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 py-3 overflow-y-auto">
-        <div className="px-4 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="px-4 mb-2 text-xs font-semibold text-white/60 uppercase tracking-wider">
           {info.badge}
         </div>
         {navItems.map((item) => {
@@ -100,7 +102,7 @@ export function StaffSidebar() {
                 'w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all text-left cursor-pointer rounded-none',
                 active
                   ? 'bg-primary-600 text-white'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  : 'text-white/75 hover:bg-white/10 hover:text-white'
               )}
             >
               <span className="text-base w-5 text-center">{item.icon}</span>
@@ -111,9 +113,9 @@ export function StaffSidebar() {
       </nav>
 
       {/* User */}
-      <div className="p-4 border-t border-slate-700/60">
+      <div className="p-4 border-t border-white/20">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
             {info.initials}
           </div>
           <div className="flex-1 min-w-0">
@@ -127,7 +129,7 @@ export function StaffSidebar() {
         </div>
         <button
           onClick={handleSignOut}
-          className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors py-1 text-left cursor-pointer"
+          className="w-full text-xs text-white/65 hover:text-white transition-colors py-1 text-left cursor-pointer"
         >
           ← Sign Out
         </button>
