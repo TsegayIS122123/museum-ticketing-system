@@ -2191,9 +2191,19 @@ components:
       type: object
       description: |-
         `StaffUpdateRequest` (Document 04) -- FR-ACC-002, Platform Admin
-        only. Every field optional: a single `PUT` may change only `role`,
-        only `active`, or both.
+        only. Every field optional so a single `PUT` can update the staff
+        profile and role without changing the password.
       properties:
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+          maxLength: 32
+        full_name:
+          type: string
+          maxLength: 255
         role:
           $ref: '#/components/schemas/StaffRoleEnum'
         active:
