@@ -37,12 +37,9 @@ export async function createStaffAccount(input: StaffCreateInput): Promise<Staff
   return apiClient.post<StaffAccountResponse>('/admin/staff/', input);
 }
 
-// PUT /admin/staff/{id}/ -- Platform Admin only. StaffUpdateRequest only
-// ever accepts `role` and/or `active` -- email/phone/full_name cannot be
-// changed through this endpoint at all (Sec 4.3: an account may only
-// ever edit its own contact fields via PUT /users/me/, never have them
-// edited by an admin). Used for both role changes and the
-// activate/deactivate toggle below.
+// PUT /admin/staff/{id}/ -- Platform Admin only. Profile fields and role
+// may be changed; email/phone changes invalidate any outstanding password
+// setup token without issuing a replacement.
 export async function updateStaffAccount(id: string, input: StaffUpdateInput): Promise<StaffAccountResponse> {
   return apiClient.put<StaffAccountResponse>(`/admin/staff/${id}/`, input);
 }

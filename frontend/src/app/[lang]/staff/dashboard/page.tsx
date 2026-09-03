@@ -173,7 +173,7 @@ export default function StaffDashboardPage() {
             ) : (
               <>
                 <Button
-                  className="w-full justify-start bg-primary-600 hover:bg-primary-700"
+                  className="w-full justify-start bg-brand-primary hover:bg-primary-700"
                   onClick={() => router.push(`/${locale}/staff/gate`)}
                 >
                   🚪 Gate Check-in

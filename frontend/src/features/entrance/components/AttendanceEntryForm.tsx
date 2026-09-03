@@ -182,7 +182,7 @@ export function AttendanceEntryForm({
                   {t('do_later') || 'Do this later'}
                 </Button>
                 <Button
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  className="flex-1 bg-brand-primary hover:bg-primary-700"
                   onClick={handleSaveVoucher}
                   disabled={isSavingVoucher || !voucherReference.trim()}
                 >
@@ -399,7 +399,7 @@ export function AttendanceEntryForm({
             </Button>
             <Button
               type="button"
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              className="flex-1 bg-brand-primary hover:bg-primary-700"
               onClick={() => setShowConfirm(true)}
               disabled={isProcessing || attendedQuantity === 0}
             >

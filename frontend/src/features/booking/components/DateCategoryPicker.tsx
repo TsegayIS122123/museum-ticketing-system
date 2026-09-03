@@ -120,7 +120,7 @@ export function DateCategoryPicker({
       <div className="flex justify-end">
         <Button
           size="lg"
-          className="bg-primary-600 hover:bg-primary-700"
+          className="bg-brand-primary hover:bg-primary-700"
           disabled={!selectedCategoryId}
           onClick={onNext}
         >

@@ -43,7 +43,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-4">
             <Link href={`/${lang}/book`}>
-              <Button size="lg" className="bg-amber-600 hover:bg-amber-700">
+              <Button size="lg" className="bg-brand-primary hover:bg-primary-700">
                 {t.book_now}
               </Button>
             </Link>
@@ -80,7 +80,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
                         {`ETB ${category.price_etb}`}
                       </p>
                       <Link href={`/${lang}/book`}>
-                        <Button className="w-full mt-3 bg-amber-600 hover:bg-amber-700">
+                        <Button className="w-full mt-3 bg-brand-primary hover:bg-primary-700">
                           {t.book_now}
                         </Button>
                       </Link>

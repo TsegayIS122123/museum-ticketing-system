@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
+import { LanguageToggle } from '@/components/ui/LanguageToggle';
 
 export function SiteHeader() {
   const { t, locale } = useTranslation();
@@ -29,7 +30,9 @@ export function SiteHeader() {
         </Link>
 
         {isAuthenticated && user ? (
-          <div className="relative">
+          <div className="flex items-center gap-4">
+            <LanguageToggle />
+            <div className="relative">
             <button
               type="button"
               onClick={() => setIsProfileOpen((open) => !open)}
@@ -52,14 +55,18 @@ export function SiteHeader() {
                 </button>
               </div>
             )}
+            </div>
           </div>
         ) : (
-          <nav aria-label="Primary" className="flex items-center gap-4 text-sm font-semibold text-brand-primary">
-            <Link href={`/${locale}#about`} className="hover:underline">{t('about') || 'About'}</Link>
-            <Link href={`/${locale}#solutions`} className="hover:underline">{t('solutions') || 'Solutions'}</Link>
-            <Link href={`/${locale}/book`} className="hover:underline">{t('booking') || 'Booking'}</Link>
-            <Link href={`/${locale}#contact`} className="hover:underline">{t('contact') || 'Contact'}</Link>
-          </nav>
+          <div className="flex items-center gap-4">
+            <nav aria-label="Primary" className="flex items-center gap-4 text-sm font-semibold text-brand-primary">
+              <Link href={`/${locale}#about`} className="hover:underline">{t('about') || 'About'}</Link>
+              <Link href={`/${locale}#solutions`} className="hover:underline">{t('solutions') || 'Solutions'}</Link>
+              <Link href={`/${locale}/book`} className="hover:underline">{t('booking') || 'Booking'}</Link>
+              <Link href={`/${locale}#contact`} className="hover:underline">{t('contact') || 'Contact'}</Link>
+            </nav>
+            <LanguageToggle />
+          </div>
         )}
       </div>
     </header>

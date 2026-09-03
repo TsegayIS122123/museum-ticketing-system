@@ -104,13 +104,16 @@ def create_staff_account(*, actor, email, full_name, role, phone=""):
     return account
 
 
-def update_staff_account(*, actor, account, role=None, active=None):
+_UNSET = object()
+
+
+def update_staff_account(
+    *, actor, account, email=_UNSET, phone=_UNSET, full_name=_UNSET, role=None, active=None
+):
     """Implements FR-ACC-002's edit path (`PUT /admin/staff/{id}`) -- a
-    Platform Admin may reassign a Cashier/Museum Manager's role or flip
-    their `active` flag. `email`, `phone`, and `full_name` aren't editable
-    here: Document 04's `StaffUpdateRequest` carries only `role`/`active`,
-    and an account edits its own contact details via `/users/me` instead
-    (accounts/services.update_profile)."""
+    Platform Admin may edit the staff profile, reassign a role, or flip
+    the `active` flag. Changing email or phone invalidates an outstanding
+    password-reset token without creating a replacement."""
     if account.role == Account.Role.PLATFORM_ADMIN:
         raise ValidationError(_PLATFORM_ADMIN_OUT_OF_SCOPE)
 
@@ -118,6 +121,26 @@ def update_staff_account(*, actor, account, role=None, active=None):
         raise ValidationError(_NOT_A_STAFF_ACCOUNT_ROLE)
 
     changes = {}
+    contact_changed = False
+    if email is not _UNSET:
+        normalized_email = Account.objects.normalize_email(email)
+        if Account.objects.exclude(pk=account.pk).filter(email=normalized_email).exists():
+            raise Conflict("An account with this email already exists.")
+        if normalized_email != account.email:
+            account.email = normalized_email
+            changes["email"] = normalized_email
+            contact_changed = True
+    if phone is not _UNSET:
+        normalized_phone = phone or None
+        if normalized_phone and Account.objects.exclude(pk=account.pk).filter(phone=normalized_phone).exists():
+            raise Conflict("An account with this phone number already exists.")
+        if normalized_phone != account.phone:
+            account.phone = normalized_phone
+            changes["phone"] = normalized_phone
+            contact_changed = True
+    if full_name is not _UNSET and full_name != account.full_name:
+        account.full_name = full_name
+        changes["full_name"] = full_name
     if role is not None and role != account.role:
         changes["role"] = role
         account.role = role
@@ -130,6 +153,11 @@ def update_staff_account(*, actor, account, role=None, active=None):
             # block their next login attempt (mirrors accounts.services'
             # own use of `token_version` on a Staff password reset).
             account.token_version += 1
+
+    if contact_changed:
+        account.password_reset_token_hash = None
+        account.password_reset_expires_at = None
+        changes["password_reset_token_invalidated"] = True
 
     if changes:
         account.save()

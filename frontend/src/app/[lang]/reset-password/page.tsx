@@ -104,7 +104,7 @@ function ResetPasswordPageContent() {
                 {t('password_set') || 'Your password has been set. You can now sign in.'}
               </p>
               <Button
-                className="mt-4 w-full bg-primary-600 hover:bg-primary-700"
+                className="mt-4 w-full bg-brand-primary hover:bg-primary-700"
                 onClick={() => router.push(`/${locale}/staff/login`)}
               >
                 {t('back_to_login') || 'Back to Login'}
@@ -135,7 +135,7 @@ function ResetPasswordPageContent() {
               <Button
                 type="submit"
                 size="lg"
-                className="w-full bg-primary-600 hover:bg-primary-700"
+                className="w-full bg-brand-primary hover:bg-primary-700"
                 disabled={isLoading}
               >
                 {isLoading ? t('loading') : t('set_password') || 'Set Password'}

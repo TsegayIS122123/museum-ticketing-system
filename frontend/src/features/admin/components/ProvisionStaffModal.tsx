@@ -32,9 +32,6 @@ export function ProvisionStaffModal({
     full_name: '',
     role: 'cashier',
   });
-  // Edit mode only ever changes role -- StaffUpdateRequest has no
-  // email/phone/full_name fields at all (see api.ts). Tracked separately
-  // so the create-mode zod schema above doesn't need role to be optional.
   const [editRole, setEditRole] = useState<'cashier' | 'museum_manager'>('cashier');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -114,10 +111,16 @@ export function ProvisionStaffModal({
     }
 
     try {
-      // Edit mode can only ever send `role` -- see the StaffUpdateInput
-      // note above and in api.ts. `active` is handled by the separate
-      // activate/deactivate buttons in StaffAccountTable, not this form.
-      await onSubmit(isEditing ? { role: editRole } : formData);
+      await onSubmit(
+        isEditing
+          ? {
+              email: formData.email,
+              phone: formData.phone,
+              full_name: formData.full_name,
+              role: editRole,
+            }
+          : formData
+      );
       setToast({
         message: isEditing
           ? t('staff_updated') || 'Staff account updated successfully!'
@@ -152,8 +155,8 @@ export function ProvisionStaffModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         {isEditing && (
           <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 text-xs text-stone-500">
-            {t('staff_edit_limited') ||
-              'Only the role can be changed here. Name, email, and phone are read-only after an account is created.'}
+            {t('staff_edit_note') ||
+              'Changing email or phone invalidates the current password setup link. A new link must be requested separately.'}
           </div>
         )}
 
@@ -164,7 +167,6 @@ export function ProvisionStaffModal({
           onChange={(e) => handleChange('full_name', e.target.value)}
           error={errors.full_name}
           required={!isEditing}
-          disabled={isEditing}
           placeholder="e.g., Nurul Hana"
         />
 
@@ -176,7 +178,6 @@ export function ProvisionStaffModal({
           onChange={(e) => handleChange('email', e.target.value)}
           error={errors.email}
           required={!isEditing}
-          disabled={isEditing}
           placeholder="staff@museum.et"
         />
 
@@ -186,7 +187,6 @@ export function ProvisionStaffModal({
           value={formData.phone}
           onChange={(e) => handleChange('phone', e.target.value)}
           error={errors.phone}
-          disabled={isEditing}
           placeholder="+251 912 345 678"
         />
 
@@ -232,7 +232,7 @@ export function ProvisionStaffModal({
           </Button>
           <Button
             type="submit"
-            className="flex-1 bg-primary-600 hover:bg-primary-700"
+            className="flex-1 bg-brand-primary hover:bg-primary-700"
             disabled={isSubmitting}
           >
             {isSubmitting ? (

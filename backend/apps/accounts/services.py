@@ -39,9 +39,9 @@ OTP_MAX_ATTEMPTS = 5
 # Revisit if Document 02's open questions (Sec 5) settle on a specific value.
 EMAIL_VERIFICATION_EXPIRY = timedelta(hours=24)
 
-# FR-ACC-006 doesn't specify a duration either; 1 hour matches common
-# practice for a Staff password-reset link.
-PASSWORD_RESET_EXPIRY = timedelta(hours=1)
+# Password-reset links are short-lived and include a random nonce so two
+# requests for the same account never produce the same signed token.
+PASSWORD_RESET_EXPIRY = timedelta(minutes=10)
 
 EMAIL_VERIFICATION_SALT = "accounts.email-verification"
 PASSWORD_RESET_SALT = "accounts.password-reset"
@@ -239,7 +239,10 @@ def request_password_reset(*, email):
     if not account.is_staff_role or not account.active:
         return
 
-    reset_token = signing.dumps({"account_id": str(account.id)}, salt=PASSWORD_RESET_SALT)
+    reset_token = signing.dumps(
+        {"account_id": str(account.id), "nonce": secrets.token_urlsafe(32)},
+        salt=PASSWORD_RESET_SALT,
+    )
     account.password_reset_token_hash = _hash_token(reset_token)
     account.password_reset_expires_at = timezone.now() + PASSWORD_RESET_EXPIRY
     account.save(update_fields=["password_reset_token_hash", "password_reset_expires_at"])

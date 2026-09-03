@@ -194,7 +194,7 @@ export function ApprovalDecisionPanel({
               ✕ {t('decline') || 'Decline'}
             </Button>
             <Button
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              className="flex-1 bg-brand-primary hover:bg-primary-700"
               onClick={() => setConfirmDialog({ open: true, decision: 'approve' })}
               disabled={isProcessing}
             >

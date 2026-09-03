@@ -98,7 +98,7 @@ export function TransferConfirmationCard({
             rel="noreferrer"
             className="flex-1"
           >
-            <Button className="w-full bg-primary-600 hover:bg-primary-700">
+            <Button className="w-full bg-brand-primary hover:bg-primary-700">
               📄 {t('download_receipt') || 'Download Transfer Receipt'}
             </Button>
           </a>

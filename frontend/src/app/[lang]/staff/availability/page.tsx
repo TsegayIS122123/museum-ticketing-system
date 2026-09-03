@@ -237,7 +237,7 @@ export default function AvailabilityPage() {
                 </div>
                 <Button
                   size="sm"
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full bg-brand-primary hover:bg-primary-700"
                   onClick={() =>
                     setConfirmDialog({ open: true, date: selectedDate, status: 'available' })
                   }

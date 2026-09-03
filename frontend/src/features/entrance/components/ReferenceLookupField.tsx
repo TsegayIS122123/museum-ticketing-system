@@ -74,7 +74,7 @@ export function ReferenceLookupField({
           <Button
             type="submit"
             size="lg"
-            className="bg-primary-600 hover:bg-primary-700 h-[42px]"
+            className="bg-brand-primary hover:bg-primary-700 h-[42px]"
             disabled={isLoading || !reference.trim()}
           >
             {isLoading ? t('searching') || 'Searching...' : t('lookup') || 'Lookup'}

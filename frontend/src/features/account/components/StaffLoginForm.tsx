@@ -101,7 +101,7 @@ export function StaffLoginForm() {
         <Button
           type="submit"
           size="lg"
-          className="w-full bg-primary-600 hover:bg-primary-700"
+          className="w-full bg-brand-primary hover:bg-primary-700"
           disabled={isLoading}
         >
           {isLoading ? 'Loading...' : 'Sign In'}

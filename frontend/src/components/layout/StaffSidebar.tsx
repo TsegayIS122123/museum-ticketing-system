@@ -101,7 +101,7 @@ export function StaffSidebar() {
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all text-left cursor-pointer rounded-none',
                 active
-                  ? 'bg-primary-600 text-white'
+                  ? 'bg-brand-primary text-white'
                   : 'text-white/75 hover:bg-white/10 hover:text-white'
               )}
             >

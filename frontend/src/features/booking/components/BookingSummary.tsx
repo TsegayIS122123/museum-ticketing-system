@@ -133,7 +133,7 @@ export function BookingSummary({
         </Button>
         <Button
           size="lg"
-          className="flex-1 bg-primary-600 hover:bg-primary-700"
+          className="flex-1 bg-brand-primary hover:bg-primary-700"
           onClick={onConfirm}
           disabled={isProcessing}
         >

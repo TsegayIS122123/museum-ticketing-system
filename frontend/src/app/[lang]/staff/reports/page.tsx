@@ -82,7 +82,7 @@ export default function ReportsPage() {
               onClick={() => setPeriod(p.value)}
               className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all cursor-pointer ${
                 period === p.value
-                  ? 'bg-slate-800 text-white border-slate-800'
+                  ? 'bg-brand-primary text-white border-brand-primary'
                   : 'border-stone-200 text-stone-700 hover:border-slate-400'
               }`}
             >

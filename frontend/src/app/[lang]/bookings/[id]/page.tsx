@@ -241,7 +241,7 @@ export default function BookingDetailPage() {
                 {booking.checkoutUrl ? (
                   <Button
                     size="sm"
-                    className="mt-3 bg-primary-600 hover:bg-primary-700"
+                    className="mt-3 bg-brand-primary hover:bg-primary-700"
                     onClick={() => window.open(booking.checkoutUrl!, '_blank')}
                   >
                     {t('pay_now') || 'Pay Now'}
@@ -308,7 +308,7 @@ export default function BookingDetailPage() {
                       ) : (
                         <Button
                           size="sm"
-                          className="bg-primary-600 hover:bg-primary-700"
+                          className="bg-brand-primary hover:bg-primary-700"
                           onClick={handleRequestRefund}
                           disabled={isRequestingRefund}
                         >

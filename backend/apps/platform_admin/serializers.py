@@ -38,8 +38,11 @@ class StaffCreateSerializer(serializers.Serializer):
 
 class StaffUpdateSerializer(serializers.Serializer):
     """`StaffUpdateRequest` (Document 04) -- FR-ACC-002, Platform Admin
-    only. Every field optional: a single `PUT` may change only `role`,
-    only `active`, or both."""
+    only. Every field optional so a single `PUT` can update the staff
+    profile and role without changing the password."""
 
+    email = serializers.EmailField(required=False)
+    phone = serializers.CharField(max_length=32, required=False, allow_blank=True, allow_null=True)
+    full_name = serializers.CharField(max_length=255, required=False)
     role = serializers.ChoiceField(choices=STAFF_ROLE_CHOICES, required=False)
     active = serializers.BooleanField(required=False)

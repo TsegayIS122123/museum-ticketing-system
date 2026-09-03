@@ -74,7 +74,7 @@ export default function SettlementTransfersPage() {
           description={t('no_transfers_description') || 'Settlement reconciliations will appear here once initiated.'}
           action={
             <Button
-              className="bg-primary-600 hover:bg-primary-700"
+              className="bg-brand-primary hover:bg-primary-700"
               onClick={() => router.push(`/${locale}/staff/settlement`)}
             >
               {t('go_to_settlement') || 'Go to Settlement'}
@@ -129,7 +129,7 @@ export default function SettlementTransfersPage() {
           </p>
         </div>
         <Button
-          className="bg-primary-600 hover:bg-primary-700"
+          className="bg-brand-primary hover:bg-primary-700"
           onClick={() => router.push(`/${locale}/staff/settlement`)}
         >
           🏦 {t('new_transfer') || 'New Reconciliation'}

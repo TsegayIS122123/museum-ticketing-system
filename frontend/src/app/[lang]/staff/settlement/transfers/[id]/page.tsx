@@ -143,7 +143,7 @@ export default function TransferDetailPage() {
           <div className="space-y-3">
             {transfer.transferReceiptUrl && (
               <a href={transfer.transferReceiptUrl} target="_blank" rel="noreferrer">
-                <Button className="w-full bg-primary-600 hover:bg-primary-700">
+                <Button className="w-full bg-brand-primary hover:bg-primary-700">
                   📄 {t('download_transfer_receipt') || 'Download Transfer Receipt'}
                 </Button>
               </a>

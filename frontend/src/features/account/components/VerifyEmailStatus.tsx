@@ -71,7 +71,7 @@ export function VerifyEmailStatus() {
               'Your email address has been confirmed. You can close this page.'}
           </p>
           <Link href={`/${locale}/bookings`}>
-            <Button size="lg" className="w-full bg-primary-600 hover:bg-primary-700">
+            <Button size="lg" className="w-full bg-brand-primary hover:bg-primary-700">
               {t('view_bookings') || 'View my bookings'}
             </Button>
           </Link>

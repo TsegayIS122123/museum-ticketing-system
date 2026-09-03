@@ -189,7 +189,7 @@ export function CategoryFormModal({
           </Button>
           <Button
             type="submit"
-            className="flex-1 bg-primary-600 hover:bg-primary-700"
+            className="flex-1 bg-brand-primary hover:bg-primary-700"
             disabled={isSubmitting}
           >
             {isSubmitting ? (

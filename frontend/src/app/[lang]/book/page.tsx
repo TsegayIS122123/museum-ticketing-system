@@ -136,7 +136,7 @@ export default function BookPage() {
                 ← {t('back') || 'Back'}
               </Button>
               <Button
-                className="bg-primary-600 hover:bg-primary-700"
+                className="bg-brand-primary hover:bg-primary-700"
                 disabled={!visitDate}
                 onClick={handleDateTimeNext}
               >

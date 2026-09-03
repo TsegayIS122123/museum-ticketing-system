@@ -57,7 +57,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
         description={t('no_bookings_description') || 'Book your first museum visit today!'}
         action={
           <Link href={`/${locale}/book`}>
-            <Button className="bg-primary-600 hover:bg-primary-700">
+            <Button className="bg-brand-primary hover:bg-primary-700">
               {t('book_now')}
             </Button>
           </Link>

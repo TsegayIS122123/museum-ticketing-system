@@ -151,7 +151,7 @@ export default function CategoriesPage() {
         </div>
         <Button
           size="lg"
-          className="bg-primary-600 hover:bg-primary-700"
+          className="bg-brand-primary hover:bg-primary-700"
           onClick={handleCreate}
         >
           + {t('add_category') || 'Add Category'}

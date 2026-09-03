@@ -65,7 +65,7 @@ export function PendingSettlementTable({
           {onTransfer && (
             <Button
               size="lg"
-              className="bg-primary-600 hover:bg-primary-700"
+              className="bg-brand-primary hover:bg-primary-700"
               onClick={onTransfer}
               disabled={isTransferring || amount <= 0}
             >

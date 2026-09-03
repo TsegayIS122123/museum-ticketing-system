@@ -161,7 +161,7 @@ function ConfirmationPageContent() {
 
             <div className="flex flex-col gap-3">
               <Button
-                className="w-full bg-primary-600 hover:bg-primary-700"
+                className="w-full bg-brand-primary hover:bg-primary-700"
                 onClick={() => router.push(`/${locale}/bookings/${booking.id}`)}
               >
                 {t('view_booking') || 'View Booking'}
