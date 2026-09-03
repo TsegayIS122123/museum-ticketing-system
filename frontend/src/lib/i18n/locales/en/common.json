@@ -35,5 +35,18 @@
   "refunded": "Refunded",
   "language": "Language",
   "amharic": "አማርኛ",
-  "english": "English"
+  "english": "English",
+  "about": "About",
+  "solutions": "Solutions",
+  "contact": "Contact",
+  "logout": "Logout",
+  "profile": "Profile",
+  "profile_description": "Manage your account details and language.",
+  "profile_updated": "Profile updated successfully.",
+  "full_name": "Full name",
+  "role": "Role",
+  "save_changes": "Save changes",
+  "opening_hours": "Opening Hours",
+  "opening_hours_time": "Mon–Sat 8:00 AM – 5:00 PM",
+  "opening_hours_closed": "Closed Sundays & Public Holidays"
 }

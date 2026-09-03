@@ -30,3 +30,4 @@ out/
 # Same for frontend/src/lib/api-types.ts, generated from it but committed
 # so the whole team builds against the same types without everyone running
 # the generator.
+*.tsbuildinfo

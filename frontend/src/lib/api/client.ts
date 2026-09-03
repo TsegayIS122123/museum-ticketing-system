@@ -1,11 +1,12 @@
 import { ApiError, type ApiErrorPayload } from './errors';
 
-const API_BASE =
+const API_BASE = (
   typeof window === 'undefined'
     ? process.env.API_INTERNAL_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       'http://localhost:8000/api/v1'
-    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+  ).replace(/\/+$/, '');
 
 // In-memory token storage (Option A - safest against XSS). Only the
 // access token lives here now -- it's short-lived (15 minutes,
@@ -120,15 +121,23 @@ async function request<T>(
   }
   headers['Accept-Language'] = locale;
 
-  const response = await fetch(`${API_BASE}${normalizedPath}`, {
-    ...options,
-    headers,
-    // Needed so the browser sends the httpOnly refresh-token cookie on
-    // /auth/refresh/ (and /auth/logout/) -- harmless elsewhere since the
-    // cookie is path-scoped to /api/v1/auth/ (apps.accounts.cookies) and
-    // simply won't be attached to other requests.
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${normalizedPath}`, {
+      ...options,
+      headers,
+      // Needed so the browser sends the httpOnly refresh-token cookie on
+      // /auth/refresh/ (and /auth/logout/) -- harmless elsewhere since the
+      // cookie is path-scoped to /api/v1/auth/ (apps.accounts.cookies) and
+      // simply won't be attached to other requests.
+      credentials: 'include',
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error(
+      'Network error - could not reach the server. Please check your connection and try again.'
+    );
+  }
 
   // A 401 means the access token is missing, expired, or was never valid
   // -- try exactly one silent refresh (it can succeed purely off the

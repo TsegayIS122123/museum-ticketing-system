@@ -7,6 +7,13 @@ import am from './locales/am/common.json';
 const translations = { en, am } as const;
 type TranslationKey = keyof typeof en;
 
+function humanizeKey(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
 export function useTranslation() {
   const params = useParams();
   const locale = (params?.lang as 'en' | 'am') || 'en';
@@ -24,7 +31,7 @@ export function useTranslation() {
   const t = (key: TranslationKey | (string & {})): string => {
     const enTranslations: Record<string, string> = translations.en;
     const localeTranslations: Record<string, string> = translations[locale] ?? enTranslations;
-    return localeTranslations[key] ?? enTranslations[key] ?? key;
+    return localeTranslations[key] ?? enTranslations[key] ?? humanizeKey(key);
   };
 
   return { t, locale };

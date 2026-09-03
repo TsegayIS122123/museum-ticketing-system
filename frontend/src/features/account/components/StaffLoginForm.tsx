@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
+import { PasswordField } from '@/components/ui/PasswordField';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { staffLogin } from '../api';
 
@@ -47,7 +48,7 @@ export function StaffLoginForm() {
         router.push(`/${locale}/`);
       }
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password. Please try again.');
+      setError('Invalid email or password.');
     } finally {
       setIsLoading(false);
     }
@@ -81,16 +82,21 @@ export function StaffLoginForm() {
           autoComplete="email"
         />
 
-        <TextField
+        <PasswordField
           id="password"
           label="Password"
-          type="password"
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="current-password"
         />
+
+        <div className="text-right">
+          <a href={`/${locale}/staff/forgot-password`} className="text-sm text-brand-primary hover:underline">
+            Forgot password?
+          </a>
+        </div>
 
         <Button
           type="submit"

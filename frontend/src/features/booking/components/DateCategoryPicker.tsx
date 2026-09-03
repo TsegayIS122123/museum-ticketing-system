@@ -98,7 +98,7 @@ export function DateCategoryPicker({
                 {locale === 'en' ? category.name_am : category.name_en}
               </div>
               <div className="mt-2 text-lg font-bold text-primary-600">
-                {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
+                {`ETB ${category.price_etb}`}
               </div>
             </button>
           ))}

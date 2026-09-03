@@ -127,7 +127,7 @@ export function VisitorVerifyForm() {
               setError(null);
             }}
           >
-            ← {t('continue') || 'Back'}
+            ← {t('back') || 'Back'}
           </Button>
         </form>
       </Card>

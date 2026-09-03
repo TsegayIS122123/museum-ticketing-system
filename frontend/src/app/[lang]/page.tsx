@@ -1,10 +1,9 @@
-import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { PublicHeader } from '@/components/layout/PublicHeader';
 import { getCategories } from '@/features/catalog/api';
 import type { Category } from '@/features/catalog/schemas';
-import { useTranslation } from '@/lib/i18n/useTranslation';
 import Link from 'next/link';
 import en from '@/lib/i18n/locales/en/common.json';
 import am from '@/lib/i18n/locales/am/common.json';
@@ -30,15 +29,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
 
   return (
     <div className="min-h-screen flex flex-col" data-surface="visitor">
-      {/* Header */}
-      <header className="border-b bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-stone-900 font-serif">
-            {t.museum_name}
-          </h1>
-          <LanguageToggle />
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -52,13 +43,8 @@ export default async function LandingPage({ params }: LandingPageProps) {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-4">
             <Link href={`/${lang}/book`}>
-              <Button size="lg" className="bg-primary-600 hover:bg-primary-700">
+              <Button size="lg" className="bg-amber-600 hover:bg-amber-700">
                 {t.book_now}
-              </Button>
-            </Link>
-            <Link href={`/${lang}/verify`}>
-              <Button size="lg" variant="secondary">
-                {t.verify_visitor}
               </Button>
             </Link>
           </div>
@@ -90,11 +76,11 @@ export default async function LandingPage({ params }: LandingPageProps) {
                       </p>
                     </div>
                     <div className="mt-4 pt-4 border-t border-stone-100">
-                      <p className="text-2xl font-bold text-primary-600 font-serif">
-                        {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
+                      <p className="text-2xl font-bold text-amber-600 font-serif">
+                        {`ETB ${category.price_etb}`}
                       </p>
                       <Link href={`/${lang}/book`}>
-                        <Button className="w-full mt-3 bg-primary-600 hover:bg-primary-700">
+                        <Button className="w-full mt-3 bg-amber-600 hover:bg-amber-700">
                           {t.book_now}
                         </Button>
                       </Link>
@@ -110,9 +96,9 @@ export default async function LandingPage({ params }: LandingPageProps) {
         <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <div className="text-2xl mb-3">🕐</div>
-            <h4 className="font-semibold text-stone-900 text-sm">Opening Hours</h4>
-            <p className="text-sm text-stone-600">Tue–Sun 9:00 AM – 5:00 PM</p>
-            <p className="text-xs text-stone-400">Closed Mondays & Public Holidays</p>
+            <h4 className="font-semibold text-stone-900 text-sm">{t.opening_hours}</h4>
+            <p className="text-sm text-stone-600">{t.opening_hours_time}</p>
+            <p className="text-xs text-stone-400">{t.opening_hours_closed}</p>
           </Card>
           <Card>
             <div className="text-2xl mb-3">📍</div>
