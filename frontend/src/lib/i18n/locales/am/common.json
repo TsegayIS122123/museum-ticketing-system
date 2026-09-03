@@ -35,5 +35,18 @@
   "refunded": "ተመልሷል",
   "language": "ቋንቋ",
   "amharic": "አማርኛ",
-  "english": "English"
+  "english": "English",
+  "about": "ስለ እኛ",
+  "solutions": "አገልግሎቶች",
+  "contact": "ያግኙን",
+  "logout": "ውጣ",
+  "profile": "መገለጫ",
+  "profile_description": "የመለያዎን መረጃ እና ቋንቋ ያስተዳድሩ።",
+  "profile_updated": "መገለጫዎ ተዘምኗል።",
+  "full_name": "ሙሉ ስም",
+  "role": "ሚና",
+  "save_changes": "ለውጦችን አስቀምጥ",
+  "opening_hours": "የመክፈቻ ሰዓት",
+  "opening_hours_time": "ሰኞ-ቅዳሜ ከጠዋቱ 2:00 - 11:00",
+  "opening_hours_closed": "እሁድ እና የህዝብ በዓላት ዝግ ነው"
 }

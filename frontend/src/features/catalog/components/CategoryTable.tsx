@@ -63,7 +63,7 @@ export function CategoryTable({
       </div>
     </div>,
     <div key="price" className="font-bold text-primary-600 font-serif">
-      {category.is_free ? 'FREE' : `ETB ${category.price_etb}`}
+      {`ETB ${category.price_etb}`}
     </div>,
     <div key="status">
       <StatusBadge status={category.active ? 'pending' : 'cancelled'} />

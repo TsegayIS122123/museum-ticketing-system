@@ -202,7 +202,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {locale === 'en' ? c.name_en : c.name_am}
-                    {c.is_free ? ` (${t('free') || 'Free'})` : ` (ETB ${c.price_etb})`}
+                    {` (ETB ${c.price_etb})`}
                   </option>
                 ))}
               </select>

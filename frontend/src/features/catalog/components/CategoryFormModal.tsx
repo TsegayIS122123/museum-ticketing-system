@@ -45,7 +45,7 @@ export function CategoryFormModal({
         name_en: initialData.name_en,
         name_am: initialData.name_am,
         price_etb: initialData.price_etb,
-        is_free: initialData.is_free,
+        is_free: false,
         active: initialData.active,
       });
     } else {
@@ -117,8 +117,6 @@ export function CategoryFormModal({
     }
   };
 
-  const isFree = formData.is_free;
-
   return (
     <Modal
       open={isOpen}
@@ -167,10 +165,9 @@ export function CategoryFormModal({
                 onChange={(e) => handleChange('price_etb', e.target.value)}
                 min={0}
                 step={1}
-                disabled={isFree}
                 className={`w-full px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 ${
                   errors.price_etb ? 'border-red-400' : 'border-stone-300'
-                } ${isFree ? 'bg-stone-100 text-stone-400' : ''}`}
+                }`}
               />
             </div>
             {errors.price_etb && (
@@ -178,24 +175,6 @@ export function CategoryFormModal({
             )}
           </div>
 
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isFree}
-                onChange={(e) => {
-                  handleChange('is_free', e.target.checked);
-                  if (e.target.checked) {
-                    handleChange('price_etb', '0');
-                  }
-                }}
-                className="w-4 h-4 rounded border-stone-300 text-secondary-600 focus:ring-secondary-500"
-              />
-              <span className="text-sm font-medium text-stone-700">
-                {t('free_category') || 'Free Category (Exempt/AAU Staff)'}
-              </span>
-            </label>
-          </div>
         </div>
 
         <div className="flex gap-3 pt-4 border-t border-stone-100">
