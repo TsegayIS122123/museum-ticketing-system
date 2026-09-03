@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
@@ -93,9 +94,9 @@ export function StaffLoginForm() {
         />
 
         <div className="text-right">
-          <a href={`/${locale}/staff/forgot-password`} className="text-sm text-brand-primary hover:underline">
+          <Link href={`/${locale}/staff/forgot-password`} className="text-sm text-brand-primary hover:underline">
             Forgot password?
-          </a>
+          </Link>
         </div>
 
         <Button

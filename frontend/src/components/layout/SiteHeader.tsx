@@ -19,7 +19,7 @@ export function SiteHeader() {
     router.push(`/${locale}`);
   };
 
-  const profilePath = user?.role === 'visitor' ? `/${locale}/profile` : `/${locale}/staff/profile`;
+  const profilePath = `/${locale}/settings/account`;
 
   return (
     <header className="border-b border-brand-primary/15 bg-white">

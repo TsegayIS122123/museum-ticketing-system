@@ -1,8 +1,27 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { setAccessToken, clearAuthTokens, refreshAccessToken } from '@/lib/api/client';
 import { apiClient } from '@/lib/api/client';
+
+// Routes that exist specifically for a visitor with NO valid session --
+// credential recovery and the login form itself. Attempting a silent
+// refresh here is never useful (a signed-in visitor has no reason to be
+// on /forgot-password or /reset-password) and, if a stale refresh-token
+// cookie happens to be present, adds a pointless failed /auth/refresh/
+// call to every page load. Matched with a trailing-segment check so it
+// still hits under any `/{lang}/...` prefix (e.g. `/en/staff/login`).
+const PUBLIC_AUTH_ROUTE_SEGMENTS = [
+  '/staff/login',
+  '/staff/forgot-password',
+  '/reset-password',
+];
+
+export function isPublicAuthRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return PUBLIC_AUTH_ROUTE_SEGMENTS.some((segment) => pathname.endsWith(segment));
+}
 
 // Matches the real `Account` schema (contracts/openapi.yaml) returned by
 // GET /users/me/ and nested in AuthResponse.user -- snake_case, because
@@ -38,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     // On every fresh mount (first load, or coming back from a full page
@@ -48,6 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // httpOnly refresh-token cookie the browser already carries, and
     // only a signed-out visitor (no valid cookie) actually falls through
     // to `isAuthenticated: false`.
+    //
+    // Exception: skip this entirely on public auth routes (login,
+    // forgot-password, reset-password) -- see isPublicAuthRoute above.
+    if (isPublicAuthRoute(pathname)) {
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function bootstrap() {
@@ -72,7 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally
+    // re-runs only when navigating into/out of a public auth route, not on
+    // every pathname change; see isPublicAuthRoute check above.
+  }, [isPublicAuthRoute(pathname)]);
 
   const login = (tokens: { access_token: string }, userData: User) => {
     // The refresh token isn't handled here at all -- the response that

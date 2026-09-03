@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useAuth } from '@/lib/auth/auth-context';
+import { useAuth, isPublicAuthRoute } from '@/lib/auth/auth-context';
 import { StaffSidebar } from '@/components/layout/StaffSidebar';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { isStaff } from '@/lib/auth/roles';
@@ -17,17 +17,17 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, isAuthenticated } = useAuth();
-  const isLoginRoute = pathname?.endsWith('/staff/login') ?? false;
+  const isPublicRoute = isPublicAuthRoute(pathname);
 
   useEffect(() => {
-    if (isLoading || isLoginRoute) return;
+    if (isLoading || isPublicRoute) return;
 
     if (!isAuthenticated || !user || !isStaff(user.role)) {
       router.push(`/${locale}/staff/login`);
     }
-  }, [isAuthenticated, isLoading, user, locale, router, isLoginRoute]);
+  }, [isAuthenticated, isLoading, user, locale, router, isPublicRoute]);
 
-  if (isLoginRoute) {
+  if (isPublicRoute) {
     return <>{children}</>;
   }
 

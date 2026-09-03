@@ -20,7 +20,7 @@ const navByRole: Record<UserRole, NavItem[]> = {
   cashier: [
     { view: 'gate', label: 'Gate Check-In', icon: '🚪', path: '/staff/gate' },
     { view: 'settlement', label: 'Settlement', icon: '🏦', path: '/staff/settlement' },
-    { view: 'profile', label: 'Profile', icon: '👤', path: '/staff/profile' },
+    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
   ],
   museum_manager: [
     { view: 'dashboard', label: 'Dashboard', icon: '📊', path: '/staff/dashboard' },
@@ -29,11 +29,11 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { view: 'group-bookings', label: 'Group Booking Approvals', icon: '👥', path: '/staff/group-bookings' },
     { view: 'refunds', label: 'Refunds', icon: '💰', path: '/staff/refunds' },
     { view: 'reports', label: 'Reports', icon: '📈', path: '/staff/reports' },
-    { view: 'profile', label: 'Profile', icon: '👤', path: '/staff/profile' },
+    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
   ],
   platform_admin: [
     { view: 'staff', label: 'Staff Accounts', icon: '👤', path: '/staff/admin/staff' },
-    { view: 'profile', label: 'Profile', icon: '👤', path: '/staff/profile' },
+    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
   ],
 };
 

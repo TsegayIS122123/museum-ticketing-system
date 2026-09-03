@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 const items = [
   { label: 'My Bookings', path: '/bookings' },
   { label: 'Book a Visit', path: '/book' },
-  { label: 'Profile', path: '/profile' },
+  { label: 'Profile', path: '/settings/account' },
 ];
 
 export function VisitorSidebar() {

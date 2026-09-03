@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { PasswordField } from '@/components/ui/PasswordField';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { staffResetPassword } from '@/features/account/api';
+import { isApiError } from '@/lib/api/errors';
 
 // Consumes the link sent by POST /auth/forgot-password/ (and reused by
 // platform_admin.create_staff_account for a brand-new Cashier/Museum
@@ -70,11 +71,22 @@ function ResetPasswordPageContent() {
     try {
       await staffResetPassword({ token, new_password: newPassword });
       setIsDone(true);
-    } catch {
-      setError(
-        t('reset_password_failed') ||
-          'This link is invalid or has expired. Request a new one and try again.'
-      );
+    } catch (err: unknown) {
+      // The backend only blames the token/link itself for a real reason
+      // (services.reset_password's "Invalid or expired reset token.").
+      // Any other failure -- most commonly a password that failed
+      // AUTH_PASSWORD_VALIDATORS (too short, too common, all-numeric, too
+      // similar to the account's own email) -- has nothing to do with the
+      // link, so show the real API message instead of misleadingly
+      // blaming it every time.
+      if (isApiError(err) && err.message) {
+        setError(err.message);
+      } else {
+        setError(
+          t('reset_password_failed') ||
+            'This link is invalid or has expired. Request a new one and try again.'
+        );
+      }
     } finally {
       setIsLoading(false);
     }

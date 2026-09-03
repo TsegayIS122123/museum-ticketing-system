@@ -7,7 +7,7 @@ from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializ
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -236,16 +236,22 @@ class CookieTokenRefreshView(TokenRefreshView):
         serializer = TokenRefreshSerializer(data={"refresh": raw_refresh})
         try:
             serializer.is_valid(raise_exception=True)
-        except TokenError as exc:
+        except TokenError:
             # Expired/invalid/already-rotated cookie -- clear it so the
             # browser stops presenting a dead token on every subsequent
             # page load, and let the frontend fall back to a normal login.
+            #
+            # NOTE: this must be `return response`, not `raise InvalidToken`.
+            # Raising discards this `response` object (and the delete-cookie
+            # header set on it below) in favor of a fresh response built by
+            # DRF's exception handler, so the stale cookie never actually
+            # gets cleared and the browser keeps re-sending it forever.
             response = Response(
                 {"detail": "Refresh token invalid or expired."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
             clear_refresh_cookie(response)
-            raise InvalidToken(exc.args[0]) from exc
+            return response
 
         response = Response({"access": serializer.validated_data["access"]})
         rotated_refresh = serializer.validated_data.get("refresh")
