@@ -17,10 +17,9 @@ pytestmark = pytest.mark.django_db
 def test_seed_categories_match_current_policy():
     expected = {
         "Student": Decimal("50.00"),
-        "Adult / Teacher": Decimal("100.00"),
+        "Adult": Decimal("100.00"),
         "Foreign Resident": Decimal("300.00"),
         "Non-Resident": Decimal("500.00"),
-        "Exempt / Free": Decimal("0.00"),
     }
 
     seeded = {c.name_en: c.price_etb for c in Category.objects.all()}
@@ -28,7 +27,7 @@ def test_seed_categories_match_current_policy():
     assert seeded == expected
 
 
-def test_seed_categories_are_active_and_only_exempt_is_free():
+def test_seed_categories_are_active_and_none_are_free():
     for category in Category.objects.all():
         assert category.active is True
-        assert category.is_free == (category.name_en == "Exempt / Free")
+        assert category.is_free is False
