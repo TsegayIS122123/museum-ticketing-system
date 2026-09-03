@@ -27,8 +27,14 @@ class ChapaWebhookView(APIView):
         responses={200: None, 400: None, 401: None},
     )
     def post(self, request, *args, **kwargs):
-        signature = request.headers.get("Chapa-Signature") or request.headers.get(
-            "X-Chapa-Signature"
+        # Chapa sends two different headers with two different formulas:
+        #   X-Chapa-Signature = HMAC_SHA256(secret, raw_body)  -- verifies the event body
+        #   Chapa-Signature   = HMAC_SHA256(secret, secret)    -- constant, NOT payload-based
+        # We must check X-Chapa-Signature first (it's the one verify_webhook_signature
+        # actually validates against); falling back to Chapa-Signature here would only
+        # ever match a secret-derived constant, which never equals HMAC(secret, body).
+        signature = request.headers.get("X-Chapa-Signature") or request.headers.get(
+            "Chapa-Signature"
         )
         if not services.verify_webhook_signature(
             raw_body=request.body, signature_header=signature

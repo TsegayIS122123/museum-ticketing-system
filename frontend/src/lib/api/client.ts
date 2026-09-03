@@ -7,15 +7,20 @@ const API_BASE =
       'http://localhost:8000/api/v1'
     : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-// In-memory token storage (Option A - safest against XSS)
+// In-memory token storage (Option A - safest against XSS). Only the
+// access token lives here now -- it's short-lived (15 minutes,
+// config.settings.base.SIMPLE_JWT) and is what actually authorizes API
+// calls, so it's the one worth keeping out of anything an XSS payload
+// could read.
+//
+// The refresh token is NOT stored here (or anywhere in JS) at all -- the
+// backend sets it as an httpOnly cookie instead (apps.accounts.cookies),
+// scoped to /api/v1/auth/, and every fetch below sends credentials:
+// 'include' so the browser attaches it automatically. That's what makes
+// a silent refresh possible even after a full page navigation away from
+// the app and back -- e.g. Chapa's hosted checkout (return_url) -- which
+// wipes plain in-memory state like this module's own `accessToken`.
 let accessToken: string | null = null;
-// Also in-memory, same rationale as accessToken above -- a page reload
-// still requires re-login either way (nothing survives a reload today),
-// so keeping the refresh token in memory alongside the access token
-// doesn't change that tradeoff, it just lets a *silent* refresh work
-// within a session instead of forcing a hard logout on every access
-// token expiry (15 minutes, config.settings.base.SIMPLE_JWT).
-let refreshTokenValue: string | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
@@ -29,55 +34,41 @@ export function clearAccessToken() {
   accessToken = null;
 }
 
-export function setRefreshToken(token: string | null) {
-  refreshTokenValue = token;
-}
-
-export function getRefreshToken() {
-  return refreshTokenValue;
-}
-
 export function clearAuthTokens() {
   accessToken = null;
-  refreshTokenValue = null;
 }
 
-// SIMPLE_JWT has ROTATE_REFRESH_TOKENS=True and
-// BLACKLIST_AFTER_ROTATION=True -- every call to POST /auth/refresh/
-// both consumes the refresh token it was given (blacklisting it) AND
-// returns a brand-new one that must be saved for next time. If two
-// requests 401 around the same moment, both must not call this
-// independently -- the first call already blacklists the refresh token
-// out from under the second. `inFlightRefresh` collapses concurrent
-// callers onto a single request/promise instead.
+// Multiple 401s around the same moment shouldn't each fire their own
+// refresh call -- `inFlightRefresh` collapses concurrent callers onto a
+// single request/promise instead.
 let inFlightRefresh: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+// Attempts a silent refresh using the httpOnly refresh-token cookie.
+// Exported so AuthProvider (lib/auth/auth-context.tsx) can call this on
+// mount -- that's the only way a returning visitor (fresh page load,
+// nothing left in memory) gets `isAuthenticated` back without a full
+// re-login.
+export async function refreshAccessToken(): Promise<string | null> {
   if (inFlightRefresh) return inFlightRefresh;
-
-  const currentRefreshToken = refreshTokenValue;
-  if (!currentRefreshToken) return null;
 
   inFlightRefresh = (async () => {
     try {
-      // Note: response field names here are `access`/`refresh`
-      // (simplejwt's stock TokenRefreshSerializer,
-      // contracts/openapi.yaml's TokenRefresh schema) -- NOT
-      // access_token/refresh_token like AuthResponse from /auth/login/
-      // and /auth/verify/. Easy to get wrong since every other
-      // token-bearing response in this API uses the longer names.
+      // No body -- the refresh token travels as the httpOnly cookie, not
+      // as a request field. Response shape is `{ access }` only
+      // (contracts/openapi.yaml's TokenRefreshResponse); the rotated
+      // refresh token comes back as a Set-Cookie the browser stores on
+      // its own, never in this JSON.
       const response = await fetch(`${API_BASE}/auth/refresh/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh: currentRefreshToken }),
+        credentials: 'include',
       });
       if (!response.ok) {
         clearAuthTokens();
         return null;
       }
-      const data: { access: string; refresh: string } = await response.json();
+      const data: { access: string } = await response.json();
       accessToken = data.access;
-      refreshTokenValue = data.refresh;
       return data.access;
     } catch {
       clearAuthTokens();
@@ -132,44 +123,32 @@ async function request<T>(
   const response = await fetch(`${API_BASE}${normalizedPath}`, {
     ...options,
     headers,
+    // Needed so the browser sends the httpOnly refresh-token cookie on
+    // /auth/refresh/ (and /auth/logout/) -- harmless elsewhere since the
+    // cookie is path-scoped to /api/v1/auth/ (apps.accounts.cookies) and
+    // simply won't be attached to other requests.
+    credentials: 'include',
   });
 
-  // A 401 on an authenticated request means the 15-minute access token
-  // has expired (or was never valid) -- try exactly one silent refresh
-  // and retry the original request once. `_isRetry` stops this from
-  // looping if the refreshed token is *also* rejected, and normalizePath
-  // ending in "/auth/refresh/" itself is skipped to avoid refreshing
-  // recursively off of the refresh call's own 401.
-  if (
-    response.status === 401 &&
-    !_isRetry &&
-    token &&
-    !normalizedPath.startsWith('/auth/refresh')
-  ) {
+  // A 401 means the access token is missing, expired, or was never valid
+  // -- try exactly one silent refresh (it can succeed purely off the
+  // httpOnly cookie, even with no token in memory -- e.g. right after a
+  // fresh page load) and retry the original request once. `_isRetry`
+  // stops this from looping if the refreshed token is *also* rejected,
+  // and normalizePath ending in "/auth/refresh/" itself is skipped to
+  // avoid refreshing recursively off of the refresh call's own 401.
+  if (response.status === 401 && !_isRetry && !normalizedPath.startsWith('/auth/refresh')) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       return request<T>(path, options, true);
     }
   }
 
-  // A 204 (e.g. DELETE /categories/{id}/'s retire) or any other
-  // genuinely empty body has nothing to parse -- `response.json()`
-  // throws on empty input, which used to be indistinguishable from an
-  // actually malformed response. Checked via status + Content-Length
-  // rather than an empty-string read, since consuming the body here
-  // would leave nothing for `.json()` below on the non-empty path.
-  const hasNoBody =
-    response.status === 204 ||
-    response.status === 205 ||
-    response.headers.get('content-length') === '0';
-
-  let data: unknown = undefined;
-  if (!hasNoBody) {
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error('Invalid response from server');
-    }
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('Invalid response from server');
   }
 
   if (!response.ok) {

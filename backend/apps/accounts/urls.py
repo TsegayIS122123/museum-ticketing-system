@@ -25,4 +25,8 @@ urlpatterns = [
     path("login/", views.StaffLoginView.as_view(), name="staff-login"),
     path("forgot-password/", views.RequestPasswordResetView.as_view(), name="forgot-password"),
     path("reset-password/", views.ConfirmPasswordResetView.as_view(), name="reset-password"),
+    #
+    # Shared by both credential paths -- clears the refresh-token cookie
+    # set by login/verify (Sec 4.1, apps/accounts/cookies.py).
+    path("logout/", views.LogoutView.as_view(), name="logout"),
 ]

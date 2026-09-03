@@ -1,15 +1,17 @@
 import { apiClient } from '@/lib/api/client';
 import type { components } from '@/lib/api-types';
-import type { TokenRefreshRequest, TokenRefreshResponse } from '@/lib/api-contract';
 
 // Real backend shape (contracts/openapi.yaml). Every auth-related
 // serializer here is snake_case -- including the request bodies and the
-// top-level token field names (access_token/refresh_token, NOT
-// accessToken/refreshToken). This is a genuine inconsistency in the
-// backend itself (most other serializers in this API use a camelCase
-// renderer; the plain auth Serializers and the ModelSerializer-based
-// Account do not) -- not something the frontend can paper over, it has
-// to match what's actually sent.
+// top-level token field name (access_token, NOT accessToken). This is a
+// genuine inconsistency in the backend itself (most other serializers in
+// this API use a camelCase renderer; the plain auth Serializers and the
+// ModelSerializer-based Account do not) -- not something the frontend
+// can paper over, it has to match what's actually sent.
+//
+// AuthResponse no longer carries a refresh_token field at all -- the
+// refresh token is set as an httpOnly cookie (apps.accounts.cookies) as
+// a side effect of this same response, never returned in JSON.
 
 export type Account = components['schemas']['Account'];
 export type VisitorVerifyStartResponse = components['schemas']['VisitorVerifyStartResponse'];
@@ -28,13 +30,6 @@ export async function confirmVisitorVerification(
   input: components['schemas']['VisitorVerifyConfirm']
 ): Promise<AuthResponse> {
   return apiClient.post<AuthResponse>('/auth/visitor/verify/confirm/', input);
-}
-
-// GET /auth/visitor/verify/email/{token}/ -- the secondary/fallback
-// verification channel (opening the emailed link). Only marks
-// email_verified_at; it never issues a session (see VerifyMagicLinkView).
-export async function confirmEmailVerification(token: string): Promise<{ detail: string }> {
-  return apiClient.get<{ detail: string }>(`/auth/visitor/verify/email/${encodeURIComponent(token)}/`);
 }
 
 // POST /auth/login/ -- Staff only (password-based).
@@ -57,13 +52,10 @@ export async function staffResetPassword(
   return apiClient.post<void>('/auth/reset-password/', input);
 }
 
-// POST /auth/refresh/ -- exchanges a refresh token for a new access
-// token. Not currently wired up anywhere in the app (no refresh_token is
-// persisted today -- see auth-context.tsx), but the endpoint is real.
-export async function refreshAccessToken(refresh: string): Promise<TokenRefreshResponse> {
-  const body: TokenRefreshRequest = { refresh };
-  return apiClient.post<TokenRefreshResponse>('/auth/refresh/', body);
-}
+// POST /auth/refresh/ and POST /auth/logout/ are both handled directly in
+// lib/api/client.ts (refreshAccessToken()) / lib/auth/auth-context.tsx
+// (logout()) -- neither takes a body, both rely on the httpOnly
+// refresh-token cookie, so there's nothing for this file to wrap.
 
 // GET /users/me/ -- current account, Visitor or Staff.
 export async function getCurrentUser(): Promise<Account> {

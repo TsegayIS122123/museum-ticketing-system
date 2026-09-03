@@ -248,6 +248,14 @@ SIMPLE_JWT = {
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"])
 
+# Required for the refresh-token cookie (apps.accounts.cookies) to make it
+# across the web (:3000) <-> api (:8000) origin boundary: without this,
+# the browser both refuses to send the cookie on cross-origin requests and
+# drops any Set-Cookie the API responds with, even though CORS_ALLOWED_ORIGINS
+# above already limits *which* origin that applies to (never combined with
+# a "*" origin -- browsers reject credentialed requests against a wildcard).
+CORS_ALLOW_CREDENTIALS = True
+
 # --------------------------------------------------------------------------
 # Redis -- three logical DB indices, Design Spec Sec 6.2. Kept as separate
 # indices (not just separate key prefixes) so a rate-limit burst can never

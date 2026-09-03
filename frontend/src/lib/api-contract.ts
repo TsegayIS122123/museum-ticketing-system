@@ -69,14 +69,15 @@ export type BookingListResponse = Omit<components['schemas']['PaginatedBookingLi
 export type ReportSummary = components['schemas']['ReportSummary'];
 
 // ---------------------------------------------------------------------
-// TokenRefresh is one shared schema for both directions of
-// POST /auth/refresh/, which doesn't cleanly fit either as-is:
-//   request:  { refresh: string }              (only `refresh` is sent)
-//   response: { readonly access, refresh }      (both come back)
-// Deriving via Pick/the full type instead of hand-writing either.
+// POST /auth/refresh/ takes no request body at all -- the refresh token
+// travels as the httpOnly cookie apps.accounts.cookies sets on
+// login/verify, never as a JSON field (lib/api/client.ts's
+// refreshAccessToken()). Response is just the new access token; the
+// rotated refresh token comes back as a Set-Cookie the browser stores on
+// its own, not in this JSON, so there's no `refresh` field to type here
+// either.
 // ---------------------------------------------------------------------
-export type TokenRefreshRequest = Pick<components['schemas']['TokenRefresh'], 'refresh'>;
-export type TokenRefreshResponse = components['schemas']['TokenRefresh'];
+export type TokenRefreshResponse = components['schemas']['TokenRefreshResponse'];
 
 // POST /admin/staff/'s response used to be mistyped as `StaffCreate`
 // (missing id/active/created_at) instead of `Account`, because

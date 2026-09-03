@@ -18,6 +18,12 @@
 # (reads contracts/openapi.yaml) via the `mock` profile instead:
 #   docker compose --profile mock up mock-api
 #   NEXT_PUBLIC_API_URL=http://localhost:4010 docker compose up web
+#
+# Testing real Chapa sandbox payments: Chapa's webhook needs a public URL
+# to POST to, which `localhost` can't provide. A free ngrok static domain
+# gives `api` a permanent public URL that never changes -- see the
+# `ngrok` service below for one-time setup, then:
+#   docker compose --profile tunnel up -d ngrok
 
 services:
   db:
@@ -152,6 +158,49 @@ services:
       - "3000:3000"
     depends_on:
       - api
+
+  # ngrok -- gives `api` a fixed, permanent public https:// URL (a free
+  # static domain, e.g. https://your-name.ngrok-free.app) so Chapa's
+  # sandbox webhook always has somewhere stable to POST to. Unlike the
+  # Cloudflare Quick Tunnel this replaces, this URL never rotates -- set
+  # it once in backend/.env and once in Chapa's dashboard Webhook URL
+  # field, and neither ever needs touching again.
+  #
+  # One-time setup:
+  #   1. Sign up free at https://ngrok.com, copy your authtoken (dashboard
+  #      > Your Authtoken).
+  #   2. Reserve a free static domain: dashboard > Universal Edge >
+  #      Domains > "+ New Domain". You get one free, e.g.
+  #      your-name.ngrok-free.app.
+  #   3. Create a `.env` file in the REPO ROOT (a different file from
+  #      backend/.env -- this one is read by docker-compose.yml itself)
+  #      containing:
+  #        NGROK_AUTHTOKEN=<your authtoken>
+  #        NGROK_STATIC_DOMAIN=<your-name>.ngrok-free.app
+  #   4. In backend/.env, set:
+  #        PUBLIC_API_BASE_URL=https://<your-name>.ngrok-free.app
+  #   5. In Chapa's dashboard (profile > Webhooks), set Webhook URL to:
+  #        https://<your-name>.ngrok-free.app/api/v1/payments/webhooks/chapa/
+  #      and Secret hash to match CHAPA_WEBHOOK_SECRET in backend/.env.
+  #
+  # Start it with: docker compose --profile tunnel up -d ngrok
+  # (requires --force-recreate on `api` the first time you set
+  # PUBLIC_API_BASE_URL, same as any other env_file change -- see the
+  # comment on the `api` service's env_file above for why plain
+  # `restart` doesn't pick up .env edits.)
+  ngrok:
+    image: ngrok/ngrok:latest
+    command:
+      - "http"
+      - "http://api:8000"
+      - "--url=https://${NGROK_STATIC_DOMAIN}"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    depends_on:
+      api:
+        condition: service_healthy
+    profiles:
+      - tunnel
 
   # Optional: Stoplight Prism, reads contracts/openapi.yaml and serves
   # realistic, schema-valid mock responses on port 4010 — for frontend work

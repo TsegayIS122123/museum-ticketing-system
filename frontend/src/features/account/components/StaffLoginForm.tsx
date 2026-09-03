@@ -33,10 +33,7 @@ export function StaffLoginForm() {
     try {
       const response = await staffLogin({ email, password });
       
-      login(
-        { access_token: response.access_token, refresh_token: response.refresh_token },
-        response.user
-      );
+      login({ access_token: response.access_token }, response.user);
 
       // Redirect based on role
       const role = response.user.role;

@@ -182,7 +182,6 @@ paths:
                 StaffLogin(mock):
                   value:
                     access_token: mock-access-token
-                    refresh_token: mock-refresh-token
                     user:
                       id: 00000000-0000-0000-0000-000000000001
                       email: manager@sciencemuseum.et
@@ -194,32 +193,59 @@ paths:
                       created_at: '2026-01-01T00:00:00Z'
                   summary: Staff login (mock)
           description: ''
-  /api/v1/auth/refresh/:
+  /api/v1/auth/logout/:
     post:
-      operationId: v1_auth_refresh_create
+      operationId: v1_auth_logout_create
       description: |-
-        Takes a refresh type JSON web token and returns an access type JSON web
-        token if the refresh token is valid.
+        POST /auth/logout -- clears the refresh-token cookie so the browser
+        stops presenting it. Note: this does not blacklist the token
+        server-side -- SIMPLE_JWT.BLACKLIST_AFTER_ROTATION=True already assumes
+        that, but `rest_framework_simplejwt.token_blacklist` isn't in
+        INSTALLED_APPS (config/settings/base.py), so today every rotation's
+        `refresh.blacklist()` call is silently swallowed (simplejwt only
+        defines that method when the app is installed, and the rotation code
+        catches the resulting AttributeError). Worth installing + migrating
+        that app separately so old refresh tokens are actually invalidated,
+        not just no-longer-cookied on this device.
       tags:
       - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-        required: true
+      security:
+      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenRefresh'
+                $ref: '#/components/schemas/DetailResponse'
+          description: ''
+  /api/v1/auth/refresh/:
+    post:
+      operationId: v1_auth_refresh_create
+      description: |-
+        POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py),
+        shared by both credential paths (Sec 4.1).
+
+        Reads the refresh token from the httpOnly cookie set by `_auth_response`
+        above instead of requiring it in the request body -- the frontend never
+        holds or sends the refresh token itself (cookies.py). Re-sets the
+        cookie with the rotated token on success, per SIMPLE_JWT's
+        ROTATE_REFRESH_TOKENS.
+      tags:
+      - v1
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefreshResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
           description: ''
   /api/v1/auth/reset-password/:
     post:
@@ -1172,13 +1198,10 @@ components:
       properties:
         access_token:
           type: string
-        refresh_token:
-          type: string
         user:
           $ref: '#/components/schemas/Account'
       required:
       - access_token
-      - refresh_token
       - user
     Booking:
       type: object
@@ -2191,17 +2214,13 @@ components:
       - pending
       - refunded
       - visited
-    TokenRefresh:
+    TokenRefreshResponse:
       type: object
       properties:
         access:
           type: string
-          readOnly: true
-        refresh:
-          type: string
       required:
       - access
-      - refresh
     VisitorVerifyConfirm:
       type: object
       description: '`VisitorVerifyConfirmRequest`.'

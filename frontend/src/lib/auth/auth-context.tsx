@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { setAccessToken, setRefreshToken, clearAuthTokens, getAccessToken } from '@/lib/api/client';
+import { setAccessToken, clearAuthTokens, refreshAccessToken } from '@/lib/api/client';
 import { apiClient } from '@/lib/api/client';
 
 // Matches the real `Account` schema (contracts/openapi.yaml) returned by
@@ -23,9 +23,11 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  // Matches AuthResponse's real field names (access_token/refresh_token,
-  // not accessToken/refreshToken).
-  login: (tokens: { access_token: string; refresh_token: string }, userData: User) => void;
+  // Matches AuthResponse's real field name (access_token, not
+  // accessToken) -- refresh_token is no longer part of this shape at
+  // all, it arrives as an httpOnly cookie the backend sets directly
+  // (apps.accounts.cookies), never in a JS-readable response field.
+  login: (tokens: { access_token: string }, userData: User) => void;
   logout: () => void;
   setUser: (user: User | null) => void;
 }
@@ -38,39 +40,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (token) {
-      apiClient
-        .get<User>('/users/me/')
-        .then((userData) => {
-          setUser(userData);
-          setIsAuthenticated(true);
-        })
-        .catch(() => {
-          clearAuthTokens();
-          setIsAuthenticated(false);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      setIsLoading(false);
+    // On every fresh mount (first load, or coming back from a full page
+    // navigation away from the app -- e.g. Chapa's hosted checkout
+    // redirecting back via return_url) there's nothing left in memory,
+    // so `getAccessToken()` would always be null here. Instead, always
+    // attempt a silent refresh first: it succeeds purely off the
+    // httpOnly refresh-token cookie the browser already carries, and
+    // only a signed-out visitor (no valid cookie) actually falls through
+    // to `isAuthenticated: false`.
+    let cancelled = false;
+
+    async function bootstrap() {
+      const newAccessToken = await refreshAccessToken();
+      if (!newAccessToken) {
+        if (!cancelled) setIsLoading(false);
+        return;
+      }
+      try {
+        const userData = await apiClient.get<User>('/users/me/');
+        if (cancelled) return;
+        setUser(userData);
+        setIsAuthenticated(true);
+      } catch {
+        if (!cancelled) clearAuthTokens();
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
     }
+
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = (tokens: { access_token: string; refresh_token: string }, userData: User) => {
+  const login = (tokens: { access_token: string }, userData: User) => {
+    // The refresh token isn't handled here at all -- the response that
+    // carried `tokens.access_token` also set the httpOnly cookie as a
+    // side effect (Set-Cookie header), which this code never sees or
+    // needs to.
     setAccessToken(tokens.access_token);
-    // apiClient (lib/api/client.ts) now uses this to silently refresh
-    // the access token on a 401 -- SIMPLE_JWT's ACCESS_TOKEN_LIFETIME is
-    // only 15 minutes, so without a refresh token stashed here every
-    // Staff member would otherwise get logged out mid-shift on the
-    // access token's first expiry, roughly every 15 minutes.
-    setRefreshToken(tokens.refresh_token);
     setUser(userData);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
+    // Fire-and-forget: clears the httpOnly refresh-token cookie
+    // server-side (apps.accounts.views.LogoutView) so a stale cookie
+    // can't silently re-authenticate this browser later. Local state
+    // clears immediately regardless of whether this call succeeds.
+    apiClient.post('/auth/logout/').catch(() => {});
     clearAuthTokens();
     setUser(null);
     setIsAuthenticated(false);

@@ -4,12 +4,13 @@ Root URLconf. Every Django app's own urls.py is included under
 so the API surface maps predictably to Document 04 (OpenAPI Specification).
 """
 
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework_simplejwt.views import TokenRefreshView
 
-from apps.accounts.views import CurrentUserView
+from apps.accounts.views import CookieTokenRefreshView, CurrentUserView
 from apps.bookings.urls import availability_urlpatterns
 from apps.bookings.views import MyBookingsView
 from apps.entrance.urls import entrance_urlpatterns
@@ -26,8 +27,10 @@ urlpatterns = [
     path("api/schema/swagger-ui/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
 
     # Auth -- both credential paths share one refresh endpoint (Sec 4.1).
+    # CookieTokenRefreshView (apps.accounts.views) reads/rotates the
+    # refresh token from its httpOnly cookie -- see apps/accounts/cookies.py.
     path("api/v1/auth/", include("apps.accounts.urls")),
-    path("api/v1/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/v1/auth/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
 
     # Document 04 places the profile endpoint under /users/, not /auth/ --
     # mounted directly here rather than via apps.accounts.urls, which is
@@ -64,3 +67,10 @@ urlpatterns = [
     path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/admin/", include("apps.platform_admin.urls")),
 ]
+
+# Serve user-uploaded/generated media (e.g. temporary receipt PDFs) locally.
+# Only wired up when DEBUG=True (dev), since in staging/production media
+# should be served by the reverse proxy or object storage, not Django --
+# see Doc 08 Sec 3.2.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

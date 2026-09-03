@@ -67,10 +67,7 @@ export function VisitorVerifyForm() {
     setIsLoading(true);
     try {
       const response = await confirmVisitorVerification({ verification_id: verificationId, otp_code: otpCode });
-      login(
-        { access_token: response.access_token, refresh_token: response.refresh_token },
-        response.user
-      );
+      login({ access_token: response.access_token }, response.user);
       router.push(`/${locale}/bookings`);
     } catch (err: any) {
       setError(err.message || 'Invalid verification code. Please try again.');

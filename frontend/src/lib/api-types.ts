@@ -93,6 +93,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/logout/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /auth/logout -- clears the refresh-token cookie so the browser
+         *     stops presenting it. Note: this does not blacklist the token
+         *     server-side -- SIMPLE_JWT.BLACKLIST_AFTER_ROTATION=True already assumes
+         *     that, but `rest_framework_simplejwt.token_blacklist` isn't in
+         *     INSTALLED_APPS (config/settings/base.py), so today every rotation's
+         *     `refresh.blacklist()` call is silently swallowed (simplejwt only
+         *     defines that method when the app is installed, and the rotation code
+         *     catches the resulting AttributeError). Worth installing + migrating
+         *     that app separately so old refresh tokens are actually invalidated,
+         *     not just no-longer-cookied on this device.
+         */
+        post: operations["v1_auth_logout_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh/": {
         parameters: {
             query?: never;
@@ -103,8 +131,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * @description Takes a refresh type JSON web token and returns an access type JSON web
-         *     token if the refresh token is valid.
+         * @description POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py),
+         *     shared by both credential paths (Sec 4.1).
+         *
+         *     Reads the refresh token from the httpOnly cookie set by `_auth_response`
+         *     above instead of requiring it in the request body -- the frontend never
+         *     holds or sends the refresh token itself (cookies.py). Re-sets the
+         *     cookie with the rotated token on success, per SIMPLE_JWT's
+         *     ROTATE_REFRESH_TOKENS.
          */
         post: operations["v1_auth_refresh_create"];
         delete?: never;
@@ -739,7 +773,6 @@ export interface components {
         };
         AuthResponse: {
             access_token: string;
-            refresh_token: string;
             user: components["schemas"]["Account"];
         };
         /**
@@ -1215,9 +1248,8 @@ export interface components {
             cancelled: number;
             refunded: number;
         };
-        TokenRefresh: {
-            readonly access: string;
-            refresh: string;
+        TokenRefreshResponse: {
+            access: string;
         };
         /** @description `VisitorVerifyConfirmRequest`. */
         VisitorVerifyConfirm: {
@@ -1397,6 +1429,25 @@ export interface operations {
             };
         };
     };
+    v1_auth_logout_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailResponse"];
+                };
+            };
+        };
+    };
     v1_auth_refresh_create: {
         parameters: {
             query?: never;
@@ -1404,20 +1455,22 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TokenRefresh"];
-                "application/x-www-form-urlencoded": components["schemas"]["TokenRefresh"];
-                "multipart/form-data": components["schemas"]["TokenRefresh"];
-            };
-        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TokenRefresh"];
+                    "application/json": components["schemas"]["TokenRefreshResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailResponse"];
                 };
             };
         };

@@ -190,11 +190,14 @@ def create_checkout_session(*, booking):
 def verify_webhook_signature(*, raw_body: bytes, signature_header) -> bool:
     """Chapa signs the raw request body with HMAC-SHA256 using the webhook
     secret configured in the Chapa dashboard (`CHAPA_WEBHOOK_SECRET`),
-    sent back in the `Chapa-Signature` header. This -- not the payload's
-    own `tx_ref`/`status` fields -- is what makes a webhook call
-    trustworthy before any booking state changes (NFR-SEC-001, Document 03
-    Sec 4.2). An empty/missing secret or header never verifies, even in
-    development -- there is no "skip verification" mode.
+    sent back in the `X-Chapa-Signature` header. (Chapa also sends a
+    `Chapa-Signature` header, but that one is HMAC(secret, secret) --
+    a constant that is NOT derived from the payload -- so it must never
+    be checked here.) This -- not the payload's own `tx_ref`/`status`
+    fields -- is what makes a webhook call trustworthy before any booking
+    state changes (NFR-SEC-001, Document 03 Sec 4.2). An empty/missing
+    secret or header never verifies, even in development -- there is no
+    "skip verification" mode.
     """
     if not signature_header or not settings.CHAPA_WEBHOOK_SECRET:
         return False

@@ -36,6 +36,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
+from apps.core.pdf_fonts import ETHIOPIC_BOLD, ETHIOPIC_REGULAR, ensure_ethiopic_fonts_registered
+
 logger = logging.getLogger(__name__)
 
 # ADR-009: rendered once, at issuance, and never regenerated -- a template
@@ -50,7 +52,14 @@ def _render_transfer_receipt_pdf(*, reconciliation) -> bytes:
     Cashier carries to Finance alongside her IFMIS vouchers -- it proves
     the reconciled amount actually left Chapa's pooled balance and landed
     in the university's account, the digital equivalent of a bank
-    deposit slip."""
+    deposit slip.
+
+    Uses the Noto Sans Ethiopic fonts from apps.core.pdf_fonts for every
+    string, rather than ReportLab's "Helvetica"/"Helvetica-Bold" -- those
+    base-14 fonts have no Ethiopic glyphs, so Amharic text drawn with
+    them renders as empty boxes instead of characters.
+    """
+    ensure_ethiopic_fonts_registered()
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     _width, _height = A4
@@ -60,15 +69,15 @@ def _render_transfer_receipt_pdf(*, reconciliation) -> bytes:
 
     def write_row(label_en, label_am, value):
         nonlocal y
-        pdf.setFont("Helvetica-Bold", 11)
+        pdf.setFont(ETHIOPIC_BOLD, 11)
         pdf.drawString(left, y, label_en)
-        pdf.setFont("Helvetica", 9)
+        pdf.setFont(ETHIOPIC_REGULAR, 9)
         pdf.drawString(left, y - 4.5 * mm, label_am)
-        pdf.setFont("Helvetica", 11)
+        pdf.setFont(ETHIOPIC_REGULAR, 11)
         pdf.drawString(left + 70 * mm, y, str(value))
         y -= line_height
 
-    pdf.setFont("Helvetica-Bold", 16)
+    pdf.setFont(ETHIOPIC_BOLD, 16)
     pdf.drawString(left, y, "Cashier Transfer Receipt / የገንዘብ ተቀባይ ማስተላለፊያ ደረሰኝ")
     y -= line_height * 1.5
 
@@ -93,7 +102,7 @@ def _render_transfer_receipt_pdf(*, reconciliation) -> bytes:
     write_row("Status", "ሁኔታ", reconciliation.get_status_display())
 
     y -= line_height
-    pdf.setFont("Helvetica-Oblique", 9)
+    pdf.setFont(ETHIOPIC_REGULAR, 9)
     pdf.drawString(
         left,
         y,
@@ -158,5 +167,16 @@ def render_and_store_transfer_receipt(self, *, reconciliation_id):
         )
         raise self.retry(exc=exc, countdown=min(60 * (2**self.request.retries), 900))
 
-    reconciliation.transfer_receipt_url = default_storage.url(storage_path)
+    # See apps.payments.tasks.render_and_store_receipt for why this can't
+    # be the bare relative path default_storage.url() returns: whatever
+    # origin later renders this URL (e.g. the frontend, on a different
+    # port/host) would otherwise be treated as the base, producing a
+    # broken link.
+    relative_url = default_storage.url(storage_path)
+    if relative_url.startswith("http://") or relative_url.startswith("https://"):
+        reconciliation.transfer_receipt_url = relative_url
+    else:
+        reconciliation.transfer_receipt_url = (
+            f"{settings.PUBLIC_API_BASE_URL.rstrip('/')}{relative_url}"
+        )
     reconciliation.save(update_fields=["transfer_receipt_url", "updated_at"])
