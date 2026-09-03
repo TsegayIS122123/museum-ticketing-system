@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 @theme {
+  --color-brand-footer: #01324E;
+  --color-brand-primary: #015484;
+
   /* Figma Design Tokens */
   --color-stone-50: #f7f5f0;
   --color-stone-100: #f5f3ef;
