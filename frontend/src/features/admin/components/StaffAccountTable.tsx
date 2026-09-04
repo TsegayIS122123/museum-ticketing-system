@@ -32,7 +32,7 @@ export function StaffAccountTable({
       case 'cashier':
         return <StatusBadge status="pending" />;
       case 'museum_manager':
-        return <StatusBadge status="pending_approval" />;
+        return <StatusBadge status="awaiting_payment" />;
       case 'platform_admin':
         return <StatusBadge status="visited" />;
       default:

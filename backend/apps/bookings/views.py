@@ -18,7 +18,6 @@ from apps.core.permissions import IsMuseumManager, IsStaff, IsVisitor
 from . import services
 from .models import Booking
 from .serializers import (
-    BookingApprovalSerializer,
     BookingCreateSerializer,
     BookingRescheduleSerializer,
     BookingSerializer,
@@ -114,16 +113,15 @@ class BookingListCreateView(generics.GenericAPIView):
         booking = services.create_booking(
             visitor=request.user, **serializer.to_service_kwargs()
         )
-        if booking.status == Booking.Status.AWAITING_PAYMENT:
-            # Individual booking (FR-BOOK-001) -- a group booking instead
-            # starts pending_approval (FR-BOOK-003) and gets its checkout
-            # session from BookingApprovalView below, once approved.
-            # Local import: apps.payments depends on apps.bookings, not
-            # the reverse (Design Spec Sec 3.2) -- this view layer is what
-            # composes both, never bookings/services.py itself.
-            from apps.payments.services import create_checkout_session
+        # Every booking (individual, FR-BOOK-001, or group, FR-BOOK-003)
+        # leaves create_booking as awaiting_payment -- there is no
+        # approval gate in between. Local import: apps.payments depends
+        # on apps.bookings, not the reverse (Design Spec Sec 3.2) -- this
+        # view layer is what composes both, never bookings/services.py
+        # itself.
+        from apps.payments.services import create_checkout_session
 
-            create_checkout_session(booking=booking)
+        create_checkout_session(booking=booking)
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 
@@ -152,30 +150,6 @@ class BookingDetailView(generics.RetrieveAPIView):
         if not (is_owner or is_staff):
             self.permission_denied(self.request)
         return booking
-
-
-class BookingApprovalView(APIView):
-    """PUT /bookings/{id}/approval -- Museum Manager only (FR-BOOK-003)."""
-
-    permission_classes = [IsMuseumManager]
-
-    @extend_schema(request=BookingApprovalSerializer, responses=BookingSerializer)
-    def put(self, request, id):
-        booking = get_object_or_404(Booking, id=id)
-        serializer = BookingApprovalSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        booking = services.decide_group_booking(
-            booking=booking, actor=request.user, **serializer.validated_data
-        )
-        if booking.status == Booking.Status.AWAITING_PAYMENT:
-            # Approved (not declined) -- Document 04: "if approved, the
-            # response includes a checkout URL for the group leader to
-            # pay". See BookingListCreateView.post for why this import is
-            # local to the view layer, not services.py.
-            from apps.payments.services import create_checkout_session
-
-            create_checkout_session(booking=booking)
-        return Response(BookingSerializer(booking).data)
 
 
 class BookingCancelView(APIView):

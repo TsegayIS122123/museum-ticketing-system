@@ -30,8 +30,8 @@ class DateAvailabilityUpdateSerializer(serializers.Serializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     """`Booking` (Document 04). Read-only -- every mutation goes through
-    the Create/Approval/Cancel/Reschedule serializers below and
-    services.py, never through this serializer directly."""
+    the Create/Cancel/Reschedule serializers below and services.py, never
+    through this serializer directly."""
 
     visitorId = serializers.UUIDField(source="visitor_id", read_only=True)
     categoryId = serializers.UUIDField(source="category_id", read_only=True)
@@ -66,9 +66,6 @@ class BookingSerializer(serializers.ModelSerializer):
     bookedQuantity = serializers.IntegerField(source="booked_quantity", read_only=True)
     attendedQuantity = serializers.IntegerField(
         source="attended_quantity", read_only=True, allow_null=True
-    )
-    approvalStatus = serializers.CharField(
-        source="approval_status", read_only=True, allow_null=True
     )
     rescheduledCount = serializers.IntegerField(source="rescheduled_count", read_only=True)
     noticeSentAt = serializers.DateTimeField(source="notice_sent_at", read_only=True, allow_null=True)
@@ -111,7 +108,6 @@ class BookingSerializer(serializers.ModelSerializer):
             "bookedQuantity",
             "attendedQuantity",
             "status",
-            "approvalStatus",
             "rescheduledCount",
             "noticeSentAt",
             "checkoutUrl",
@@ -155,13 +151,6 @@ class BookingCreateSerializer(serializers.Serializer):
             "group_name": self.validated_data.get("groupName") or None,
             "group_contact_phone": self.validated_data.get("groupContactPhone") or None,
         }
-
-
-class BookingApprovalSerializer(serializers.Serializer):
-    """`BookingApprovalRequest` -- Museum Manager only (FR-BOOK-003)."""
-
-    decision = serializers.ChoiceField(choices=["approve", "decline"])
-    note = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 
 class BookingRescheduleSerializer(serializers.Serializer):

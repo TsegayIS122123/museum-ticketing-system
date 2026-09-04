@@ -37,7 +37,7 @@ C4Context
 
     Person(visitor, "Visitor", "Books and pays for a ticket online, or pays cash at the counter")
     Person(cashier, "Cashier", "Verifies headcount at the gate, keys each visitor's transaction into IFMIS herself, and settles her own outstanding balance via a Chapa transfer")
-    Person(manager, "Museum Manager", "Approves group bookings, controls date availability, configures ticket categories/prices, views reporting")
+    Person(manager, "Museum Manager", "Controls date availability, configures ticket categories/prices, views reporting")
     Person(admin, "Platform Admin", "Provisions staff accounts")
 
     System(platform, "Museum Ticketing & Booking Platform", "Digital booking, payment, and settlement track — additive to the existing manual/cash process")
@@ -48,7 +48,7 @@ C4Context
 
     Rel(visitor, platform, "Books, pays, cancels/reschedules, views receipts")
     Rel(cashier, platform, "Confirms attendance, records IFMIS voucher references, requests her own reconciliation transfer")
-    Rel(manager, platform, "Approves group bookings, opens/closes dates, configures categories/prices, views dashboard")
+    Rel(manager, platform, "Opens/closes dates, configures categories/prices, views dashboard")
     Rel(admin, platform, "Manages staff accounts")
 
     Rel(platform, chapa, "Initiates checkout, receives payment confirmation, issues refunds/transfers", "HTTPS API")

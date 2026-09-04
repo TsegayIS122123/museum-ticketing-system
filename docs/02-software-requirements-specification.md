@@ -109,10 +109,12 @@ step; the only difference is that the repeat visitor's history is already there 
   pay online.
 - **FR-BOOK-002**: A Visitor can also walk in unannounced and be processed entirely by the Cashier
   at the counter with cash, exactly as today — untouched by this system.
-- **FR-BOOK-003**: A school/group visit is requested in advance (digitally, in addition to existing
-  phone/letter channels) with a proposed date, time slot, and headcount; Museum Manager approves or
-  declines.
-- **FR-BOOK-004**: An approved/paid booking generates a booking reference the Visitor or group
+- **FR-BOOK-003**: A school/group visit is booked the same way as an individual one (FR-BOOK-001) —
+  same self-serve flow, same instant `awaiting_payment` outcome — with a group name/contact and a
+  headcount instead of a single visitor's details. There is no separate Museum Manager approval
+  step: `DateAvailability` (FR-BOOK-008) is the only capacity control, and it applies identically
+  to individual and group bookings.
+- **FR-BOOK-004**: A paid booking generates a booking reference the Visitor or group
   leader presents at the gate.
 - **FR-BOOK-005**: A Visitor can cancel a paid online booking only while its status is `Pending`
   (§2.4) — once the Cashier has begun processing arrival for that booking, it can no longer be

@@ -39,7 +39,6 @@ export function getStaffRoutes(role: UserRole): string[] {
       '/staff/dashboard',
       '/staff/categories',
       '/staff/availability',
-      '/staff/group-bookings',
       '/staff/refunds',
       '/staff/reports',
     ];

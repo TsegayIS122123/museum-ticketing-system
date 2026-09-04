@@ -153,6 +153,19 @@ async function request<T>(
     }
   }
 
+  // 204 No Content (e.g. DELETE /categories/{id}/ -- backend's
+  // retire_category returns Response(status=204) with no body) has
+  // nothing for response.json() to parse. Treat it as success with no
+  // payload rather than letting the JSON parse fail and get reported as
+  // a bogus "Invalid response from server" -- the request itself
+  // already succeeded by the time we get here.
+  if (response.status === 204) {
+    if (!response.ok) {
+      throw new ApiError({} as ApiErrorPayload);
+    }
+    return undefined as T;
+  }
+
   let data;
   try {
     data = await response.json();

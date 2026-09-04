@@ -15,7 +15,6 @@ app_name = "bookings"
 urlpatterns = [
     path("", views.BookingListCreateView.as_view(), name="booking-list"),
     path("<uuid:id>/", views.BookingDetailView.as_view(), name="booking-detail"),
-    path("<uuid:id>/approval/", views.BookingApprovalView.as_view(), name="booking-approval"),
     path("<uuid:id>/cancel/", views.BookingCancelView.as_view(), name="booking-cancel"),
     path(
         "<uuid:id>/reschedule/",

@@ -138,14 +138,16 @@ def test_create_individual_booking_starts_awaiting_payment():
     )
 
     assert booking.status == Booking.Status.AWAITING_PAYMENT
-    assert booking.approval_status is None
     assert booking.total_amount_etb == Decimal("100.00")
     assert booking.category_name_en == category.name_en
     assert len(booking.reference) == 8
     assert AuditLogEntry.objects.filter(action="booking.created").exists()
 
 
-def test_create_group_booking_starts_pending_approval():
+def test_create_group_booking_starts_awaiting_payment():
+    """A group booking (FR-BOOK-003) has no Museum-Manager approval gate
+    -- DateAvailability (FR-BOOK-008) is the only capacity control, and it
+    applies identically to individual and group bookings alike."""
     visitor = _make_visitor()
     category = _make_category()
 
@@ -158,8 +160,7 @@ def test_create_group_booking_starts_pending_approval():
         group_name="Example Primary School",
     )
 
-    assert booking.status == Booking.Status.PENDING_APPROVAL
-    assert booking.approval_status == Booking.ApprovalStatus.PENDING
+    assert booking.status == Booking.Status.AWAITING_PAYMENT
 
 
 def test_create_group_booking_requires_group_name():
@@ -218,70 +219,6 @@ def test_create_booking_rejected_for_closed_date():
             quantity=1,
             booking_type=Booking.BookingType.INDIVIDUAL,
         )
-
-
-# --------------------------------------------------------------------------
-# decide_group_booking (FR-BOOK-003)
-# --------------------------------------------------------------------------
-
-
-def _make_group_booking(quantity=20):
-    visitor = _make_visitor()
-    category = _make_category()
-    return services.create_booking(
-        visitor=visitor,
-        category_id=category.id,
-        visit_date=TOMORROW,
-        quantity=quantity,
-        booking_type=Booking.BookingType.GROUP,
-        group_name="Example Primary School",
-    )
-
-
-def test_approving_a_group_booking_moves_it_to_awaiting_payment():
-    booking = _make_group_booking()
-    manager = _make_manager()
-
-    booking = services.decide_group_booking(booking=booking, decision="approve", actor=manager)
-
-    assert booking.status == Booking.Status.AWAITING_PAYMENT
-    assert booking.approval_status == Booking.ApprovalStatus.APPROVED
-    assert booking.approved_by_user_id_id == manager.id
-
-
-def test_declining_a_group_booking_cancels_it():
-    booking = _make_group_booking()
-    manager = _make_manager()
-
-    booking = services.decide_group_booking(booking=booking, decision="decline", actor=manager)
-
-    assert booking.status == Booking.Status.CANCELLED
-    assert booking.approval_status == Booking.ApprovalStatus.DECLINED
-
-
-def test_deciding_an_already_decided_booking_conflicts():
-    booking = _make_group_booking()
-    manager = _make_manager()
-    services.decide_group_booking(booking=booking, decision="approve", actor=manager)
-
-    with pytest.raises(Conflict):
-        services.decide_group_booking(booking=booking, decision="approve", actor=manager)
-
-
-def test_deciding_an_individual_booking_conflicts():
-    visitor = _make_visitor()
-    category = _make_category()
-    booking = services.create_booking(
-        visitor=visitor,
-        category_id=category.id,
-        visit_date=TOMORROW,
-        quantity=1,
-        booking_type=Booking.BookingType.INDIVIDUAL,
-    )
-    manager = _make_manager()
-
-    with pytest.raises(Conflict):
-        services.decide_group_booking(booking=booking, decision="approve", actor=manager)
 
 
 # --------------------------------------------------------------------------

@@ -20,8 +20,6 @@ booking flow -- see Document 08 Sec 5.2 alerting rationale.
   - "reschedule_confirmed": {"booking_id", "reference", "new_visit_date"} (TBD --
     no caller yet; apps.notifications.services degrades gracefully if a key
     is missing)
-  - "group_booking_decided": {"booking_id", "reference", "decision"} (TBD --
-    same note as above)
 """
 
 import logging

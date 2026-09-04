@@ -113,13 +113,12 @@ def test_dashboard_is_all_zero_with_no_bookings():
     }
 
 
-def test_dashboard_excludes_awaiting_payment_and_pending_approval_bookings():
-    """AwaitingPayment/PendingApproval bookings never completed checkout
-    or approval -- see services.py module docstring on why they're
-    excluded from every dashboard figure."""
+def test_dashboard_excludes_awaiting_payment_bookings():
+    """AwaitingPayment bookings never completed checkout -- see
+    services.py module docstring on why they're excluded from every
+    dashboard figure."""
     category = _make_category()
     _make_booking(category=category, status=Booking.Status.AWAITING_PAYMENT)
-    _make_booking(category=category, status=Booking.Status.PENDING_APPROVAL)
 
     dashboard = services.get_dashboard()
     assert dashboard["revenue_total_etb"] == Decimal("0")

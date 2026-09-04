@@ -90,7 +90,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
 
     setIsSubmitting(true);
     try {
-      await submitGroupBooking({
+      const booking = await submitGroupBooking({
         categoryId: formData.categoryId,
         visitDate: formData.visitDate,
         quantity: formData.quantity,
@@ -98,7 +98,9 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
         groupContactPhone: formData.groupContactPhone || null,
       });
       setToast({
-        message: t('group_request_submitted') || 'Group visit request submitted successfully! You will be notified once approved.',
+        message:
+          t('booking_created') ||
+          'Booking created successfully! Reference: ' + booking.reference,
         type: 'success',
       });
 
@@ -249,8 +251,8 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
           <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-3 text-sm text-secondary-700">
             <span className="font-semibold">📌 {t('group_booking_note') || 'Important Information'}</span>
             <ul className="mt-1 list-disc list-inside space-y-0.5 text-xs">
-              <li>{t('group_booking_note_1') || 'Group bookings require Manager approval before payment'}</li>
-              <li>{t('group_booking_note_2') || 'You will be notified once your request is reviewed'}</li>
+              <li>{t('group_booking_note_1') || 'You will pay for the whole group in one transaction.'}</li>
+              <li>{t('group_booking_note_2') || 'Bring your booking reference to the gate for the group.'}</li>
             </ul>
           </div>
         </div>

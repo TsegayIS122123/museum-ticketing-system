@@ -128,10 +128,15 @@ def create_booking(
 ):
     """Implements FR-BOOK-001 (individual) and FR-BOOK-003 (group).
 
-    An individual booking starts `awaiting_payment`, ready for
-    `apps.payments` to create a Chapa checkout session against it. A
-    group booking starts `pending_approval` instead -- FR-BOOK-003: the
-    Museum Manager decides before any payment is initiated.
+    A group booking is otherwise identical to an individual one -- it
+    starts `awaiting_payment` just the same, ready for `apps.payments` to
+    create a Chapa checkout session against it. There is no Museum
+    Manager approval step: `DateAvailability` (FR-BOOK-008) is the only
+    capacity control, and it already governs every booking, individual or
+    group, by rejecting the request outright when the date is closed.
+    `group_name`/`group_contact_phone` are retained purely as manifest
+    metadata for the Cashier at the gate (FR-BOOK-003), not as a workflow
+    gate.
     """
     if not visitor.email_verified_at or not visitor.phone_verified_at:
         # FR-ACC-003: both must be verified before an online booking can
@@ -168,8 +173,7 @@ def create_booking(
         group_contact_phone=group_contact_phone,
         booked_quantity=quantity,
         total_amount_etb=category.price_etb * quantity,
-        status=Booking.Status.PENDING_APPROVAL if is_group else Booking.Status.AWAITING_PAYMENT,
-        approval_status=Booking.ApprovalStatus.PENDING if is_group else None,
+        status=Booking.Status.AWAITING_PAYMENT,
     )
 
     write_audit_log(
@@ -178,48 +182,6 @@ def create_booking(
         target_type="booking",
         target_id=booking.id,
         metadata={"booking_type": booking_type, "visit_date": visit_date.isoformat()},
-    )
-    return booking
-
-
-# --------------------------------------------------------------------------
-# Group approval (FR-BOOK-003)
-# --------------------------------------------------------------------------
-
-
-def decide_group_booking(*, booking, decision, actor, note=None):
-    """Implements the Museum-Manager-only `PUT /bookings/{id}/approval`.
-    Approving moves the booking to `awaiting_payment` so the group leader
-    can pay (`apps.payments` picks it up from there, Document 04's "if
-    approved, the response includes a checkout URL"); declining is
-    terminal -- there is no `declined` value in `Booking.Status`
-    (Document 05 Sec 3.3), so a declined booking is simply `cancelled`,
-    with `approvalStatus=declined` carrying the distinction."""
-    if (
-        booking.booking_type != Booking.BookingType.GROUP
-        or booking.status != Booking.Status.PENDING_APPROVAL
-    ):
-        raise Conflict("This booking is not awaiting a group-approval decision.")
-
-    if decision == "approve":
-        booking.approval_status = Booking.ApprovalStatus.APPROVED
-        booking.status = Booking.Status.AWAITING_PAYMENT
-    elif decision == "decline":
-        booking.approval_status = Booking.ApprovalStatus.DECLINED
-        booking.status = Booking.Status.CANCELLED
-    else:
-        raise ValidationError({"decision": "Must be 'approve' or 'decline'."})
-
-    booking.approved_by_user_id = actor
-    booking.approved_at = timezone.now()
-    booking.save()
-
-    write_audit_log(
-        actor_id=actor.id,
-        action="booking.approval_decided",
-        target_type="booking",
-        target_id=booking.id,
-        metadata={"decision": decision, "note": note},
     )
     return booking
 

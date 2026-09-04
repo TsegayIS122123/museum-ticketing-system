@@ -240,7 +240,6 @@ export function AttendanceEntryForm({
             {booking.status === 'cancelled' && (t('booking_cancelled') || 'Booking has been cancelled')}
             {booking.status === 'refunded' && (t('booking_refunded') || 'Booking has been refunded')}
             {booking.status === 'awaiting_payment' && (t('payment_pending') || 'Payment is still pending')}
-            {booking.status === 'pending_approval' && (t('awaiting_approval') || 'Awaiting group approval')}
           </div>
           <Button
             variant="secondary"

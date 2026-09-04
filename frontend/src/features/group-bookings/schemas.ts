@@ -21,11 +21,3 @@ export const groupVisitRequestSchema = z.object({
 });
 
 export type GroupVisitRequestInput = z.infer<typeof groupVisitRequestSchema>;
-
-export const groupBookingApprovalSchema = z.object({
-  bookingId: z.string().uuid(),
-  decision: z.enum(['approve', 'decline']),
-  note: z.string().optional(),
-});
-
-export type GroupBookingApprovalInput = z.infer<typeof groupBookingApprovalSchema>;

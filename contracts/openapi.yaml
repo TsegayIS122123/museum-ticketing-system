@@ -480,40 +480,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Booking'
           description: ''
-  /api/v1/bookings/{id}/approval/:
-    put:
-      operationId: v1_bookings_approval_update
-      description: PUT /bookings/{id}/approval -- Museum Manager only (FR-BOOK-003).
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BookingApproval'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BookingApproval'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BookingApproval'
-        required: true
-      security:
-      - TokenVersionAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-          description: ''
   /api/v1/bookings/{id}/cancel/:
     post:
       operationId: v1_bookings_cancel_create
@@ -1207,8 +1173,8 @@ components:
       type: object
       description: |-
         `Booking` (Document 04). Read-only -- every mutation goes through
-        the Create/Approval/Cancel/Reschedule serializers below and
-        services.py, never through this serializer directly.
+        the Create/Cancel/Reschedule serializers below and services.py, never
+        through this serializer directly.
       properties:
         id:
           type: string
@@ -1267,10 +1233,6 @@ components:
           allOf:
           - $ref: '#/components/schemas/BookingStatusEnum'
           readOnly: true
-        approvalStatus:
-          type: string
-          readOnly: true
-          nullable: true
         rescheduledCount:
           type: integer
           readOnly: true
@@ -1306,7 +1268,6 @@ components:
           format: date-time
           readOnly: true
       required:
-      - approvalStatus
       - attendedQuantity
       - bookedQuantity
       - bookingType
@@ -1331,17 +1292,6 @@ components:
       - visitorId
       - visitorName
       - visitorPhone
-    BookingApproval:
-      type: object
-      description: '`BookingApprovalRequest` -- Museum Manager only (FR-BOOK-003).'
-      properties:
-        decision:
-          $ref: '#/components/schemas/DecisionEnum'
-        note:
-          type: string
-          nullable: true
-      required:
-      - decision
     BookingCreate:
       type: object
       description: |-
@@ -1386,7 +1336,6 @@ components:
     BookingStatusEnum:
       enum:
       - awaiting_payment
-      - pending_approval
       - pending
       - visited
       - cancelled
@@ -1394,7 +1343,6 @@ components:
       type: string
       description: |-
         * `awaiting_payment` - Awaiting payment
-        * `pending_approval` - Pending approval
         * `pending` - Pending
         * `visited` - Visited
         * `cancelled` - Cancelled
@@ -1693,10 +1641,6 @@ components:
           allOf:
           - $ref: '#/components/schemas/BookingStatusEnum'
           readOnly: true
-        approvalStatus:
-          type: string
-          readOnly: true
-          nullable: true
         rescheduledCount:
           type: integer
           readOnly: true
@@ -1748,7 +1692,6 @@ components:
       required:
       - amountFigures
       - amountWords
-      - approvalStatus
       - attendedQuantity
       - bookedQuantity
       - bookingType
@@ -1828,14 +1771,6 @@ components:
           type: boolean
       required:
       - isOpenForBooking
-    DecisionEnum:
-      enum:
-      - approve
-      - decline
-      type: string
-      description: |-
-        * `approve` - approve
-        * `decline` - decline
     DetailResponse:
       type: object
       properties:

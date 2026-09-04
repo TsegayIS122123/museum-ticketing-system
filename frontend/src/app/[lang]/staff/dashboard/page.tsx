@@ -10,7 +10,6 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { useRouter } from 'next/navigation';
 import { getDashboard, getReportSummary, type DashboardResponse } from '@/features/reports/api';
 import type { ReportSummary } from '@/lib/api-contract';
-import { getGroupBookings } from '@/features/group-bookings/api';
 
 export default function StaffDashboardPage() {
   const { t, locale } = useTranslation();
@@ -27,7 +26,6 @@ export default function StaffDashboardPage() {
   // a role the backend will actually authorize.
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [todaySummary, setTodaySummary] = useState<ReportSummary | null>(null);
-  const [pendingGroupRequests, setPendingGroupRequests] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(isManager || isAdmin);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,13 +38,11 @@ export default function StaffDashboardPage() {
     Promise.all([
       getDashboard(),
       getReportSummary('daily'),
-      getGroupBookings({ status: 'pending_approval', limit: 1 }),
     ])
-      .then(([dashboardRes, summaryRes, groupRes]) => {
+      .then(([dashboardRes, summaryRes]) => {
         if (cancelled) return;
         setDashboard(dashboardRes);
         setTodaySummary(summaryRes);
-        setPendingGroupRequests(groupRes.meta.total);
       })
       .catch((err: any) => {
         if (!cancelled) setError(err.message || 'Failed to load dashboard data');
@@ -124,12 +120,6 @@ export default function StaffDashboardPage() {
                 sub={totalBookings > 0 ? `${checkedInPct}% of all bookings` : 'No bookings yet'}
                 color="blue"
               />
-              <StatCard
-                label="Pending Requests"
-                value={pendingGroupRequests ?? 0}
-                sub="Group bookings"
-                color="red"
-              />
             </div>
           )}
         </>
@@ -141,13 +131,6 @@ export default function StaffDashboardPage() {
           <div className="space-y-3">
             {isManager ? (
               <>
-                <Button
-                  className="w-full justify-start"
-                  variant="secondary"
-                  onClick={() => router.push(`/${locale}/staff/group-bookings`)}
-                >
-                  👥 Manage Group Bookings
-                </Button>
                 <Button
                   className="w-full justify-start"
                   variant="secondary"

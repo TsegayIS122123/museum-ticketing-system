@@ -87,7 +87,6 @@ NOTIFICATION_CHANNELS = {
         NotificationDelivery.Channel.EMAIL,
         NotificationDelivery.Channel.SMS,
     ],
-    NotificationType.GROUP_BOOKING_DECIDED: [NotificationDelivery.Channel.EMAIL],
 }
 
 # A notification_type not yet wired above (e.g. a future module) still
@@ -221,18 +220,6 @@ def _reschedule_confirmed_content(context):
     }
 
 
-def _group_booking_decided_content(context):
-    reference = context.get("reference", context.get("booking_id", ""))
-    decision = context.get("decision", "")
-    return {
-        "subject": {"en": "Group booking update", "am": "የቡድን ቦታ ማስያዝ ዝማኔ"},
-        "body": {
-            "en": f"Your group booking {reference} was {decision}.",
-            "am": f"የቡድን ቦታ ማስያዝዎ {reference} {decision} ነው።",
-        },
-    }
-
-
 def _fallback_content(notification_type, context):
     return {
         "subject": {"en": "Museum Ticketing notification", "am": "የቲኬት ማሳወቂያ"},
@@ -251,7 +238,6 @@ _CONTENT_BUILDERS = {
     NotificationType.NO_SHOW_NOTICE: _no_show_notice_content,
     NotificationType.REFUND_CONFIRMED: _refund_confirmed_content,
     NotificationType.RESCHEDULE_CONFIRMED: _reschedule_confirmed_content,
-    NotificationType.GROUP_BOOKING_DECIDED: _group_booking_decided_content,
 }
 
 

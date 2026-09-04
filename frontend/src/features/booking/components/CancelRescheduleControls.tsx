@@ -13,7 +13,7 @@ interface CancelRescheduleControlsProps {
   bookingId: string;
   rescheduledCount: number;
   currentVisitDate: string;
-  status: 'awaiting_payment' | 'pending_approval' | 'pending' | 'visited' | 'cancelled' | 'refunded';
+  status: 'awaiting_payment' | 'pending' | 'visited' | 'cancelled' | 'refunded';
   onActionComplete?: () => void;
 }
 
@@ -108,7 +108,6 @@ export function CancelRescheduleControls({
         {status === 'cancelled' && (t('already_cancelled') || 'This booking has been cancelled.')}
         {status === 'refunded' && (t('already_refunded') || 'This booking has been refunded.')}
         {status === 'awaiting_payment' && (t('awaiting_payment_message') || 'Payment is still pending.')}
-        {status === 'pending_approval' && (t('pending_approval_message') || 'Waiting for group approval.')}
         {rescheduledCount >= 1 && (t('max_reschedule_reached') || 'This booking has already been rescheduled once.')}
       </div>
     );

@@ -18,36 +18,34 @@
 import type { components } from './api-types';
 
 // ---------------------------------------------------------------------
-// Booking.bookingType / Booking.approvalStatus
+// Booking.bookingType
 //
-// apps/bookings/serializers.py's BookingSerializer declares both as
+// apps/bookings/serializers.py's BookingSerializer declares this as a
 // plain `serializers.CharField(read_only=True)`, not `ChoiceField`, so
 // drf-spectacular has no way to see the model's real `choices` and the
-// generated schema types both as bare `string`. The underlying model
-// (apps/bookings/models.py) has real TextChoices enums though:
-//   BookingType:      individual | group
-//   ApprovalStatus:   pending | approved | declined
-// `pending` is genuinely reachable -- apps/bookings/services.py line 172
-// sets `approval_status=Booking.ApprovalStatus.PENDING if is_group else
-// None` on every new group booking. There's no generated
-// `ApprovalStatusEnum` to import (spectacular never saw the choices), so
-// the literal union here is hand-written -- but everything else about
+// generated schema types it as bare `string`. The underlying model
+// (apps/bookings/models.py) has a real TextChoices enum though:
+//   BookingType: individual | group
+// so the literal union here is hand-written -- but everything else about
 // `Booking` still comes from the generated schema, so any other field
 // changing is still a compile error.
+//
+// There is no `approvalStatus` any more: the group-approval workflow
+// (FR-BOOK-003) was removed everywhere, backend included, so a group
+// booking has nothing left to distinguish it from an individual one
+// beyond `bookingType`/`groupName`/`groupContactPhone` -- confirmed by
+// diffing contracts/openapi.yaml before/after that removal.
 // ---------------------------------------------------------------------
 export type BookingTypeValue = components['schemas']['BookingTypeEnum'];
-export type ApprovalStatusValue = 'pending' | 'approved' | 'declined';
 
-type TightenBooking<T> = Omit<T, 'bookingType' | 'approvalStatus'> & {
+type TightenBooking<T> = Omit<T, 'bookingType'> & {
   readonly bookingType: BookingTypeValue;
-  readonly approvalStatus: ApprovalStatusValue | null;
 };
 
 export type Booking = TightenBooking<components['schemas']['Booking']>;
 
 // CheckInResponse (POST /bookings/{id}/check-in) is Booking's fields plus
-// four IFMIS voucher-prep fields -- same bookingType/approvalStatus
-// looseness, same fix.
+// four IFMIS voucher-prep fields -- same bookingType looseness, same fix.
 export type CheckInResponse = TightenBooking<components['schemas']['CheckInResponse']>;
 
 // PaginatedBookingList.data still points at the raw (loose) generated

@@ -158,7 +158,6 @@ def test_check_in_rejects_negative_attendance():
     "status",
     [
         Booking.Status.AWAITING_PAYMENT,
-        Booking.Status.PENDING_APPROVAL,
         Booking.Status.VISITED,
         Booking.Status.CANCELLED,
         Booking.Status.REFUNDED,

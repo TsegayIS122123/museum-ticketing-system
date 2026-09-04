@@ -103,16 +103,10 @@ class Booking(TimeStampedModel):
 
     class Status(models.TextChoices):
         AWAITING_PAYMENT = "awaiting_payment", "Awaiting payment"
-        PENDING_APPROVAL = "pending_approval", "Pending approval"
         PENDING = "pending", "Pending"
         VISITED = "visited", "Visited"
         CANCELLED = "cancelled", "Cancelled"
         REFUNDED = "refunded", "Refunded"
-
-    class ApprovalStatus(models.TextChoices):
-        PENDING = "pending", "Pending"
-        APPROVED = "approved", "Approved"
-        DECLINED = "declined", "Declined"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -154,17 +148,6 @@ class Booking(TimeStampedModel):
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.AWAITING_PAYMENT
     )
-    approval_status = models.CharField(
-        max_length=10, choices=ApprovalStatus.choices, null=True, blank=True
-    )
-    approved_by_user_id = models.ForeignKey(
-        "accounts.Account",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-    )
-    approved_at = models.DateTimeField(null=True, blank=True)
 
     rescheduled_count = models.PositiveSmallIntegerField(default=0)
     notice_sent_at = models.DateTimeField(null=True, blank=True)
@@ -230,15 +213,6 @@ class Booking(TimeStampedModel):
                     | models.Q(group_name__isnull=False)
                 ),
                 name="booking_group_requires_group_name",
-            ),
-            models.CheckConstraint(
-                # approvalStatus (Document 04) is present only for group
-                # bookings -- an individual booking never has one.
-                condition=(
-                    models.Q(booking_type="group")
-                    | models.Q(approval_status__isnull=True)
-                ),
-                name="booking_approval_status_only_for_group",
             ),
             models.CheckConstraint(
                 # FR-BOOK-007's "at most once" cap, enforced as a database

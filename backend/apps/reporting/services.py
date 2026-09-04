@@ -14,11 +14,10 @@ Shared vocabulary used by both functions below:
 
 - "Reportable" bookings (`_reportable_bookings_queryset`) are those whose
   status is one of the four FR-REPORT-001 calls out by name -- Pending,
-  Visited, Cancelled, Refunded. `AwaitingPayment` and `PendingApproval`
-  are deliberately excluded: those are pre-checkout/pre-approval states a
-  booking may never emerge from (an abandoned checkout, a declined group
-  request), so they were never a completed "digital booking" for
-  reporting purposes -- counting them would overstate both revenue
+  Visited, Cancelled, Refunded. `AwaitingPayment` is deliberately
+  excluded: that's a pre-checkout state a booking may never emerge from
+  (an abandoned checkout), so it was never a completed "digital booking"
+  for reporting purposes -- counting it would overstate both revenue
   potential and visitor interest.
 - "Revenue" is net money actually collected: completed `Payment` amounts
   minus completed `Refund` amounts (`Refund.amount_etb` is already the
@@ -62,7 +61,7 @@ _INDIVIDUAL_GROUP_KEY = "Individual"
 def _reportable_bookings_queryset():
     """Every booking FR-REPORT-001/002 count towards revenue, visitor
     counts, or the status mix -- see module docstring for why
-    AwaitingPayment/PendingApproval bookings are excluded."""
+    AwaitingPayment bookings are excluded."""
     return Booking.objects.filter(status__in=_REPORTABLE_STATUSES)
 
 

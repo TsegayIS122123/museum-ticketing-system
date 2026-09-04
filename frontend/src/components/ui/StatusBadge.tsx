@@ -4,20 +4,17 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export type BookingStatus = 
   | 'awaiting_payment'
-  | 'pending_approval'
   | 'pending'
   | 'visited'
   | 'cancelled'
-  | 'refunded';
+  | 'refunded'
+  | 'active'
+  | 'inactive';
 
 const statusConfig: Record<BookingStatus, { color: string; labelKey: string }> = {
   awaiting_payment: { 
     color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
     labelKey: 'awaiting_payment' 
-  },
-  pending_approval: { 
-    color: 'bg-purple-100 text-purple-800 border-purple-200', 
-    labelKey: 'pending_approval' 
   },
   pending: { 
     color: 'bg-blue-100 text-blue-800 border-blue-200', 
@@ -34,6 +31,17 @@ const statusConfig: Record<BookingStatus, { color: string; labelKey: string }> =
   refunded: { 
     color: 'bg-red-100 text-red-800 border-red-200', 
     labelKey: 'refunded' 
+  },
+  // Category active/inactive -- distinct from the booking-lifecycle
+  // statuses above (a category is never "pending" or "cancelled", it's
+  // just on or off for booking).
+  active: {
+    color: 'bg-green-100 text-green-800 border-green-200',
+    labelKey: 'active',
+  },
+  inactive: {
+    color: 'bg-gray-100 text-gray-800 border-gray-200',
+    labelKey: 'inactive',
   },
 };
 

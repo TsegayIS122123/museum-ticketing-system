@@ -53,7 +53,7 @@ Colors are specified as semantic roles, not literal hex values, since final bran
 
 | Role token | Usage |
 |---|---|
-| `color-primary` | Primary actions (Book, Pay, Approve, Initiate Transfer), active nav state. |
+| `color-primary` | Primary actions (Book, Pay, Initiate Transfer), active nav state. |
 | `color-surface` / `color-surface-alt` | Page and card backgrounds — the light/elevated distinction used across the Visitor site and Staff dashboard. |
 | `color-text` / `color-text-muted` | Body text and secondary/meta text (booking reference, timestamps). |
 | `color-success` / `color-warning` / `color-danger` | `StatusBadge` colors for the booking lifecycle (`Pending` amber, `Visited` green, `Cancelled`/`Refunded` neutral/red) and form validation states. |
@@ -100,7 +100,7 @@ There is no context switcher in this UI (Section 1.3) — the sidebar/menu a use
 |---|---|
 | My Bookings, Book a Visit, Request a Group Visit | `Visitor` |
 | Gate Check-In, Settlement | `Cashier` |
-| Group Booking Approvals, Date Availability, Ticket Categories, Dashboard, Reports | `Museum Manager` |
+| Date Availability, Ticket Categories, Dashboard, Reports | `Museum Manager` |
 | Staff Accounts | `Platform Admin` |
 | Account Settings, Language | All authenticated roles |
 
@@ -155,12 +155,13 @@ Mobile app mirrors Verify and Account Settings as native screens for the Visitor
 
 Mobile app mirrors Book a visit, Booking detail, and My bookings as native screens (ADR-006) — the same API, per [Document 03, Section 2.2](03-software-design-specification.md#22-level-2--container-diagram).
 
-### 5.4 Group Booking Approval (Museum Manager)
+### 5.4 (Removed) Group Booking Approval
 
-| Screen | Route | Rendering | Role(s) | FR IDs exposed |
-|---|---|---|---|---|
-| Group booking approval queue | `/staff/group-bookings` | CSR | Museum Manager | FR-BOOK-003 |
-| Group booking detail (approve/decline) | `/staff/group-bookings/{id}` | CSR | Museum Manager | FR-BOOK-003 |
+There is no Museum-Manager approval step for a group booking — see FR-BOOK-003 and Document 05's
+`booking.status` note. A group visit is booked through the same `/group-visits/new` screen (Section
+5.3) as before, with `date_availability` (FR-BOOK-008) as its only capacity control; this section
+number is left in place, unused, rather than renumbering every section after it and the several
+cross-references to them elsewhere in this document and in Documents 03/05.
 
 ### 5.5 Entrance / Gate Check-In (Cashier)
 
@@ -242,19 +243,20 @@ flowchart TD
 
 *UI note:* the reschedule cap in E is a hard `rescheduled_count <= 1` database constraint (Document 05 §3.3), not just a UI affordance — the button is disabled with the explanation shown, rather than left enabled to fail with a raw error, directly satisfying FR-BOOK-007's intent at the UI layer.
 
-### 6.3 Group/school visit: request → approval → payment → check-in
+### 6.3 Group/school visit: request → payment → check-in
 
 ```mermaid
 flowchart TD
-    A["Request a Group/School Visit\n/group-visits/new\n(FR-BOOK-003)"] --> B["Booking created:\nstatus = Pending Approval"]
-    B --> C["Museum Manager reviews\n/staff/group-bookings"]
-    C -->|Decline| D["Declined — reason shown to group leader"]
-    C -->|Approve| E["Checkout URL generated —\ngroup leader notified to pay\n(FR-PAY-001)"]
+    A["Request a Group/School Visit\n/group-visits/new\n(FR-BOOK-003)"] --> E["Checkout URL generated —\ngroup leader pays\n(FR-PAY-001)"]
     E --> F["Payment confirmed → Pending\n(same lifecycle as an individual booking from here)"]
     F --> G["Gate check-in\n(FR-TICKET-001, actual headcount billed —\nmay be less than requested, FR-TICKET-002)"]
 ```
 
-*UI note:* a group booking's headcount shown at check-in (G) is always the number actually confirmed at the gate, which may differ from what was requested at step A — the UI never presents the originally requested count as final once check-in has occurred.
+*UI note:* a group booking follows the exact same flow as an individual one from creation onward —
+there is no Museum-Manager review step in between (see Section 5.4). A group booking's headcount
+shown at check-in (G) is always the number actually confirmed at the gate, which may differ from
+what was requested at step A — the UI never presents the originally requested count as final once
+check-in has occurred.
 
 ### 6.4 Cashier: gate check-in and headcount reconciliation
 
@@ -296,7 +298,7 @@ Mirrors the frontend module boundaries fixed in [Document 03, Section 7.3](03-so
 | `features/account` | Visitor passwordless verification, Staff password login/reset, settings | VisitorVerifyForm (email+phone, then OTP), StaffLoginForm, StaffForgotPasswordForm, LanguagePreferenceToggle |
 | `features/catalog` | Category browsing and Museum Manager category management | CategoryCard, CategoryEditor |
 | `features/booking` | Visitor booking flow and booking detail | DateCategoryPicker, BookingSummary, BookingDetailCard, CancelRescheduleControls |
-| `features/group-bookings` | Group/school request and approval | GroupVisitRequestForm, ApprovalQueueTable, ApprovalDecisionPanel |
+| `features/group-bookings` | Group/school request | GroupVisitRequestForm |
 | `features/entrance` | Cashier gate console | ReferenceLookupField, AttendanceEntryForm |
 | `features/refunds` | Refund request and staff visibility | RefundRequestButton, RefundHistoryTable |
 | `features/settlement` | Cashier settlement flow | PendingSettlementTable, TransferConfirmationCard, TransferReceiptViewer |
@@ -352,7 +354,7 @@ Document 02 does not enumerate dedicated accessibility (`NFR-ACC-*`) or usabilit
 | FR-ACC-007 | Section 5.8 (Reporting) — activity is attributable to a verified email/phone for every Visitor, one-time or repeat, since there is a single verification flow (Section 5.1) rather than a separate guest/account choice |
 | FR-CAT-001 – FR-CAT-003 | Section 5.2 |
 | FR-BOOK-001 – FR-BOOK-002 | Section 5.3, Flow 6.1 |
-| FR-BOOK-003 | Section 5.3, Section 5.4, Flow 6.3 |
+| FR-BOOK-003 | Section 5.3, Flow 6.3 |
 | FR-BOOK-004 | Flow 6.1 |
 | FR-BOOK-005 – FR-BOOK-007 | Section 5.3, Flow 6.2 |
 | FR-BOOK-008 | Section 5.2, Flow 6.1 |

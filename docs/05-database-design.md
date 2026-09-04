@@ -38,7 +38,6 @@ This document covers the relational schema for PostgreSQL (the system of record 
 ```mermaid
 erDiagram
     ACCOUNT ||--o{ BOOKING : "books (visitor_id)"
-    ACCOUNT ||--o{ BOOKING : "approves (approved_by_user_id)"
     ACCOUNT ||--o{ BOOKING : "checks in (checked_in_by_user_id)"
     ACCOUNT ||--o{ REFUND : requests
     ACCOUNT ||--o{ CASHIER_RECONCILIATION : "is the cashier for"
@@ -97,7 +96,7 @@ flow — none of this is optional metadata, it is what FR-ACC-001/003/004/006 ar
 | `email_verification_expires_at` | TIMESTAMPTZ | `NULLABLE` | Expiry for the above, mirroring the OTP's short lifetime. |
 | `password_reset_token_hash` | TEXT | `NULLABLE` | Staff-only (FR-ACC-006). Hash of an outstanding password-reset token; always `NULL` for a Visitor account, since Visitors never have a password to reset. |
 | `password_reset_expires_at` | TIMESTAMPTZ | `NULLABLE` | Expiry for the above. |
-| `active` | BOOLEAN | `NOT NULL DEFAULT true` | Deactivating a staff account (`DELETE /admin/staff/{id}`) sets this to `false`; the row is never removed, since it may already be `approved_by_user_id` or `checked_in_by_user_id` on historical bookings. |
+| `active` | BOOLEAN | `NOT NULL DEFAULT true` | Deactivating a staff account (`DELETE /admin/staff/{id}`) sets this to `false`; the row is never removed, since it may already be `checked_in_by_user_id` on historical bookings. |
 | `token_version` | INTEGER | `NOT NULL DEFAULT 0` | Incremented to invalidate all outstanding access tokens for this account without waiting for their 15-minute expiry (ADR-002). |
 | `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
 
@@ -151,15 +150,12 @@ Implements FR-BOOK-001 – FR-BOOK-008 and the lifecycle mechanics of FR-PAY-002
 | `booked_quantity` | INTEGER | `NOT NULL, CHECK (booked_quantity >= 1)` | |
 | `attended_quantity` | INTEGER | `CHECK (attended_quantity IS NULL OR (attended_quantity >= 0 AND attended_quantity <= booked_quantity))` | Set once, by the Cashier, at check-in. The upper-bound half of this constraint is FR-TICKET-005 ("extra visitors are not admitted under the original booking") enforced at the database level, not just in `services.py`. |
 | `total_amount_etb` | NUMERIC(12,2) | `NOT NULL` | `booked_quantity × unit_price_etb`, computed and fixed at creation. |
-| `status` | TEXT | `CHECK (status IN ('awaiting_payment','pending_approval','pending','visited','cancelled','refunded')) NOT NULL DEFAULT 'awaiting_payment'` | `pending_approval` exists only for a group booking awaiting the Museum Manager's decision (FR-BOOK-003); an individual booking never visits that state. |
-| `approval_status` | TEXT | `CHECK (approval_status IN ('pending','approved','declined')), CHECK (booking_type = 'group' OR approval_status IS NULL)` | Present only for group bookings, matching the API contract (Document 04, `Booking.approvalStatus`). |
-| `approved_by_user_id` | UUID | `FK → account.id` | The Museum Manager who decided (FR-BOOK-003). |
-| `approved_at` | TIMESTAMPTZ | | |
+| `status` | TEXT | `CHECK (status IN ('awaiting_payment','pending','visited','cancelled','refunded')) NOT NULL DEFAULT 'awaiting_payment'` | A group booking starts `awaiting_payment` exactly like an individual one -- there is no Museum-Manager approval state; `date_availability` (FR-BOOK-008) is the only capacity control, and it applies identically to both. |
 | `rescheduled_count` | INTEGER | `NOT NULL DEFAULT 0, CHECK (rescheduled_count <= 1)` | FR-BOOK-007's "at most once" cap enforced as a database invariant, not only a service-layer check — a second reschedule attempt cannot succeed even if a bug bypasses `services.py`. |
 | `notice_sent_at` | TIMESTAMPTZ | | Set the day the visit date has passed while still `Pending` (FR-PAY-005, step 1). |
 | `checked_in_at` | TIMESTAMPTZ | | FR-TICKET-001. |
 | `checked_in_by_user_id` | UUID | `FK → account.id` | The Cashier who recorded attendance (NFR-AUDIT-001). |
-| `chapa_checkout_url` | TEXT | | Present only while `awaiting_payment`, or immediately after a group booking's approval; cleared once payment is confirmed. |
+| `chapa_checkout_url` | TEXT | | Present only while `awaiting_payment`; cleared once payment is confirmed. |
 | `receipt_url` | TEXT | | Pointer into object storage (`receipts/temporary/{booking_id}.pdf`, Document 03 §6.3). Populated once, at payment confirmation, and never regenerated (ADR-009). |
 | `ifmis_voucher_reference` | TEXT | `NULLABLE` | The real Document No/Ref No the Cashier gets back from IFMIS after keying this check-in's transaction into IFMIS herself. Not known at the instant check-in happens — she reports it back separately (`PATCH /bookings/{id}/ifmis-voucher`, `apps.entrance`); the platform never generates or calls IFMIS for this value (FR-GOV-001). |
 | `reconciliation_id` | UUID | `FK → cashier_reconciliation.id ON DELETE RESTRICT` | Set once, only when this booking's amount has been included in a *completed* per-cashier reconciliation (Section 3.6) — never at the moment a reconciliation is merely initiated. `RESTRICT` (not `SET NULL`/`CASCADE`): a reconciliation with bookings attributed to it must never be deleted out from under them. |

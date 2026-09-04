@@ -117,9 +117,9 @@ export default function AvailabilityPage() {
   const getStatusBadge = (status: AvailabilityStatus) => {
     switch (status) {
       case 'available':
-        return <StatusBadge status="pending" />;
+        return <StatusBadge status="active" />;
       case 'closed':
-        return <StatusBadge status="cancelled" />;
+        return <StatusBadge status="inactive" />;
     }
   };
 

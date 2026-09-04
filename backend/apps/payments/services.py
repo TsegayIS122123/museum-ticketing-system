@@ -11,12 +11,12 @@ that one function instead of the network.
 Two entry points, matching Document 03 Sec 4.2's sequence diagram:
 
 - `create_checkout_session` -- called by `apps.bookings`' view layer right
-  after an individual booking is created, or right after a group booking
-  is approved (both leave the booking `awaiting_payment` with no
-  `chapa_checkout_url` set -- see bookings/services.py's own docstring).
-  This keeps `payments` depending on `bookings`, never the reverse
-  (Design Spec Sec 3.2): nothing in `bookings` imports this module: its
-  *view* layer composes both apps' services.
+  after any booking (individual or group, FR-BOOK-001/003 alike) is
+  created, leaving it `awaiting_payment` with no `chapa_checkout_url` set
+  yet (see bookings/services.py's own docstring). This keeps `payments`
+  depending on `bookings`, never the reverse (Design Spec Sec 3.2):
+  nothing in `bookings` imports this module: its *view* layer composes
+  both apps' services.
 
 - `confirm_payment_from_webhook` -- the only path that confirms a booking
   (FR-PAY-002); the client-side `return_url` redirect is never trusted on
@@ -136,15 +136,14 @@ def _initialize_chapa_checkout(*, tx_ref, booking):
 @transaction.atomic
 def create_checkout_session(*, booking):
     """Implements FR-PAY-001 and Document 04's "response includes a
-    checkout URL" on `POST /bookings` (individual) and
-    `PUT /bookings/{id}/approval` (group, once approved).
+    checkout URL" on `POST /bookings` (individual or group alike).
 
     Idempotency guard: if this booking already has an open (`initiated`)
     payment with a `checkout_url`, that session is reused instead of
-    opening a second one with Chapa -- covers a retried request or the
-    approval endpoint being called twice, in the same spirit as
-    NFR-IDEMPOTENT-001 even though FR-PAY-004's own DB-level guarantee
-    (`tx_ref` UNIQUE) is specifically about the *webhook* side.
+    opening a second one with Chapa -- covers a retried request, in the
+    same spirit as NFR-IDEMPOTENT-001 even though FR-PAY-004's own
+    DB-level guarantee (`tx_ref` UNIQUE) is specifically about the
+    *webhook* side.
     """
     if booking.status != Booking.Status.AWAITING_PAYMENT:
         raise Conflict("This booking is not awaiting payment.")

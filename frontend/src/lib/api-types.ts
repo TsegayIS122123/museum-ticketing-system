@@ -302,23 +302,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/bookings/{id}/approval/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** @description PUT /bookings/{id}/approval -- Museum Manager only (FR-BOOK-003). */
-        put: operations["v1_bookings_approval_update"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/bookings/{id}/cancel/": {
         parameters: {
             query?: never;
@@ -777,8 +760,8 @@ export interface components {
         };
         /**
          * @description `Booking` (Document 04). Read-only -- every mutation goes through
-         *     the Create/Approval/Cancel/Reschedule serializers below and
-         *     services.py, never through this serializer directly.
+         *     the Create/Cancel/Reschedule serializers below and services.py, never
+         *     through this serializer directly.
          */
         Booking: {
             /** Format: uuid */
@@ -801,7 +784,6 @@ export interface components {
             readonly bookedQuantity: number;
             readonly attendedQuantity: number | null;
             readonly status: components["schemas"]["BookingStatusEnum"];
-            readonly approvalStatus: string | null;
             readonly rescheduledCount: number;
             /** Format: date-time */
             readonly noticeSentAt: string | null;
@@ -814,11 +796,6 @@ export interface components {
             readonly totalAmountEtb: string;
             /** Format: date-time */
             readonly createdAt: string;
-        };
-        /** @description `BookingApprovalRequest` -- Museum Manager only (FR-BOOK-003). */
-        BookingApproval: {
-            decision: components["schemas"]["DecisionEnum"];
-            note?: string | null;
         };
         /**
          * @description `BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
@@ -845,14 +822,13 @@ export interface components {
         };
         /**
          * @description * `awaiting_payment` - Awaiting payment
-         *     * `pending_approval` - Pending approval
          *     * `pending` - Pending
          *     * `visited` - Visited
          *     * `cancelled` - Cancelled
          *     * `refunded` - Refunded
          * @enum {string}
          */
-        BookingStatusEnum: "awaiting_payment" | "pending_approval" | "pending" | "visited" | "cancelled" | "refunded";
+        BookingStatusEnum: "awaiting_payment" | "pending" | "visited" | "cancelled" | "refunded";
         /**
          * @description * `individual` - Individual
          *     * `group` - Group
@@ -1005,7 +981,6 @@ export interface components {
             readonly bookedQuantity: number;
             readonly attendedQuantity: number | null;
             readonly status: components["schemas"]["BookingStatusEnum"];
-            readonly approvalStatus: string | null;
             readonly rescheduledCount: number;
             /** Format: date-time */
             readonly noticeSentAt: string | null;
@@ -1051,12 +1026,6 @@ export interface components {
         DateAvailabilityUpdate: {
             isOpenForBooking: boolean;
         };
-        /**
-         * @description * `approve` - approve
-         *     * `decline` - decline
-         * @enum {string}
-         */
-        DecisionEnum: "approve" | "decline";
         DetailResponse: {
             detail: string;
         };
@@ -1235,10 +1204,14 @@ export interface components {
         StaffRoleEnum: "cashier" | "museum_manager";
         /**
          * @description `StaffUpdateRequest` (Document 04) -- FR-ACC-002, Platform Admin
-         *     only. Every field optional: a single `PUT` may change only `role`,
-         *     only `active`, or both.
+         *     only. Every field optional so a single `PUT` can update the staff
+         *     profile and role without changing the password.
          */
         StaffUpdate: {
+            /** Format: email */
+            email?: string;
+            phone?: string | null;
+            full_name?: string;
             role?: components["schemas"]["StaffRoleEnum"];
             active?: boolean;
         };
@@ -1671,33 +1644,6 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Booking"];
-                };
-            };
-        };
-    };
-    v1_bookings_approval_update: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BookingApproval"];
-                "application/x-www-form-urlencoded": components["schemas"]["BookingApproval"];
-                "multipart/form-data": components["schemas"]["BookingApproval"];
-            };
-        };
         responses: {
             200: {
                 headers: {

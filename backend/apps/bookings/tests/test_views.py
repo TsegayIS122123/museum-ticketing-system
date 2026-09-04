@@ -26,14 +26,13 @@ TOMORROW = date.today() + timedelta(days=1)
 
 @pytest.fixture(autouse=True)
 def _mock_chapa_checkout():
-    """Every individual booking created here (and every approved group
-    booking) now triggers apps.payments.services.create_checkout_session,
-    which calls out to Chapa (see BookingListCreateView.post/
-    BookingApprovalView.put). This module tests bookings' own
-    permission/ownership/wiring boundary (module docstring), not Chapa
-    integration -- that's apps/payments/tests' job -- so the one function
-    that actually makes the HTTP call is mocked here, autouse, for every
-    test in this file."""
+    """Every booking created here, individual or group alike, now
+    triggers apps.payments.services.create_checkout_session, which calls
+    out to Chapa (see BookingListCreateView.post). This module tests
+    bookings' own permission/ownership/wiring boundary (module
+    docstring), not Chapa integration -- that's apps/payments/tests' job
+    -- so the one function that actually makes the HTTP call is mocked
+    here, autouse, for every test in this file."""
     with mock.patch(
         "apps.payments.services._initialize_chapa_checkout",
         return_value="https://checkout.chapa.co/checkout/test-session",
@@ -254,11 +253,14 @@ def test_get_booking_allowed_for_staff():
 
 
 # --------------------------------------------------------------------------
-# PUT /bookings/{id}/approval -- Museum Manager only (FR-BOOK-003)
+# POST /bookings -- a group booking has no approval gate (FR-BOOK-003)
 # --------------------------------------------------------------------------
 
 
-def test_approval_rejected_for_non_manager():
+def test_group_booking_goes_straight_to_awaiting_payment():
+    """There is no PUT /bookings/{id}/approval endpoint any more -- a
+    group booking is created exactly like an individual one, with
+    DateAvailability (FR-BOOK-008) as the only capacity control."""
     category = _make_category()
     visitor_client = _authed_client(_make_visitor())
     created = visitor_client.post(
@@ -266,34 +268,15 @@ def test_approval_rejected_for_non_manager():
         _create_booking_payload(category, booking_type="group", quantity=20, groupName="A School"),
         format="json",
     ).data
+
+    assert created["status"] == "awaiting_payment"
+    assert created["checkoutUrl"]
 
     response = visitor_client.put(
         f"/api/v1/bookings/{created['id']}/approval/", {"decision": "approve"}, format="json"
     )
 
-    assert response.status_code == 403
-
-
-def test_approval_allowed_for_museum_manager():
-    category = _make_category()
-    visitor_client = _authed_client(_make_visitor())
-    created = visitor_client.post(
-        "/api/v1/bookings/",
-        _create_booking_payload(category, booking_type="group", quantity=20, groupName="A School"),
-        format="json",
-    ).data
-
-    manager_client = _authed_client(
-        _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
-    )
-    response = manager_client.put(
-        f"/api/v1/bookings/{created['id']}/approval/", {"decision": "approve"}, format="json"
-    )
-
-    assert response.status_code == 200
-    assert response.data["status"] == "awaiting_payment"
-    assert response.data["approvalStatus"] == "approved"
-    assert response.data["checkoutUrl"]
+    assert response.status_code == 404
 
 
 # --------------------------------------------------------------------------

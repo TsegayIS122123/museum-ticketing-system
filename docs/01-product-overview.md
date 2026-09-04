@@ -45,7 +45,7 @@ The platform serves the museum's own staff and the visitors who choose to use it
 |---|---|---|
 | **Visitor** | An individual, family, or school/group representative | Book a visit ahead of time, pay online, and get in without queuing to pay in person |
 | **Cashier** | Front-counter and gate staff | Verify a digital booking's headcount at the gate, and periodically settle collected digital revenue to the Finance Office |
-| **Museum Manager** | Museum administration | Approve group/school bookings, control which dates are open for online booking, configure ticket categories and prices, and monitor bookings and revenue |
+| **Museum Manager** | Museum administration | Control which dates are open for online booking, configure ticket categories and prices, and monitor bookings and revenue |
 | **Platform Admin** | Whoever operates the platform technically | Provision staff accounts |
 
 These four roles are fixed across the SRS and SDS; no other document in this set introduces a role not listed here. The **Finance Office** and **Chapa** are important parties in how the system works, but are external parties, not platform users (Document 02, §1).

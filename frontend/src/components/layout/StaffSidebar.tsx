@@ -26,7 +26,6 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { view: 'dashboard', label: 'Dashboard', icon: '📊', path: '/staff/dashboard' },
     { view: 'categories', label: 'Ticket Categories & Pricing', icon: '💲', path: '/staff/categories' },
     { view: 'availability', label: 'Availability', icon: '📅', path: '/staff/availability' },
-    { view: 'group-bookings', label: 'Group Booking Approvals', icon: '👥', path: '/staff/group-bookings' },
     { view: 'refunds', label: 'Refunds', icon: '💰', path: '/staff/refunds' },
     { view: 'reports', label: 'Reports', icon: '📈', path: '/staff/reports' },
     { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },

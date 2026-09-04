@@ -47,7 +47,6 @@ class Notification(models.Model):
         NO_SHOW_NOTICE = "no_show_notice", "No-show notice"
         REFUND_CONFIRMED = "refund_confirmed", "Refund confirmed"
         RESCHEDULE_CONFIRMED = "reschedule_confirmed", "Reschedule confirmed"
-        GROUP_BOOKING_DECIDED = "group_booking_decided", "Group booking decided"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 

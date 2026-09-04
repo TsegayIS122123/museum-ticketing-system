@@ -66,7 +66,7 @@ export function CategoryTable({
       {`ETB ${category.price_etb}`}
     </div>,
     <div key="status">
-      <StatusBadge status={category.active ? 'pending' : 'cancelled'} />
+      <StatusBadge status={category.active ? 'active' : 'inactive'} />
     </div>,
     <div key="actions" className="flex flex-wrap gap-2">
       <Button

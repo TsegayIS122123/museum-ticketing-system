@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StepIndicator } from '@/components/ui/StepIndicator';
 import { DateCategoryPicker } from '@/features/booking/components/DateCategoryPicker';
+import { AvailabilityDatePicker } from '@/features/booking/components/AvailabilityDatePicker';
 import { BookingSummary } from '@/features/booking/components/BookingSummary';
 import { createBooking } from '@/features/booking/api';
 import { Toast } from '@/components/ui/Toast';
@@ -117,19 +118,17 @@ export default function BookPage() {
               {/* Time-of-day was removed from this step -- the booking
                   contract has no time concept at all (a booking is for a
                   visitDate, full stop), so a time picker here could never
-                  have been anything but decoration. */}
-              <div>
-                <label className="text-sm font-medium text-stone-700">
-                  {t('date') || 'Date'}
-                </label>
-                <input
-                  type="date"
-                  value={visitDate}
-                  onChange={(e) => setVisitDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500"
-                />
-              </div>
+                  have been anything but decoration.
+
+                  Closed dates (set by the Museum Manager on
+                  staff/availability) are fetched here and disabled
+                  directly on the calendar grid -- previously this was a
+                  bare input[type=date] with no awareness of closed
+                  dates at all, so a visitor could pick one freely and
+                  would only find out it was rejected after reaching the
+                  payment step (services.is_date_open_for_booking's 409
+                  Conflict, "This date is closed to online booking."). */}
+              <AvailabilityDatePicker value={visitDate} onChange={setVisitDate} />
             </Card>
             <div className="flex justify-between">
               <Button variant="secondary" onClick={() => setCurrentStep('category')}>

@@ -5,10 +5,12 @@ import type { Booking, BookingListResponse } from '@/lib/api-contract';
 // Real backend model (contracts/openapi.yaml): there is no dedicated
 // group-booking resource. A group visit is a Booking with
 // bookingType: 'group', created via the same POST /bookings every
-// individual booking uses, then approved/declined via
-// PUT /bookings/{id}/approval. Visitor identity (name/email/phone) is
-// never part of this payload -- it comes from the authenticated visitor's
-// account (request.user) on the backend.
+// individual booking uses -- it goes straight to awaiting_payment, same
+// as an individual booking, with no Museum-Manager approval step in
+// between (DateAvailability, FR-BOOK-008, is the only capacity control).
+// Visitor identity (name/email/phone) is never part of this payload --
+// it comes from the authenticated visitor's account (request.user) on
+// the backend.
 
 export type { Booking, BookingListResponse };
 export type BookingStatus = components['schemas']['BookingStatusEnum'];
@@ -19,12 +21,6 @@ export interface CreateGroupBookingInput {
   quantity: number;
   groupName?: string | null;
   groupContactPhone?: string | null;
-}
-
-export interface DecideGroupBookingInput {
-  bookingId: string;
-  decision: components['schemas']['DecisionEnum'];
-  note?: string | null;
 }
 
 // POST /bookings -- Visitor only, with bookingType: 'group'. The visitor
@@ -41,8 +37,7 @@ export async function submitGroupBooking(input: CreateGroupBookingInput): Promis
   return apiClient.post<Booking>('/bookings/', body);
 }
 
-// GET /bookings?bookingType=group -- Staff only. There is no separate
-// "pending count" endpoint; derive it from meta.total on a filtered call.
+// GET /bookings?bookingType=group -- Staff only.
 export async function getGroupBookings(params?: {
   status?: BookingStatus;
   visitDate?: string;
@@ -61,18 +56,4 @@ export async function getGroupBookings(params?: {
 // GET /bookings/{id}/ -- the owning visitor or any Staff member.
 export async function getGroupBooking(id: string): Promise<Booking> {
   return apiClient.get<Booking>(`/bookings/${id}/`);
-}
-
-// PUT /bookings/{id}/approval/ -- Museum Manager only. Approving moves the
-// booking to awaiting_payment and a checkout session is created
-// server-side; declining is terminal (status becomes cancelled,
-// approvalStatus becomes 'declined'). There is no "count of pending group
-// bookings" endpoint -- callers should use getGroupBookings({ status:
-// 'pending_approval' }) and read meta.total.
-export async function decideGroupBooking(input: DecideGroupBookingInput): Promise<Booking> {
-  const body: components['schemas']['BookingApproval'] = {
-    decision: input.decision,
-    note: input.note ?? null,
-  };
-  return apiClient.put<Booking>(`/bookings/${input.bookingId}/approval/`, body);
 }

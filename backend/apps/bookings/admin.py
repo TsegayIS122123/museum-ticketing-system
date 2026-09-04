@@ -29,7 +29,6 @@ class BookingAdmin(admin.ModelAdmin):
         "id",
         "reference",
         "status",
-        "approval_status",
         "rescheduled_count",
         "checked_in_at",
         "checked_in_by_user_id",
