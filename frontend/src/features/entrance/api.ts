@@ -68,7 +68,11 @@ export async function recordIfmisVoucherReference(
 // success/failure branch for which direction the correction went.
 export async function correctBookingCategory(
   bookingId: string,
+  itemId: string,
   categoryId: string
 ): Promise<Booking> {
-  return apiClient.patch<Booking>(`/bookings/${bookingId}/category-correction/`, { categoryId });
+  return apiClient.patch<Booking>(`/bookings/${bookingId}/category-correction/`, {
+    itemId,
+    categoryId,
+  });
 }

@@ -5,7 +5,7 @@ Delegates to services.py for anything stateful.
 
 from rest_framework import serializers
 
-from .models import Booking, DateAvailability
+from .models import Booking, BookingItem, DateAvailability
 
 
 class DateAvailabilitySerializer(serializers.ModelSerializer):
@@ -28,22 +28,54 @@ class DateAvailabilityUpdateSerializer(serializers.Serializer):
     isOpenForBooking = serializers.BooleanField()
 
 
-class BookingSerializer(serializers.ModelSerializer):
-    """`Booking` (Document 04). Read-only -- every mutation goes through
-    the Create/Cancel/Reschedule serializers below and services.py, never
-    through this serializer directly."""
+class BookingItemSerializer(serializers.ModelSerializer):
+    """`BookingItem` (Document 04/05) -- one visitor category plus how
+    many tickets of it were bought, one entry per category on a
+    `Booking`. Read-only, same as `BookingSerializer` itself: line items
+    are only ever created together with their parent booking (in
+    `services.create_booking`) or corrected in place (`services.
+    correct_booking_category`), never mutated directly through this
+    serializer.
+    """
 
-    visitorId = serializers.UUIDField(source="visitor_id", read_only=True)
+    id = serializers.UUIDField(read_only=True)
     categoryId = serializers.UUIDField(source="category_id", read_only=True)
-    # Bilingual name *snapshot* taken at booking time (see `models.Booking`
-    # -- never a live join to `catalog.Category`), so a since-retired or
-    # renamed category still displays correctly against a historical
-    # booking. Previously stored on the model but never serialized --
-    # every UI that needs a human-readable category name (the visitor's
-    # own booking detail page, the Cashier's gate check-in screen) had no
-    # way to get one from this endpoint.
     categoryNameEn = serializers.CharField(source="category_name_en", read_only=True)
     categoryNameAm = serializers.CharField(source="category_name_am", read_only=True)
+    unitPriceEtb = serializers.DecimalField(
+        source="unit_price_etb", read_only=True, max_digits=12, decimal_places=2
+    )
+    subtotalEtb = serializers.DecimalField(
+        source="subtotal_etb", read_only=True, max_digits=12, decimal_places=2
+    )
+
+    class Meta:
+        model = BookingItem
+        fields = [
+            "id",
+            "categoryId",
+            "categoryNameEn",
+            "categoryNameAm",
+            "quantity",
+            "unitPriceEtb",
+            "subtotalEtb",
+        ]
+        read_only_fields = fields
+
+
+class BookingSerializer(serializers.ModelSerializer):
+    """`Booking` (Document 04). Read-only -- every mutation goes through
+    the Create/Cancel/Reschedule/CategoryCorrection serializers below and
+    services.py, never through this serializer directly."""
+
+    visitorId = serializers.UUIDField(source="visitor_id", read_only=True)
+    # One entry per visitor category on this booking (see `BookingItem`
+    # -- a booking mixing categories, e.g. one Adult plus two Student
+    # tickets bought together, has more than one entry here). Previously
+    # a single categoryId/categoryNameEn/categoryNameAm trio lived
+    # directly on this serializer, back when a booking could only ever
+    # hold one category.
+    items = BookingItemSerializer(many=True, read_only=True)
     visitDate = serializers.DateField(source="visit_date", read_only=True)
     bookingType = serializers.CharField(source="booking_type", read_only=True)
     groupName = serializers.CharField(source="group_name", read_only=True, allow_null=True)
@@ -101,9 +133,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "id",
             "reference",
             "visitorId",
-            "categoryId",
-            "categoryNameEn",
-            "categoryNameAm",
+            "items",
             "visitDate",
             "bookingType",
             "groupName",
@@ -127,17 +157,31 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class BookingCreateItemSerializer(serializers.Serializer):
+    """One `{categoryId, quantity}` entry of a `BookingCreateRequest`'s
+    `items` list -- see `BookingCreateSerializer` below."""
+
+    categoryId = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
 class BookingCreateSerializer(serializers.Serializer):
     """`BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
     (group). A plain Serializer, not a ModelSerializer: `visitor` is
     supplied by the view from `request.user`, never from the request
-    body, and `categoryId`/`bookingType` need their own field names
-    mapped onto services.create_booking's kwargs rather than a 1:1 model
-    field mapping."""
+    body, and `items`/`bookingType` need their own field names mapped
+    onto services.create_booking's kwargs rather than a 1:1 model field
+    mapping.
+
+    `items` replaces the old single `categoryId`/`quantity` pair -- a
+    booking can now mix categories (one Adult plus two Student tickets in
+    the same checkout) instead of being limited to one category with a
+    plain headcount. `min_length=1`: every booking still needs at least
+    one category, same as before.
+    """
 
     visitDate = serializers.DateField()
-    categoryId = serializers.UUIDField()
-    quantity = serializers.IntegerField(min_value=1)
+    items = BookingCreateItemSerializer(many=True, min_length=1)
     bookingType = serializers.ChoiceField(choices=Booking.BookingType.choices)
     groupName = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     groupContactPhone = serializers.CharField(required=False, allow_null=True, allow_blank=True)
@@ -151,9 +195,11 @@ class BookingCreateSerializer(serializers.Serializer):
 
     def to_service_kwargs(self):
         return {
-            "category_id": self.validated_data["categoryId"],
+            "items": [
+                {"category_id": item["categoryId"], "quantity": item["quantity"]}
+                for item in self.validated_data["items"]
+            ],
             "visit_date": self.validated_data["visitDate"],
-            "quantity": self.validated_data["quantity"],
             "booking_type": self.validated_data["bookingType"],
             "group_name": self.validated_data.get("groupName") or None,
             "group_contact_phone": self.validated_data.get("groupContactPhone") or None,
@@ -168,11 +214,17 @@ class BookingRescheduleSerializer(serializers.Serializer):
 
 class BookingCategoryCorrectionSerializer(serializers.Serializer):
     """`BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
-    addendum to Document 02 Sec 2.2). A plain Serializer, not a
-    ModelSerializer, mirroring `BookingCreateSerializer` above: the
-    single input is a new category, not a 1:1 model field mapping."""
+    addendum to Document 02 Sec 2.2). `itemId` identifies which of the
+    booking's `BookingItem` line items to correct -- see
+    `services.correct_booking_category`'s own docstring for why a
+    mixed-category booking needs this instead of assuming there's only
+    ever one category to correct."""
 
+    itemId = serializers.UUIDField()
     categoryId = serializers.UUIDField()
 
     def to_service_kwargs(self):
-        return {"category_id": self.validated_data["categoryId"]}
+        return {
+            "item_id": self.validated_data["itemId"],
+            "category_id": self.validated_data["categoryId"],
+        }

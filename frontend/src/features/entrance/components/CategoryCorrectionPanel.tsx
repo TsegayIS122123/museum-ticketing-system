@@ -29,6 +29,11 @@ export function CategoryCorrectionPanel({
 }: CategoryCorrectionPanelProps) {
   const { t, locale } = useTranslation();
   const [categories, setCategories] = useState<Category[]>([]);
+  // A booking under correction almost always has just one item (the
+  // common single-category case), so default straight to it -- a Cashier
+  // only has to pick which ticket-holder when the booking actually mixes
+  // categories (e.g. one Adult plus two Student tickets).
+  const [selectedItemId, setSelectedItemId] = useState(booking.items[0]?.id ?? '');
   const [selectedId, setSelectedId] = useState('');
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,11 +59,11 @@ export function CategoryCorrectionPanel({
   }, []);
 
   const handleSubmit = async () => {
-    if (!selectedId) return;
+    if (!selectedItemId || !selectedId) return;
     setIsSubmitting(true);
     setError(null);
     try {
-      const updated = await correctBookingCategory(booking.id, selectedId);
+      const updated = await correctBookingCategory(booking.id, selectedItemId, selectedId);
       onCorrected(updated);
     } catch (err) {
       setError(
@@ -71,8 +76,17 @@ export function CategoryCorrectionPanel({
     }
   };
 
-  // The booking already has this category -- nothing to correct it to.
-  const otherCategories = categories.filter((c) => c.id !== booking.categoryId);
+  const selectedItem = booking.items.find((item) => item.id === selectedItemId);
+  // The item's own current category, plus any category another item on
+  // this same booking already holds, aren't valid corrections for it --
+  // mirrors the same two checks services.correct_booking_category itself
+  // enforces server-side.
+  const otherCategoryIds = new Set(
+    booking.items.filter((item) => item.id !== selectedItemId).map((item) => item.categoryId)
+  );
+  const otherCategories = categories.filter(
+    (c) => c.id !== selectedItem?.categoryId && !otherCategoryIds.has(c.id)
+  );
 
   return (
     <div className="mt-4 border-t border-stone-200 pt-4">
@@ -80,6 +94,26 @@ export function CategoryCorrectionPanel({
         {t('correct_category_prompt') ||
           "The visitor's ID doesn't match this category. Select the correct one:"}
       </div>
+
+      {/* Which ticket-holder -- only shown when the booking actually
+          mixes categories; a single-category booking has nothing to
+          choose between. */}
+      {booking.items.length > 1 && (
+        <select
+          value={selectedItemId}
+          onChange={(e) => {
+            setSelectedItemId(e.target.value);
+            setSelectedId('');
+          }}
+          className="w-full px-3 py-2 rounded-lg border border-stone-300 bg-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-secondary-500"
+        >
+          {booking.items.map((item) => (
+            <option key={item.id} value={item.id}>
+              {(locale === 'en' ? item.categoryNameEn : item.categoryNameAm)} x{item.quantity}
+            </option>
+          ))}
+        </select>
+      )}
 
       {isLoadingCategories ? (
         <div className="text-sm text-stone-500">{t('loading') || 'Loading...'}</div>
@@ -117,7 +151,7 @@ export function CategoryCorrectionPanel({
           size="sm"
           className="flex-1 bg-brand-primary hover:bg-primary-700"
           onClick={handleSubmit}
-          disabled={isSubmitting || !selectedId}
+          disabled={isSubmitting || !selectedItemId || !selectedId}
         >
           {isSubmitting ? t('processing') || 'Processing...' : t('confirm') || 'Confirm'}
         </Button>

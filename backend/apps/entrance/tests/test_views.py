@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.authentication import AccountRefreshToken
 from apps.accounts.models import Account
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, BookingItem
 from apps.catalog.models import Category
 
 pytestmark = pytest.mark.django_db
@@ -48,18 +48,24 @@ def _authed_client(account):
 def _make_pending_booking(quantity=20):
     visitor = _make_visitor_account()
     category = Category.objects.create(name_en="Student", name_am="Student", price_etb=Decimal("50.00"))
-    return Booking.objects.create(
+    booking = Booking.objects.create(
         visitor=visitor,
-        category=category,
-        category_name_en=category.name_en,
-        category_name_am=category.name_am,
-        unit_price_etb=category.price_etb,
         visit_date=TOMORROW,
         booking_type=Booking.BookingType.INDIVIDUAL,
         booked_quantity=quantity,
         total_amount_etb=category.price_etb * quantity,
         status=Booking.Status.PENDING,
     )
+    BookingItem.objects.create(
+        booking=booking,
+        category=category,
+        category_name_en=category.name_en,
+        category_name_am=category.name_am,
+        unit_price_etb=category.price_etb,
+        quantity=quantity,
+        subtotal_etb=category.price_etb * quantity,
+    )
+    return booking
 
 
 # --------------------------------------------------------------------------

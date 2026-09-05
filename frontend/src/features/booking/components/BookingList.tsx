@@ -7,19 +7,21 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import Link from 'next/link';
 
-interface BookingItem {
+interface BookingListItem {
   id: string;
   reference: string;
   status: BookingStatus;
   visitDate: string;
   bookedQuantity: number;
   totalAmountEtb: number;
-  categoryNameEn: string;
-  categoryNameAm: string;
+  // One entry per category on this booking -- a booking mixing
+  // categories (e.g. one Adult plus two Student tickets bought
+  // together) has more than one entry here.
+  items: { categoryNameEn: string; categoryNameAm: string; quantity: number }[];
 }
 
 interface BookingListProps {
-  bookings: BookingItem[];
+  bookings: BookingListItem[];
   isLoading?: boolean;
   onRefresh?: () => void;
 }
@@ -99,7 +101,11 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
                   </span>
                 </div>
                 <div className="text-sm text-stone-400 mt-0.5">
-                  {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
+                  {booking.items
+                    .map((item) =>
+                      `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`
+                    )
+                    .join(', ')}
                 </div>
               </div>
               <Button variant="ghost" size="sm" className="flex-shrink-0">

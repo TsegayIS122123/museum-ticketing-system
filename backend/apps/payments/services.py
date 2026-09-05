@@ -115,7 +115,14 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
         "return_url": f"{settings.PUBLIC_WEB_BASE_URL.rstrip('/')}/bookings/{booking.id}",
         "customization": {
             "title": "Museum Ticket",
-            "description": f"{booking.category_name_en} x{booking.booked_quantity}",
+            # Itemized across every category on this booking (e.g. "Adult
+            # x1, Student x2") -- a booking is no longer guaranteed to
+            # hold just one category, so a single `category_name_en x
+            # booked_quantity` line would misdescribe a mixed-category
+            # checkout.
+            "description": ", ".join(
+                f"{item.category_name_en} x{item.quantity}" for item in booking.items.all()
+            ),
         },
     }
 

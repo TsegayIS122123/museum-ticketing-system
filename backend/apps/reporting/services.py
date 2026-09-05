@@ -36,7 +36,7 @@ from django.db.models import Case, Count, F, Sum, TextField, Value, When
 from django.db.models.functions import Coalesce
 from rest_framework.exceptions import ValidationError
 
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, BookingItem
 from apps.payments.models import Payment
 from apps.refunds.models import Refund
 
@@ -67,44 +67,58 @@ def _reportable_bookings_queryset():
 
 def _net_revenue_by_category(*, bookings_queryset):
     """Completed-payment total minus completed-refund total, grouped by
-    `Booking.category_name_en` (the bilingual snapshot taken at booking
-    time, per `apps.bookings.models.Booking` -- never a live join to
-    `catalog.Category`, so a since-retired or renamed category still
-    reports correctly against historical bookings).
+    `BookingItem.category_name_en` (the bilingual snapshot taken at
+    booking time, per `apps.bookings.models.BookingItem` -- never a live
+    join to `catalog.Category`, so a since-retired or renamed category
+    still reports correctly against historical bookings).
 
-    Computed as two independent aggregations (payments, then refunds) and
-    combined in Python rather than one query joining both `payments` and
-    `refunds` off the same booking -- a single joined query would fan out
-    across both child tables at once and double-count whichever side has
-    more than one row per booking (e.g. a booking with two payment
-    attempts and one refund).
+    A `Payment`/`Refund` is still recorded once per *booking*, not once
+    per category (Chapa is only ever charged/refunded a single lump sum
+    per booking, per `apps.payments`/`apps.refunds`) -- so a booking's net
+    revenue is first computed per booking exactly as before, then split
+    across that booking's `BookingItem`s in proportion to each item's
+    share of `Booking.total_amount_etb`. For a single-category booking
+    (still the common case) every cent of its net revenue lands on that
+    one category, unchanged from before; a mixed booking (e.g. one Adult
+    plus two Student tickets) instead attributes its net revenue
+    proportionally across both.
     """
-    categories = list(
-        bookings_queryset.values_list("category_name_en", flat=True).distinct()
-    )
+    booking_ids = list(bookings_queryset.values_list("id", flat=True))
 
-    payments_by_category = dict(
-        Payment.objects.filter(
-            status=Payment.Status.COMPLETED, booking__in=bookings_queryset
-        )
-        .values_list("booking__category_name_en")
+    payments_by_booking = dict(
+        Payment.objects.filter(status=Payment.Status.COMPLETED, booking_id__in=booking_ids)
+        .values_list("booking_id")
         .annotate(total=Sum("amount_etb"))
     )
-    refunds_by_category = dict(
-        Refund.objects.filter(
-            status=Refund.Status.COMPLETED, booking__in=bookings_queryset
-        )
-        .values_list("booking__category_name_en")
+    refunds_by_booking = dict(
+        Refund.objects.filter(status=Refund.Status.COMPLETED, booking_id__in=booking_ids)
+        .values_list("booking_id")
         .annotate(total=Sum("amount_etb"))
     )
-
-    return {
-        category: (
-            payments_by_category.get(category, Decimal("0"))
-            - refunds_by_category.get(category, Decimal("0"))
+    net_revenue_by_booking = {
+        booking_id: (
+            payments_by_booking.get(booking_id, Decimal("0"))
+            - refunds_by_booking.get(booking_id, Decimal("0"))
         )
-        for category in categories
+        for booking_id in set(payments_by_booking) | set(refunds_by_booking)
     }
+
+    items = BookingItem.objects.filter(booking_id__in=booking_ids).values_list(
+        "booking_id", "category_name_en", "subtotal_etb", "booking__total_amount_etb"
+    )
+
+    revenue_by_category = {}
+    for booking_id, category, subtotal, booking_total in items:
+        # Every category on a booking that never had a completed
+        # payment/refund still shows up, at zero, same as the old
+        # per-category `.distinct()` list did.
+        revenue_by_category.setdefault(category, Decimal("0"))
+        net = net_revenue_by_booking.get(booking_id)
+        if not net or not booking_total:
+            continue
+        revenue_by_category[category] += (subtotal / booking_total) * net
+
+    return revenue_by_category
 
 
 def _net_revenue_total(*, bookings_queryset):
@@ -131,9 +145,14 @@ def get_dashboard():
     """
     bookings = _reportable_bookings_queryset()
 
+    # Summed over `BookingItem.quantity`, not `Booking.booked_quantity`
+    # directly -- a booking's `booked_quantity` is now a cross-category
+    # total (FR-BOOK-001 no longer limits a booking to one category), so
+    # the per-category breakdown has to come from the line items instead.
     visitor_counts_by_category = dict(
-        bookings.values_list("category_name_en")
-        .annotate(total=Sum("booked_quantity"))
+        BookingItem.objects.filter(booking__in=bookings)
+        .values_list("category_name_en")
+        .annotate(total=Sum("quantity"))
         .order_by()
     )
 

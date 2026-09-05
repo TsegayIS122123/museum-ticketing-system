@@ -187,7 +187,11 @@ export default function BookingDetailPage() {
             <div>
               <div className="text-stone-500">{t('category')}</div>
               <div className="font-medium text-stone-900">
-                {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
+                {booking.items
+                  .map((item) =>
+                    `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`
+                  )
+                  .join(', ')}
               </div>
             </div>
             <div>

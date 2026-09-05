@@ -134,8 +134,9 @@ class BookingDetailView(generics.RetrieveAPIView):
     # visitor.full_name/email/phone (visitorName/visitorEmail/
     # visitorPhone) for every row, so this avoids an extra query per
     # request that would otherwise go unnoticed (this view returns one
-    # row at a time).
-    queryset = Booking.objects.select_related("visitor")
+    # row at a time). prefetch_related("items") -- same reasoning, for
+    # the per-category line-item list (`items`).
+    queryset = Booking.objects.select_related("visitor").prefetch_related("items")
     lookup_field = "id"
     serializer_class = BookingSerializer
 

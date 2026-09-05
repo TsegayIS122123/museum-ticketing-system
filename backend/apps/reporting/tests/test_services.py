@@ -13,7 +13,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import Account
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, BookingItem
 from apps.catalog.models import Category
 from apps.payments.models import Payment
 from apps.refunds.models import Refund
@@ -59,12 +59,8 @@ def _make_booking(
 ):
     visitor = _make_visitor(email=f"visitor-{Account.objects.count()}@example.com")
     unit_price = unit_price if unit_price is not None else category.price_etb
-    return Booking.objects.create(
+    booking = Booking.objects.create(
         visitor=visitor,
-        category=category,
-        category_name_en=category.name_en,
-        category_name_am=category.name_am,
-        unit_price_etb=unit_price,
         visit_date=visit_date,
         booking_type=booking_type,
         group_name=group_name,
@@ -72,6 +68,16 @@ def _make_booking(
         total_amount_etb=unit_price * booked_quantity,
         status=status,
     )
+    BookingItem.objects.create(
+        booking=booking,
+        category=category,
+        category_name_en=category.name_en,
+        category_name_am=category.name_am,
+        unit_price_etb=unit_price,
+        quantity=booked_quantity,
+        subtotal_etb=unit_price * booked_quantity,
+    )
+    return booking
 
 
 def _make_completed_payment(*, booking, amount=None):

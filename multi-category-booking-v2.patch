@@ -1,0 +1,2659 @@
+diff --git a/backend/apps/bookings/admin.py b/backend/apps/bookings/admin.py
+index bee65c4..36e6fc9 100644
+--- a/backend/apps/bookings/admin.py
++++ b/backend/apps/bookings/admin.py
+@@ -7,7 +7,32 @@ governed), so those fields are read-only here.
+ 
+ from django.contrib import admin
+ 
+-from .models import Booking, DateAvailability
++from .models import Booking, BookingItem, DateAvailability
++
++
++class BookingItemInline(admin.TabularInline):
++    """Read-only -- line items are only ever created together with their
++    parent booking, or corrected in place via the Cashier-only gate
++    correction flow, never edited here."""
++
++    model = BookingItem
++    extra = 0
++    can_delete = False
++    fields = ["category_name_en", "category_name_am", "quantity", "unit_price_etb", "subtotal_etb"]
++    readonly_fields = fields
++
++    def has_add_permission(self, request, obj=None):
++        return False
++
++
++def _categories_summary(booking):
++    """e.g. \"Adult x1, Student x2\" -- list_display has no easy way to
++    show a related-row breakdown itself, so this composes the same
++    summary the visitor-facing UI shows for each row."""
++    return ", ".join(f"{item.category_name_en} x{item.quantity}" for item in booking.items.all())
++
++
++_categories_summary.short_description = "Categories"
+ 
+ 
+ @admin.register(Booking)
+@@ -16,7 +41,7 @@ class BookingAdmin(admin.ModelAdmin):
+     list_display = [
+         "reference",
+         "visitor",
+-        "category_name_en",
++        _categories_summary,
+         "visit_date",
+         "booking_type",
+         "status",
+@@ -25,6 +50,13 @@ class BookingAdmin(admin.ModelAdmin):
+     ]
+     list_filter = ["status", "booking_type", "visit_date"]
+     search_fields = ["reference", "visitor__email", "group_name"]
++    inlines = [BookingItemInline]
++
++    def get_queryset(self, request):
++        # _categories_summary above reads `booking.items.all()` for every
++        # row in the changelist -- prefetch once instead of N+1.
++        return super().get_queryset(request).prefetch_related("items")
++
+     readonly_fields = [
+         "id",
+         "reference",
+diff --git a/backend/apps/bookings/migrations/0006_booking_items.py b/backend/apps/bookings/migrations/0006_booking_items.py
+new file mode 100644
+index 0000000..c5f4784
+--- /dev/null
++++ b/backend/apps/bookings/migrations/0006_booking_items.py
+@@ -0,0 +1,130 @@
++"""
++Splits `Booking`'s single category/quantity/price fields out into a new
++`BookingItem` line-items table, so one booking can cover more than one
++visitor category (e.g. one Adult ticket plus two Student tickets bought
++together in a single checkout) instead of forcing a separate booking per
++category.
++
++Three phases, in order, so the data migration below still sees the old
++columns before they're dropped:
++  1. Create `booking_item`.
++  2. Backfill: one `BookingItem` per existing `Booking`, copying that
++     booking's own category/name/price/quantity/total across verbatim --
++     every booking that exists today keeps exactly the single line item
++     it always implicitly had.
++  3. Remove the now-redundant `category`/`category_name_en`/
++     `category_name_am`/`unit_price_etb` columns from `booking` itself.
++     `category_corrected_at`/`category_corrected_by_user_id` (added in
++     0005) are untouched -- they stay on `Booking` as a booking-level
++     "was this ever corrected at the gate" marker; see
++     `BookingItem`'s own docstring.
++"""
++
++import uuid
++
++import django.db.models.deletion
++from django.db import migrations, models
++
++
++def _backfill_booking_items(apps, schema_editor):
++    Booking = apps.get_model("bookings", "Booking")
++    BookingItem = apps.get_model("bookings", "BookingItem")
++
++    items = [
++        BookingItem(
++            id=uuid.uuid4(),
++            booking_id=booking.pk,
++            category_id=booking.category_id,
++            category_name_en=booking.category_name_en,
++            category_name_am=booking.category_name_am,
++            unit_price_etb=booking.unit_price_etb,
++            quantity=booking.booked_quantity,
++            subtotal_etb=booking.total_amount_etb,
++        )
++        for booking in Booking.objects.all()
++    ]
++    BookingItem.objects.bulk_create(items)
++
++
++def _reverse_backfill_booking_items(apps, schema_editor):
++    # Reversing just drops the line items -- the RemoveField operations
++    # below are reversed separately (AddField, backed by the loud
++    # non-nullable defaults below), which is the direction this migration
++    # is realistically ever un-applied in (a failed deploy, not a live
++    # rollback after new multi-category bookings exist).
++    BookingItem = apps.get_model("bookings", "BookingItem")
++    BookingItem.objects.all().delete()
++
++
++class Migration(migrations.Migration):
++
++    dependencies = [
++        ("catalog", "0003_deactivate_legacy_free_category"),
++        ("bookings", "0005_booking_category_corrected_at_and_more"),
++    ]
++
++    operations = [
++        migrations.CreateModel(
++            name="BookingItem",
++            fields=[
++                (
++                    "id",
++                    models.UUIDField(
++                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
++                    ),
++                ),
++                ("created_at", models.DateTimeField(auto_now_add=True)),
++                ("updated_at", models.DateTimeField(auto_now=True)),
++                ("category_name_en", models.TextField()),
++                ("category_name_am", models.TextField()),
++                ("unit_price_etb", models.DecimalField(decimal_places=2, max_digits=12)),
++                ("quantity", models.PositiveIntegerField()),
++                ("subtotal_etb", models.DecimalField(decimal_places=2, max_digits=12)),
++                (
++                    "booking",
++                    models.ForeignKey(
++                        db_column="booking_id",
++                        on_delete=django.db.models.deletion.CASCADE,
++                        related_name="items",
++                        to="bookings.booking",
++                    ),
++                ),
++                (
++                    "category",
++                    models.ForeignKey(
++                        db_column="category_id",
++                        on_delete=django.db.models.deletion.PROTECT,
++                        related_name="booking_items",
++                        to="catalog.category",
++                    ),
++                ),
++            ],
++            options={
++                "db_table": "booking_item",
++                "ordering": ["created_at"],
++            },
++        ),
++        migrations.AddIndex(
++            model_name="bookingitem",
++            index=models.Index(fields=["booking"], name="booking_item_booking_idx"),
++        ),
++        migrations.AddConstraint(
++            model_name="bookingitem",
++            constraint=models.CheckConstraint(
++                condition=models.Q(quantity__gte=1),
++                name="booking_item_quantity_at_least_one",
++            ),
++        ),
++        migrations.AddConstraint(
++            model_name="bookingitem",
++            constraint=models.UniqueConstraint(
++                fields=["booking", "category"],
++                name="booking_item_unique_category_per_booking",
++            ),
++        ),
++        migrations.RunPython(_backfill_booking_items, _reverse_backfill_booking_items),
++        migrations.RemoveField(model_name="booking", name="category"),
++        migrations.RemoveField(model_name="booking", name="category_name_en"),
++        migrations.RemoveField(model_name="booking", name="category_name_am"),
++        migrations.RemoveField(model_name="booking", name="unit_price_etb"),
++    ]
+diff --git a/backend/apps/bookings/models.py b/backend/apps/bookings/models.py
+index 01272e8..71f52ee 100644
+--- a/backend/apps/bookings/models.py
++++ b/backend/apps/bookings/models.py
+@@ -118,21 +118,17 @@ class Booking(TimeStampedModel):
+         related_name="bookings",
+         db_column="visitor_id",
+     )
+-    category = models.ForeignKey(
+-        "catalog.Category",
+-        on_delete=models.PROTECT,
+-        related_name="bookings",
+-        db_column="category_id",
+-    )
+ 
+-    # Snapshot of the category's bilingual name/price at booking time
+-    # (Sec 3.3) -- a later Museum Manager price edit (FR-CAT-002) never
+-    # touches an already-issued booking. Declared as its own fields per
+-    # `core.BilingualNameMixin`'s own docstring: a differently-named
+-    # bilingual pair declares its own fields rather than using the mixin.
+-    category_name_en = models.TextField()
+-    category_name_am = models.TextField()
+-    unit_price_etb = models.DecimalField(max_digits=12, decimal_places=2)
++    # A booking can cover more than one visitor category in one go (e.g.
++    # a father booking one Adult ticket and two Student tickets for his
++    # kids in a single checkout) -- see `BookingItem` below, which is
++    # where the per-category category FK / bilingual name+price snapshot
++    # / quantity now live, one row per category in this booking.
++    # `booked_quantity` and `total_amount_etb` below stay on `Booking`
++    # itself as the denormalized sum across its items -- every existing
++    # consumer (entrance check-in's headcount, settlement/payments'
++    # single lump-sum amount) only ever needs the booking-level total,
++    # never a per-category breakdown.
+ 
+     visit_date = models.DateField()
+ 
+@@ -140,9 +136,13 @@ class Booking(TimeStampedModel):
+     group_name = models.TextField(null=True, blank=True)
+     group_contact_phone = models.TextField(null=True, blank=True)
+ 
++    # Sum of every BookingItem.quantity on this booking.
+     booked_quantity = models.PositiveIntegerField()
+     attended_quantity = models.PositiveIntegerField(null=True, blank=True)
+ 
++    # Sum of every BookingItem.subtotal_etb on this booking -- the single
++    # amount actually charged/refunded through Chapa (apps.payments/
++    # apps.refunds never charge per category, only per booking).
+     total_amount_etb = models.DecimalField(max_digits=12, decimal_places=2)
+ 
+     status = models.CharField(
+@@ -259,4 +259,87 @@ class Booking(TimeStampedModel):
+         ]
+ 
+     def __str__(self):
+-        return self.reference
+\ No newline at end of file
++        return self.reference
++
++
++class BookingItem(TimeStampedModel):
++    """
++    One line of a `Booking` -- one visitor category plus how many tickets
++    of it were bought, e.g. "1 x Adult" or "2 x Student". A `Booking`
++    always has at least one `BookingItem`; it has more than one exactly
++    when the same checkout mixes categories (the "father booking one
++    Adult + two Student tickets" case) rather than requiring a separate
++    `Booking` per category.
++
++    Mirrors `Booking`'s own pre-existing fields 1:1 (this is literally
++    what used to live directly on `Booking` before it could hold more
++    than one category) -- same snapshot rationale: `category_name_en`/
++    `category_name_am`/`unit_price_etb` are copied from `catalog.Category`
++    at booking time so a later price edit or retirement (FR-CAT-002)
++    never changes an already-issued line item.
++
++    A single item's category/price can later be overwritten in place by
++    the Cashier-only gate-side correction (ID-verification addendum,
++    `apps.bookings.services.correct_booking_category`) -- e.g. one of
++    three ticket-holders in a party turns out not to have a valid student
++    ID. `Booking.category_corrected_at`/`category_corrected_by_user_id`
++    record *that this booking was touched* at the gate (used by the
++    Visitor-facing "why do I owe more" messaging); which item and what
++    changed is in the audit log (`booking.category_corrected`), matching
++    this codebase's existing convention of using the audit log for
++    "what changed" rather than a dedicated column per change.
++    """
++
++    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
++
++    booking = models.ForeignKey(
++        Booking,
++        on_delete=models.CASCADE,
++        related_name="items",
++        db_column="booking_id",
++    )
++    category = models.ForeignKey(
++        "catalog.Category",
++        on_delete=models.PROTECT,
++        related_name="booking_items",
++        db_column="category_id",
++    )
++
++    category_name_en = models.TextField()
++    category_name_am = models.TextField()
++    unit_price_etb = models.DecimalField(max_digits=12, decimal_places=2)
++
++    quantity = models.PositiveIntegerField()
++    # unit_price_etb * quantity, snapshotted alongside it rather than
++    # computed on read -- consistent with `Booking.total_amount_etb`
++    # never being recomputed from a live join either.
++    subtotal_etb = models.DecimalField(max_digits=12, decimal_places=2)
++
++    class Meta:
++        app_label = "bookings"
++        db_table = "booking_item"
++        ordering = ["created_at"]
++        constraints = [
++            models.CheckConstraint(
++                condition=models.Q(quantity__gte=1),
++                name="booking_item_quantity_at_least_one",
++            ),
++            # One row per category per booking -- a visitor adding more
++            # Adult tickets increases this row's quantity, it never gets
++            # a second Adult row on the same booking. A gate-side
++            # correction (see class docstring) is exempt in practice:
++            # correct_booking_category rejects correcting an item *into*
++            # a category another item on the same booking already holds,
++            # for the same reason it rejects "correcting" into the
++            # item's own current category -- there's nothing to merge,
++            # the Cashier picked a category already represented.
++            models.UniqueConstraint(
++                fields=["booking", "category"], name="booking_item_unique_category_per_booking"
++            ),
++        ]
++        indexes = [
++            models.Index(fields=["booking"], name="booking_item_booking_idx"),
++        ]
++
++    def __str__(self):
++        return f"{self.category_name_en} x{self.quantity} ({self.booking.reference})"
+\ No newline at end of file
+diff --git a/backend/apps/bookings/serializers.py b/backend/apps/bookings/serializers.py
+index b9b5d28..ae3ccb2 100644
+--- a/backend/apps/bookings/serializers.py
++++ b/backend/apps/bookings/serializers.py
+@@ -5,7 +5,7 @@ Delegates to services.py for anything stateful.
+ 
+ from rest_framework import serializers
+ 
+-from .models import Booking, DateAvailability
++from .models import Booking, BookingItem, DateAvailability
+ 
+ 
+ class DateAvailabilitySerializer(serializers.ModelSerializer):
+@@ -28,22 +28,54 @@ class DateAvailabilityUpdateSerializer(serializers.Serializer):
+     isOpenForBooking = serializers.BooleanField()
+ 
+ 
+-class BookingSerializer(serializers.ModelSerializer):
+-    """`Booking` (Document 04). Read-only -- every mutation goes through
+-    the Create/Cancel/Reschedule serializers below and services.py, never
+-    through this serializer directly."""
++class BookingItemSerializer(serializers.ModelSerializer):
++    """`BookingItem` (Document 04/05) -- one visitor category plus how
++    many tickets of it were bought, one entry per category on a
++    `Booking`. Read-only, same as `BookingSerializer` itself: line items
++    are only ever created together with their parent booking (in
++    `services.create_booking`) or corrected in place (`services.
++    correct_booking_category`), never mutated directly through this
++    serializer.
++    """
+ 
+-    visitorId = serializers.UUIDField(source="visitor_id", read_only=True)
++    id = serializers.UUIDField(read_only=True)
+     categoryId = serializers.UUIDField(source="category_id", read_only=True)
+-    # Bilingual name *snapshot* taken at booking time (see `models.Booking`
+-    # -- never a live join to `catalog.Category`), so a since-retired or
+-    # renamed category still displays correctly against a historical
+-    # booking. Previously stored on the model but never serialized --
+-    # every UI that needs a human-readable category name (the visitor's
+-    # own booking detail page, the Cashier's gate check-in screen) had no
+-    # way to get one from this endpoint.
+     categoryNameEn = serializers.CharField(source="category_name_en", read_only=True)
+     categoryNameAm = serializers.CharField(source="category_name_am", read_only=True)
++    unitPriceEtb = serializers.DecimalField(
++        source="unit_price_etb", read_only=True, max_digits=12, decimal_places=2
++    )
++    subtotalEtb = serializers.DecimalField(
++        source="subtotal_etb", read_only=True, max_digits=12, decimal_places=2
++    )
++
++    class Meta:
++        model = BookingItem
++        fields = [
++            "id",
++            "categoryId",
++            "categoryNameEn",
++            "categoryNameAm",
++            "quantity",
++            "unitPriceEtb",
++            "subtotalEtb",
++        ]
++        read_only_fields = fields
++
++
++class BookingSerializer(serializers.ModelSerializer):
++    """`Booking` (Document 04). Read-only -- every mutation goes through
++    the Create/Cancel/Reschedule/CategoryCorrection serializers below and
++    services.py, never through this serializer directly."""
++
++    visitorId = serializers.UUIDField(source="visitor_id", read_only=True)
++    # One entry per visitor category on this booking (see `BookingItem`
++    # -- a booking mixing categories, e.g. one Adult plus two Student
++    # tickets bought together, has more than one entry here). Previously
++    # a single categoryId/categoryNameEn/categoryNameAm trio lived
++    # directly on this serializer, back when a booking could only ever
++    # hold one category.
++    items = BookingItemSerializer(many=True, read_only=True)
+     visitDate = serializers.DateField(source="visit_date", read_only=True)
+     bookingType = serializers.CharField(source="booking_type", read_only=True)
+     groupName = serializers.CharField(source="group_name", read_only=True, allow_null=True)
+@@ -101,9 +133,7 @@ class BookingSerializer(serializers.ModelSerializer):
+             "id",
+             "reference",
+             "visitorId",
+-            "categoryId",
+-            "categoryNameEn",
+-            "categoryNameAm",
++            "items",
+             "visitDate",
+             "bookingType",
+             "groupName",
+@@ -127,17 +157,31 @@ class BookingSerializer(serializers.ModelSerializer):
+         read_only_fields = fields
+ 
+ 
++class BookingCreateItemSerializer(serializers.Serializer):
++    """One `{categoryId, quantity}` entry of a `BookingCreateRequest`'s
++    `items` list -- see `BookingCreateSerializer` below."""
++
++    categoryId = serializers.UUIDField()
++    quantity = serializers.IntegerField(min_value=1)
++
++
+ class BookingCreateSerializer(serializers.Serializer):
+     """`BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
+     (group). A plain Serializer, not a ModelSerializer: `visitor` is
+     supplied by the view from `request.user`, never from the request
+-    body, and `categoryId`/`bookingType` need their own field names
+-    mapped onto services.create_booking's kwargs rather than a 1:1 model
+-    field mapping."""
++    body, and `items`/`bookingType` need their own field names mapped
++    onto services.create_booking's kwargs rather than a 1:1 model field
++    mapping.
++
++    `items` replaces the old single `categoryId`/`quantity` pair -- a
++    booking can now mix categories (one Adult plus two Student tickets in
++    the same checkout) instead of being limited to one category with a
++    plain headcount. `min_length=1`: every booking still needs at least
++    one category, same as before.
++    """
+ 
+     visitDate = serializers.DateField()
+-    categoryId = serializers.UUIDField()
+-    quantity = serializers.IntegerField(min_value=1)
++    items = BookingCreateItemSerializer(many=True, min_length=1)
+     bookingType = serializers.ChoiceField(choices=Booking.BookingType.choices)
+     groupName = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+     groupContactPhone = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+@@ -151,9 +195,11 @@ class BookingCreateSerializer(serializers.Serializer):
+ 
+     def to_service_kwargs(self):
+         return {
+-            "category_id": self.validated_data["categoryId"],
++            "items": [
++                {"category_id": item["categoryId"], "quantity": item["quantity"]}
++                for item in self.validated_data["items"]
++            ],
+             "visit_date": self.validated_data["visitDate"],
+-            "quantity": self.validated_data["quantity"],
+             "booking_type": self.validated_data["bookingType"],
+             "group_name": self.validated_data.get("groupName") or None,
+             "group_contact_phone": self.validated_data.get("groupContactPhone") or None,
+@@ -168,11 +214,17 @@ class BookingRescheduleSerializer(serializers.Serializer):
+ 
+ class BookingCategoryCorrectionSerializer(serializers.Serializer):
+     """`BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
+-    addendum to Document 02 Sec 2.2). A plain Serializer, not a
+-    ModelSerializer, mirroring `BookingCreateSerializer` above: the
+-    single input is a new category, not a 1:1 model field mapping."""
++    addendum to Document 02 Sec 2.2). `itemId` identifies which of the
++    booking's `BookingItem` line items to correct -- see
++    `services.correct_booking_category`'s own docstring for why a
++    mixed-category booking needs this instead of assuming there's only
++    ever one category to correct."""
+ 
++    itemId = serializers.UUIDField()
+     categoryId = serializers.UUIDField()
+ 
+     def to_service_kwargs(self):
+-        return {"category_id": self.validated_data["categoryId"]}
++        return {
++            "item_id": self.validated_data["itemId"],
++            "category_id": self.validated_data["categoryId"],
++        }
+diff --git a/backend/apps/bookings/services.py b/backend/apps/bookings/services.py
+index aae3ff9..0c8cccf 100644
+--- a/backend/apps/bookings/services.py
++++ b/backend/apps/bookings/services.py
+@@ -38,7 +38,7 @@ from apps.catalog.models import Category
+ from apps.core.exceptions import Conflict
+ from apps.core.services import write_audit_log
+ 
+-from .models import Booking, DateAvailability
++from .models import Booking, BookingItem, DateAvailability
+ 
+ # Document 02 Sec 5 / Document 07: a sensible ceiling on a single
+ # GET /availability query so a caller can't force an unbounded scan --
+@@ -117,19 +117,69 @@ def set_date_availability(*, visit_date, is_open_for_booking, actor):
+ # --------------------------------------------------------------------------
+ 
+ 
++def _resolve_items(items):
++    """Validates and merges the raw `[{category_id, quantity}, ...]` list
++    a caller passes into `create_booking` -- this is the multi-category
++    equivalent of the single `category_id`/`quantity` validation the old
++    single-line version of this function used to do inline.
++
++    A visitor picking the same category twice (e.g. bumping the Adult
++    quantity up in two separate clicks that both end up in the same
++    request) is merged into one line rather than rejected -- `BookingItem`
++    itself enforces at most one row per category per booking
++    (`booking_item_unique_category_per_booking`), so merging here is what
++    keeps a well-formed multi-select request from ever hitting that
++    constraint. Order of the input list still determines the order
++    categories are first seen in, for a stable, predictable receipt/
++    summary ordering.
++    """
++    if not items:
++        raise ValidationError({"items": "At least one category is required."})
++
++    merged_quantities = {}
++    order = []
++    for raw in items:
++        category_id = raw["category_id"]
++        quantity = raw["quantity"]
++        if quantity < 1:
++            raise ValidationError({"items": "Each item's quantity must be at least 1."})
++        if category_id not in merged_quantities:
++            order.append(category_id)
++            merged_quantities[category_id] = 0
++        merged_quantities[category_id] += quantity
++
++    categories = {
++        str(category.id): category
++        for category in Category.objects.filter(id__in=order, active=True)
++    }
++    missing = [category_id for category_id in order if str(category_id) not in categories]
++    if missing:
++        raise ValidationError({"items": "Not a known, active category."})
++
++    return [
++        {"category": categories[str(category_id)], "quantity": merged_quantities[category_id]}
++        for category_id in order
++    ]
++
++
+ @transaction.atomic
+ def create_booking(
+     *,
+     visitor,
+-    category_id,
++    items,
+     visit_date,
+-    quantity,
+     booking_type,
+     group_name=None,
+     group_contact_phone=None,
+ ):
+     """Implements FR-BOOK-001 (individual) and FR-BOOK-003 (group).
+ 
++    `items` is a non-empty list of `{"category_id": ..., "quantity": ...}`
++    -- one entry per visitor category in this single checkout (FR-BOOK-001
++    doesn't limit a booking to one category: a party mixing categories,
++    e.g. one Adult plus two Student tickets, is one `Booking` with one
++    `BookingItem` per category, not one `Booking` per category).
++
+     A group booking is otherwise identical to an individual one -- it
+     starts `awaiting_payment` just the same, ready for `apps.payments` to
+     create a Chapa checkout session against it. There is no Museum
+@@ -148,36 +198,44 @@ def create_booking(
+             "Both your email and phone must be verified before you can book online."
+         )
+ 
+-    if quantity < 1:
+-        raise ValidationError({"quantity": "Must be at least 1."})
+-
+     if booking_type == Booking.BookingType.GROUP and not group_name:
+         raise ValidationError({"groupName": "Required for a group booking."})
+ 
+-    try:
+-        category = Category.objects.get(id=category_id, active=True)
+-    except Category.DoesNotExist:
+-        raise ValidationError({"categoryId": "Not a known, active category."})
++    resolved_items = _resolve_items(items)
+ 
+     if not is_date_open_for_booking(visit_date):
+         raise Conflict("This date is closed to online booking.")
+ 
++    booked_quantity = sum(item["quantity"] for item in resolved_items)
++    total_amount_etb = sum(
++        item["category"].price_etb * item["quantity"] for item in resolved_items
++    )
++
+     is_group = booking_type == Booking.BookingType.GROUP
+     booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=category.price_etb,
+         visit_date=visit_date,
+         booking_type=booking_type,
+         group_name=group_name if is_group else None,
+         group_contact_phone=group_contact_phone,
+-        booked_quantity=quantity,
+-        total_amount_etb=category.price_etb * quantity,
++        booked_quantity=booked_quantity,
++        total_amount_etb=total_amount_etb,
+         status=Booking.Status.AWAITING_PAYMENT,
+     )
+ 
++    BookingItem.objects.bulk_create(
++        BookingItem(
++            booking=booking,
++            category=item["category"],
++            category_name_en=item["category"].name_en,
++            category_name_am=item["category"].name_am,
++            unit_price_etb=item["category"].price_etb,
++            quantity=item["quantity"],
++            subtotal_etb=item["category"].price_etb * item["quantity"],
++        )
++        for item in resolved_items
++    )
++
+     write_audit_log(
+         actor_id=visitor.id,
+         action="booking.created",
+@@ -193,12 +251,23 @@ def create_booking(
+ # --------------------------------------------------------------------------
+ 
+ 
+-def correct_booking_category(*, booking, category_id, actor):
++def correct_booking_category(*, booking, item_id, category_id, actor):
+     """Implements the Cashier-only `PATCH /bookings/{id}/category-correction`
+     (ID-verification addendum to Document 02 Sec 2.2): at the gate, before
+-    check-in, a Cashier discovers the visitor's ID doesn't match the
+-    category they booked under (e.g. booked as Student, no valid student
+-    ID) and corrects it here.
++    check-in, a Cashier discovers one of the booking's ticket-holders'
++    ID doesn't match the category they booked under (e.g. booked as
++    Student, no valid student ID) and corrects it here.
++
++    `item_id` identifies *which* `BookingItem` on this booking to correct
++    -- a party booked under a single category still has exactly one item
++    to pick from, but a mixed-category booking (e.g. one Adult plus two
++    Student tickets) can have the Cashier discover the problem is with
++    just one of several ticket-holders, not the whole party. Only that
++    one item's category/price/subtotal is corrected; the booking's
++    `total_amount_etb` is then recomputed as the sum across every item
++    (corrected or not) -- `booked_quantity` is untouched, since
++    correcting a category never changes how many tickets were bought,
++    only what they cost.
+ 
+     Only ever on a `Pending` booking -- i.e. paid, but not yet checked
+     in. Once `apps.entrance.services.check_in_booking` has run, the
+@@ -207,14 +276,14 @@ def correct_booking_category(*, booking, category_id, actor):
+     the same way (both are "before the Cashier has acted" windows, just
+     for different actors).
+ 
+-    This function only ever mutates the booking's own category/price
+-    fields (and, for an undercharge, reopens `status` for payment) -- it
+-    never calls into `apps.payments` or `apps.refunds` itself. Creating
+-    the follow-up top-up checkout session (undercharge) or issuing the
+-    refund (overcharge) is the view layer's job, exactly like
+-    `BookingCancelView`/`BookingListCreateView.post` already compose
+-    `apps.refunds`/`apps.payments` at that layer, never from this module
+-    (Design Spec Sec 3.2).
++    This function only ever mutates the item's own category/price fields
++    and the booking's aggregate total (and, for an undercharge, reopens
++    `status` for payment) -- it never calls into `apps.payments` or
++    `apps.refunds` itself. Creating the follow-up top-up checkout session
++    (undercharge) or issuing the refund (overcharge) is the view layer's
++    job, exactly like `BookingCancelView`/`BookingListCreateView.post`
++    already compose `apps.refunds`/`apps.payments` at that layer, never
++    from this module (Design Spec Sec 3.2).
+ 
+     Returns `(booking, delta)`, where `delta = new_total - old_total`:
+     positive means the visitor now owes the difference (undercharge),
+@@ -224,32 +293,60 @@ def correct_booking_category(*, booking, category_id, actor):
+     if booking.status != Booking.Status.PENDING:
+         raise Conflict("Only a Pending booking's category can be corrected.")
+ 
++    try:
++        item = booking.items.get(id=item_id)
++    except BookingItem.DoesNotExist:
++        raise ValidationError({"itemId": "Not one of this booking's line items."})
++
+     try:
+         category = Category.objects.get(id=category_id, active=True)
+     except Category.DoesNotExist:
+         raise ValidationError({"categoryId": "Not a known, active category."})
+ 
+-    if category.id == booking.category_id:
+-        raise ValidationError({"categoryId": "This is already the booking's category."})
++    if category.id == item.category_id:
++        raise ValidationError({"categoryId": "This is already the item's category."})
++    if booking.items.filter(category=category).exclude(id=item.id).exists():
++        # This booking already has a separate line for that category --
++        # merging into it would collide with `BookingItem`'s own
++        # `booking_item_unique_category_per_booking` constraint, and
++        # simply bumping that other line's quantity instead is a
++        # different operation than "correct this ticket-holder's
++        # category" (it would also misattribute this item's price
++        # history). Not expected to come up often in practice, but
++        # rejected explicitly rather than left to the DB constraint to
++        # surface as an opaque IntegrityError.
++        raise ValidationError(
++            {"categoryId": "This booking already has a separate line for that category."}
++        )
+ 
+-    old_category_id = booking.category_id
+     old_total = booking.total_amount_etb
+-    new_total = category.price_etb * booking.booked_quantity
++    old_item_subtotal = item.subtotal_etb
++    new_item_subtotal = category.price_etb * item.quantity
++
++    item.category = category
++    item.category_name_en = category.name_en
++    item.category_name_am = category.name_am
++    item.unit_price_etb = category.price_etb
++    item.subtotal_etb = new_item_subtotal
++    item.save(
++        update_fields=[
++            "category",
++            "category_name_en",
++            "category_name_am",
++            "unit_price_etb",
++            "subtotal_etb",
++            "updated_at",
++        ]
++    )
++
++    new_total = old_total - old_item_subtotal + new_item_subtotal
+     delta = new_total - old_total
+ 
+-    booking.category = category
+-    booking.category_name_en = category.name_en
+-    booking.category_name_am = category.name_am
+-    booking.unit_price_etb = category.price_etb
+     booking.total_amount_etb = new_total
+     booking.category_corrected_at = timezone.now()
+     booking.category_corrected_by_user_id = actor
+ 
+     update_fields = [
+-        "category",
+-        "category_name_en",
+-        "category_name_am",
+-        "unit_price_etb",
+         "total_amount_etb",
+         "category_corrected_at",
+         "category_corrected_by_user_id",
+@@ -270,7 +367,7 @@ def correct_booking_category(*, booking, category_id, actor):
+     # delta <= 0 (overcharge or exact match): status is left untouched --
+     # a `Pending` booking that's owed a refund is still checkable-in right
+     # away, it just also gets money back (delta == 0 needs neither a
+-    # top-up nor a refund, but the category/price fields are still
++    # top-up nor a refund, but the item's category/price fields are still
+     # corrected for accuracy at the gate and on any future receipt).
+ 
+     booking.save(update_fields=update_fields)
+@@ -281,8 +378,11 @@ def correct_booking_category(*, booking, category_id, actor):
+         target_type="booking",
+         target_id=booking.id,
+         metadata={
+-            "old_category_id": str(old_category_id),
++            "item_id": str(item.id),
++            "old_category_id": str(item.category_id),
+             "new_category_id": str(category.id),
++            "old_item_subtotal_etb": str(old_item_subtotal),
++            "new_item_subtotal_etb": str(new_item_subtotal),
+             "old_total_amount_etb": str(old_total),
+             "new_total_amount_etb": str(new_total),
+             "delta_etb": str(delta),
+@@ -364,7 +464,9 @@ def reschedule_booking(*, booking, visitor, new_visit_date):
+ def list_my_bookings(*, visitor, status=None):
+     """Implements `GET /users/me/bookings` (FR-ACC-004) -- a Visitor's own
+     booking history, whether they've booked once or many times."""
+-    queryset = Booking.objects.select_related("visitor").filter(visitor=visitor)
++    queryset = (
++        Booking.objects.select_related("visitor").prefetch_related("items").filter(visitor=visitor)
++    )
+     if status:
+         queryset = queryset.filter(status=status)
+     return queryset
+@@ -376,7 +478,9 @@ def list_bookings_for_staff(*, status=None, visit_date=None, booking_type=None):
+     matching the single-venue, flat-role authorization model (Sec 4.3)."""
+     # select_related("visitor") -- BookingSerializer reads
+     # visitor.full_name/email/phone for every row in this list.
+-    queryset = Booking.objects.select_related("visitor")
++    # prefetch_related("items") -- BookingSerializer now reads the full
++    # per-category line-item list (`items`) for every row too.
++    queryset = Booking.objects.select_related("visitor").prefetch_related("items")
+     if status:
+         queryset = queryset.filter(status=status)
+     if visit_date:
+diff --git a/backend/apps/bookings/tests/test_services.py b/backend/apps/bookings/tests/test_services.py
+index 9a2dbf7..0063934 100644
+--- a/backend/apps/bookings/tests/test_services.py
++++ b/backend/apps/bookings/tests/test_services.py
+@@ -108,9 +108,8 @@ def test_set_date_availability_never_touches_existing_bookings():
+     category = _make_category()
+     booking = services.create_booking(
+         visitor=visitor,
+-        category_id=category.id,
++        items=[{"category_id": category.id, "quantity": 1}],
+         visit_date=TOMORROW,
+-        quantity=1,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+     )
+ 
+@@ -131,15 +130,14 @@ def test_create_individual_booking_starts_awaiting_payment():
+ 
+     booking = services.create_booking(
+         visitor=visitor,
+-        category_id=category.id,
++        items=[{"category_id": category.id, "quantity": 2}],
+         visit_date=TOMORROW,
+-        quantity=2,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+     )
+ 
+     assert booking.status == Booking.Status.AWAITING_PAYMENT
+     assert booking.total_amount_etb == Decimal("100.00")
+-    assert booking.category_name_en == category.name_en
++    assert booking.items.get().category_name_en == category.name_en
+     assert len(booking.reference) == 8
+     assert AuditLogEntry.objects.filter(action="booking.created").exists()
+ 
+@@ -153,9 +151,8 @@ def test_create_group_booking_starts_awaiting_payment():
+ 
+     booking = services.create_booking(
+         visitor=visitor,
+-        category_id=category.id,
++        items=[{"category_id": category.id, "quantity": 30}],
+         visit_date=TOMORROW,
+-        quantity=30,
+         booking_type=Booking.BookingType.GROUP,
+         group_name="Example Primary School",
+     )
+@@ -170,9 +167,8 @@ def test_create_group_booking_requires_group_name():
+     with pytest.raises(ValidationError):
+         services.create_booking(
+             visitor=visitor,
+-            category_id=category.id,
++            items=[{"category_id": category.id, "quantity": 30}],
+             visit_date=TOMORROW,
+-            quantity=30,
+             booking_type=Booking.BookingType.GROUP,
+         )
+ 
+@@ -184,9 +180,8 @@ def test_create_booking_rejected_for_unverified_visitor():
+     with pytest.raises(ValidationError):
+         services.create_booking(
+             visitor=visitor,
+-            category_id=category.id,
++            items=[{"category_id": category.id, "quantity": 1}],
+             visit_date=TOMORROW,
+-            quantity=1,
+             booking_type=Booking.BookingType.INDIVIDUAL,
+         )
+ 
+@@ -198,9 +193,8 @@ def test_create_booking_rejected_for_inactive_category():
+     with pytest.raises(ValidationError):
+         services.create_booking(
+             visitor=visitor,
+-            category_id=category.id,
++            items=[{"category_id": category.id, "quantity": 1}],
+             visit_date=TOMORROW,
+-            quantity=1,
+             booking_type=Booking.BookingType.INDIVIDUAL,
+         )
+ 
+@@ -214,9 +208,8 @@ def test_create_booking_rejected_for_closed_date():
+     with pytest.raises(Conflict):
+         services.create_booking(
+             visitor=visitor,
+-            category_id=category.id,
++            items=[{"category_id": category.id, "quantity": 1}],
+             visit_date=TOMORROW,
+-            quantity=1,
+             booking_type=Booking.BookingType.INDIVIDUAL,
+         )
+ 
+@@ -237,9 +230,8 @@ def _make_correctable_booking(category, quantity=1):
+     visitor = _make_visitor()
+     booking = services.create_booking(
+         visitor=visitor,
+-        category_id=category.id,
++        items=[{"category_id": category.id, "quantity": quantity}],
+         visit_date=TOMORROW,
+-        quantity=quantity,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+     )
+     # Skip apps.payments entirely -- these tests only exercise
+@@ -253,15 +245,18 @@ def test_correct_category_to_a_pricier_one_reopens_payment_for_the_difference():
+     student = _make_category(name_en="Student", price_etb="50.00")
+     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+     booking = _make_correctable_booking(student)
++    item = booking.items.get()
+     cashier = _make_cashier()
+ 
+     booking, delta = services.correct_booking_category(
+-        booking=booking, category_id=non_resident.id, actor=cashier
++        booking=booking, item_id=item.id, category_id=non_resident.id, actor=cashier
+     )
+ 
++    item.refresh_from_db()
+     assert delta == Decimal("450.00")
+-    assert booking.category_id == non_resident.id
+-    assert booking.unit_price_etb == Decimal("500.00")
++    assert item.category_id == non_resident.id
++    assert item.unit_price_etb == Decimal("500.00")
++    assert item.subtotal_etb == Decimal("500.00")
+     assert booking.total_amount_etb == Decimal("500.00")
+     assert booking.status == Booking.Status.AWAITING_PAYMENT
+     assert booking.category_corrected_by_user_id_id == cashier.id
+@@ -272,10 +267,11 @@ def test_correct_category_to_a_cheaper_one_leaves_booking_pending():
+     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+     student = _make_category(name_en="Student", price_etb="50.00")
+     booking = _make_correctable_booking(non_resident)
++    item = booking.items.get()
+     cashier = _make_cashier()
+ 
+     booking, delta = services.correct_booking_category(
+-        booking=booking, category_id=student.id, actor=cashier
++        booking=booking, item_id=item.id, category_id=student.id, actor=cashier
+     )
+ 
+     assert delta == Decimal("-450.00")
+@@ -284,49 +280,137 @@ def test_correct_category_to_a_cheaper_one_leaves_booking_pending():
+     assert booking.status == Booking.Status.PENDING
+ 
+ 
+-def test_correct_category_scales_with_booked_quantity():
++def test_correct_category_scales_with_item_quantity():
+     student = _make_category(name_en="Student", price_etb="50.00")
+     adult = _make_category(name_en="Adult / Teacher", price_etb="100.00")
+     booking = _make_correctable_booking(student, quantity=30)
++    item = booking.items.get()
+     cashier = _make_cashier()
+ 
+     booking, delta = services.correct_booking_category(
+-        booking=booking, category_id=adult.id, actor=cashier
++        booking=booking, item_id=item.id, category_id=adult.id, actor=cashier
+     )
+ 
+     assert delta == Decimal("1500.00")
+     assert booking.total_amount_etb == Decimal("3000.00")
+ 
+ 
++def test_correct_category_on_a_mixed_booking_only_touches_the_given_item():
++    """A father's booking: one Adult ticket for himself, two Student
++    tickets for his kids. The gate finds one of the kids has no valid
++    student ID -- only that one item is corrected, the Adult item and
++    its own subtotal are untouched, and the booking's total reflects
++    just that one item's price change."""
++    adult = _make_category(name_en="Adult", price_etb="100.00")
++    student = _make_category(name_en="Student", price_etb="50.00")
++    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
++    visitor = _make_visitor()
++    booking = services.create_booking(
++        visitor=visitor,
++        items=[
++            {"category_id": adult.id, "quantity": 1},
++            {"category_id": student.id, "quantity": 2},
++        ],
++        visit_date=TOMORROW,
++        booking_type=Booking.BookingType.INDIVIDUAL,
++    )
++    booking.status = Booking.Status.PENDING
++    booking.save(update_fields=["status", "updated_at"])
++    student_item = booking.items.get(category=student)
++    adult_item = booking.items.get(category=adult)
++    cashier = _make_cashier()
++
++    # old total: 100 + (2 x 50) = 200.00
++    booking, delta = services.correct_booking_category(
++        booking=booking, item_id=student_item.id, category_id=non_resident.id, actor=cashier
++    )
++
++    student_item.refresh_from_db()
++    adult_item.refresh_from_db()
++    assert student_item.category_id == non_resident.id
++    assert student_item.subtotal_etb == Decimal("1000.00")  # 500 x 2
++    assert adult_item.category_id == adult.id  # untouched
++    assert adult_item.subtotal_etb == Decimal("100.00")  # untouched
++    assert booking.total_amount_etb == Decimal("1100.00")  # 100 + 1000
++    assert delta == Decimal("900.00")  # 1100 - 200
++
++
+ def test_correct_category_rejected_once_no_longer_pending():
+     student = _make_category(name_en="Student", price_etb="50.00")
+     adult = _make_category(name_en="Adult / Teacher", price_etb="100.00")
+     booking = _make_correctable_booking(student)
++    item = booking.items.get()
+     booking.status = Booking.Status.VISITED
+     booking.save(update_fields=["status", "updated_at"])
+     cashier = _make_cashier()
+ 
+     with pytest.raises(Conflict):
+-        services.correct_booking_category(booking=booking, category_id=adult.id, actor=cashier)
++        services.correct_booking_category(
++            booking=booking, item_id=item.id, category_id=adult.id, actor=cashier
++        )
+ 
+ 
+ def test_correct_category_rejects_the_same_category():
+     student = _make_category(name_en="Student", price_etb="50.00")
+     booking = _make_correctable_booking(student)
++    item = booking.items.get()
+     cashier = _make_cashier()
+ 
+     with pytest.raises(ValidationError):
+-        services.correct_booking_category(booking=booking, category_id=student.id, actor=cashier)
++        services.correct_booking_category(
++            booking=booking, item_id=item.id, category_id=student.id, actor=cashier
++        )
+ 
+ 
+ def test_correct_category_rejects_an_inactive_category():
+     student = _make_category(name_en="Student", price_etb="50.00")
+     retired = _make_category(name_en="Retired Category", price_etb="10.00", active=False)
+     booking = _make_correctable_booking(student)
++    item = booking.items.get()
+     cashier = _make_cashier()
+ 
+     with pytest.raises(ValidationError):
+-        services.correct_booking_category(booking=booking, category_id=retired.id, actor=cashier)
++        services.correct_booking_category(
++            booking=booking, item_id=item.id, category_id=retired.id, actor=cashier
++        )
++
++
++def test_correct_category_rejects_an_item_not_on_this_booking():
++    student = _make_category(name_en="Student", price_etb="50.00")
++    adult = _make_category(name_en="Adult", price_etb="100.00")
++    booking = _make_correctable_booking(student)
++    other_booking = _make_correctable_booking(student)
++    other_item = other_booking.items.get()
++    cashier = _make_cashier()
++
++    with pytest.raises(ValidationError):
++        services.correct_booking_category(
++            booking=booking, item_id=other_item.id, category_id=adult.id, actor=cashier
++        )
++
++
++def test_correct_category_rejects_a_category_another_item_already_has():
++    adult = _make_category(name_en="Adult", price_etb="100.00")
++    student = _make_category(name_en="Student", price_etb="50.00")
++    visitor = _make_visitor()
++    booking = services.create_booking(
++        visitor=visitor,
++        items=[
++            {"category_id": adult.id, "quantity": 1},
++            {"category_id": student.id, "quantity": 2},
++        ],
++        visit_date=TOMORROW,
++        booking_type=Booking.BookingType.INDIVIDUAL,
++    )
++    booking.status = Booking.Status.PENDING
++    booking.save(update_fields=["status", "updated_at"])
++    student_item = booking.items.get(category=student)
++    cashier = _make_cashier()
++
++    with pytest.raises(ValidationError):
++        services.correct_booking_category(
++            booking=booking, item_id=student_item.id, category_id=adult.id, actor=cashier
++        )
+ 
+ 
+ # --------------------------------------------------------------------------
+@@ -339,9 +423,8 @@ def _make_pending_booking(visitor=None):
+     category = _make_category()
+     booking = services.create_booking(
+         visitor=visitor,
+-        category_id=category.id,
++        items=[{"category_id": category.id, "quantity": 1}],
+         visit_date=TOMORROW,
+-        quantity=1,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+     )
+     booking.status = Booking.Status.PENDING
+@@ -435,16 +518,14 @@ def test_list_my_bookings_only_returns_own_bookings():
+     category = _make_category()
+     mine = services.create_booking(
+         visitor=visitor,
+-        category_id=category.id,
++        items=[{"category_id": category.id, "quantity": 1}],
+         visit_date=TOMORROW,
+-        quantity=1,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+     )
+     services.create_booking(
+         visitor=other,
+-        category_id=category.id,
++        items=[{"category_id": category.id, "quantity": 1}],
+         visit_date=TOMORROW,
+-        quantity=1,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+     )
+ 
+diff --git a/backend/apps/bookings/tests/test_views.py b/backend/apps/bookings/tests/test_views.py
+index ef90569..cc20df6 100644
+--- a/backend/apps/bookings/tests/test_views.py
++++ b/backend/apps/bookings/tests/test_views.py
+@@ -68,11 +68,10 @@ def _authed_client(account):
+     return client
+ 
+ 
+-def _create_booking_payload(category, booking_type="individual", **overrides):
++def _create_booking_payload(category, booking_type="individual", quantity=1, **overrides):
+     payload = {
+         "visitDate": TOMORROW.isoformat(),
+-        "categoryId": str(category.id),
+-        "quantity": 1,
++        "items": [{"categoryId": str(category.id), "quantity": quantity}],
+         "bookingType": booking_type,
+     }
+     payload.update(overrides)
+@@ -378,13 +377,14 @@ def test_category_correction_rejected_for_non_cashier():
+     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+     visitor_client = _authed_client(_make_visitor())
+     booking = _make_pending_booking_via_api(visitor_client, student)
++    item = booking.items.get()
+     manager_client = _authed_client(
+         _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
+     )
+ 
+     response = manager_client.patch(
+         f"/api/v1/bookings/{booking.id}/category-correction/",
+-        {"categoryId": str(non_resident.id)},
++        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
+         format="json",
+     )
+ 
+@@ -396,11 +396,12 @@ def test_category_correction_undercharge_reopens_payment():
+     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+     visitor_client = _authed_client(_make_visitor())
+     booking = _make_pending_booking_via_api(visitor_client, student)
++    item = booking.items.get()
+     cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+ 
+     response = cashier_client.patch(
+         f"/api/v1/bookings/{booking.id}/category-correction/",
+-        {"categoryId": str(non_resident.id)},
++        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
+         format="json",
+     )
+ 
+@@ -420,11 +421,12 @@ def test_category_correction_overcharge_issues_refund_and_stays_pending():
+     student = _make_category(name_en="Student", price_etb="50.00")
+     visitor_client = _authed_client(_make_visitor())
+     booking = _make_pending_booking_via_api(visitor_client, non_resident)
++    item = booking.items.get()
+     cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+ 
+     response = cashier_client.patch(
+         f"/api/v1/bookings/{booking.id}/category-correction/",
+-        {"categoryId": str(student.id)},
++        {"itemId": str(item.id), "categoryId": str(student.id)},
+         format="json",
+     )
+ 
+@@ -443,13 +445,14 @@ def test_category_correction_rejected_once_no_longer_pending():
+     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+     visitor_client = _authed_client(_make_visitor())
+     booking = _make_pending_booking_via_api(visitor_client, student)
++    item = booking.items.get()
+     booking.status = Booking.Status.VISITED
+     booking.save(update_fields=["status"])
+     cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+ 
+     response = cashier_client.patch(
+         f"/api/v1/bookings/{booking.id}/category-correction/",
+-        {"categoryId": str(non_resident.id)},
++        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
+         format="json",
+     )
+ 
+diff --git a/backend/apps/bookings/views.py b/backend/apps/bookings/views.py
+index 07e64a7..07a8c1b 100644
+--- a/backend/apps/bookings/views.py
++++ b/backend/apps/bookings/views.py
+@@ -134,8 +134,9 @@ class BookingDetailView(generics.RetrieveAPIView):
+     # visitor.full_name/email/phone (visitorName/visitorEmail/
+     # visitorPhone) for every row, so this avoids an extra query per
+     # request that would otherwise go unnoticed (this view returns one
+-    # row at a time).
+-    queryset = Booking.objects.select_related("visitor")
++    # row at a time). prefetch_related("items") -- same reasoning, for
++    # the per-category line-item list (`items`).
++    queryset = Booking.objects.select_related("visitor").prefetch_related("items")
+     lookup_field = "id"
+     serializer_class = BookingSerializer
+ 
+diff --git a/backend/apps/entrance/tests/test_services.py b/backend/apps/entrance/tests/test_services.py
+index 2dce937..9cf33ac 100644
+--- a/backend/apps/entrance/tests/test_services.py
++++ b/backend/apps/entrance/tests/test_services.py
+@@ -13,7 +13,7 @@ from django.utils import timezone
+ from rest_framework.exceptions import NotFound, ValidationError
+ 
+ from apps.accounts.models import Account
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.catalog.models import Category
+ from apps.core.exceptions import Conflict
+ from apps.core.models import AuditLogEntry
+@@ -49,16 +49,21 @@ def _make_pending_booking(quantity=20):
+     category = _make_category()
+     booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=category.price_etb,
+         visit_date=TOMORROW,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+         booked_quantity=quantity,
+         total_amount_etb=category.price_etb * quantity,
+         status=Booking.Status.PENDING,
+     )
++    BookingItem.objects.create(
++        booking=booking,
++        category=category,
++        category_name_en=category.name_en,
++        category_name_am=category.name_am,
++        unit_price_etb=category.price_etb,
++        quantity=quantity,
++        subtotal_etb=category.price_etb * quantity,
++    )
+     return booking
+ 
+ 
+diff --git a/backend/apps/entrance/tests/test_views.py b/backend/apps/entrance/tests/test_views.py
+index bc581f6..28296aa 100644
+--- a/backend/apps/entrance/tests/test_views.py
++++ b/backend/apps/entrance/tests/test_views.py
+@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
+ 
+ from apps.accounts.authentication import AccountRefreshToken
+ from apps.accounts.models import Account
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.catalog.models import Category
+ 
+ pytestmark = pytest.mark.django_db
+@@ -48,18 +48,24 @@ def _authed_client(account):
+ def _make_pending_booking(quantity=20):
+     visitor = _make_visitor_account()
+     category = Category.objects.create(name_en="Student", name_am="Student", price_etb=Decimal("50.00"))
+-    return Booking.objects.create(
++    booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=category.price_etb,
+         visit_date=TOMORROW,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+         booked_quantity=quantity,
+         total_amount_etb=category.price_etb * quantity,
+         status=Booking.Status.PENDING,
+     )
++    BookingItem.objects.create(
++        booking=booking,
++        category=category,
++        category_name_en=category.name_en,
++        category_name_am=category.name_am,
++        unit_price_etb=category.price_etb,
++        quantity=quantity,
++        subtotal_etb=category.price_etb * quantity,
++    )
++    return booking
+ 
+ 
+ # --------------------------------------------------------------------------
+diff --git a/backend/apps/notifications/tests/test_services.py b/backend/apps/notifications/tests/test_services.py
+index 1b80f76..4d48831 100644
+--- a/backend/apps/notifications/tests/test_services.py
++++ b/backend/apps/notifications/tests/test_services.py
+@@ -17,7 +17,7 @@ from unittest import mock
+ import pytest
+ 
+ from apps.accounts.models import Account
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.catalog.models import Category
+ from apps.notifications import services
+ from apps.notifications.models import Notification, NotificationDelivery
+@@ -38,18 +38,24 @@ def _make_booking(*, visitor):
+     category = Category.objects.create(
+         name_en="Adult", name_am="Adult", price_etb=Decimal("100.00")
+     )
+-    return Booking.objects.create(
++    booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=category.price_etb,
+         visit_date=TOMORROW,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+         booked_quantity=1,
+         total_amount_etb=category.price_etb,
+         status=Booking.Status.PENDING,
+     )
++    BookingItem.objects.create(
++        booking=booking,
++        category=category,
++        category_name_en=category.name_en,
++        category_name_am=category.name_am,
++        unit_price_etb=category.price_etb,
++        quantity=1,
++        subtotal_etb=category.price_etb,
++    )
++    return booking
+ 
+ 
+ # --------------------------------------------------------------------------
+diff --git a/backend/apps/payments/services.py b/backend/apps/payments/services.py
+index 851019d..39900e5 100644
+--- a/backend/apps/payments/services.py
++++ b/backend/apps/payments/services.py
+@@ -115,7 +115,14 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
+         "return_url": f"{settings.PUBLIC_WEB_BASE_URL.rstrip('/')}/bookings/{booking.id}",
+         "customization": {
+             "title": "Museum Ticket",
+-            "description": f"{booking.category_name_en} x{booking.booked_quantity}",
++            # Itemized across every category on this booking (e.g. "Adult
++            # x1, Student x2") -- a booking is no longer guaranteed to
++            # hold just one category, so a single `category_name_en x
++            # booked_quantity` line would misdescribe a mixed-category
++            # checkout.
++            "description": ", ".join(
++                f"{item.category_name_en} x{item.quantity}" for item in booking.items.all()
++            ),
+         },
+     }
+ 
+diff --git a/backend/apps/payments/tasks.py b/backend/apps/payments/tasks.py
+index 4c82760..ca00ec4 100644
+--- a/backend/apps/payments/tasks.py
++++ b/backend/apps/payments/tasks.py
+@@ -68,7 +68,17 @@ def _render_receipt_pdf(*, booking) -> bytes:
+ 
+     write_row("Booking reference", "የቦታ ማስያዣ ቁጥር", booking.reference)
+     write_row("Visitor", "ጎብኚ", booking.visitor.full_name)
+-    write_row("Category", "ምድብ", f"{booking.category_name_en} / {booking.category_name_am}")
++    # One row per category on this booking (a checkout may now mix more
++    # than one, e.g. one Adult plus two Student tickets) instead of the
++    # single "Category" row this receipt used to have back when a
++    # booking could only ever hold one.
++    for item in booking.items.all():
++        write_row(
++            "Category",
++            "ምድብ",
++            f"{item.category_name_en} / {item.category_name_am} x{item.quantity} "
++            f"(ETB {item.unit_price_etb} each)",
++        )
+     write_row("Visit date", "የጉብኝት ቀን", booking.visit_date.isoformat())
+     write_row("Quantity", "ብዛት", booking.booked_quantity)
+     write_row("Amount paid (ETB)", "የተከፈለ መጠን (ብር)", booking.total_amount_etb)
+diff --git a/backend/apps/payments/tests/test_services.py b/backend/apps/payments/tests/test_services.py
+index fb7062b..2c4c340 100644
+--- a/backend/apps/payments/tests/test_services.py
++++ b/backend/apps/payments/tests/test_services.py
+@@ -17,7 +17,7 @@ from django.utils import timezone
+ from rest_framework.exceptions import ValidationError
+ 
+ from apps.accounts.models import Account
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.catalog.models import Category
+ from apps.core.exceptions import Conflict
+ from apps.payments import services
+@@ -45,18 +45,24 @@ def _make_booking(*, visitor=None, status=Booking.Status.AWAITING_PAYMENT, quant
+     category = Category.objects.create(
+         name_en="Adult", name_am="Adult", price_etb=Decimal("100.00")
+     )
+-    return Booking.objects.create(
++    booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=category.price_etb,
+         visit_date=TOMORROW,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+         booked_quantity=quantity,
+         total_amount_etb=category.price_etb * quantity,
+         status=status,
+     )
++    BookingItem.objects.create(
++        booking=booking,
++        category=category,
++        category_name_en=category.name_en,
++        category_name_am=category.name_am,
++        unit_price_etb=category.price_etb,
++        quantity=quantity,
++        subtotal_etb=category.price_etb * quantity,
++    )
++    return booking
+ 
+ 
+ # --------------------------------------------------------------------------
+diff --git a/backend/apps/payments/tests/test_views.py b/backend/apps/payments/tests/test_views.py
+index a7e4ad4..31fa976 100644
+--- a/backend/apps/payments/tests/test_views.py
++++ b/backend/apps/payments/tests/test_views.py
+@@ -17,7 +17,7 @@ from django.utils import timezone
+ from rest_framework.test import APIClient
+ 
+ from apps.accounts.models import Account
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.catalog.models import Category
+ from apps.payments.models import Payment
+ 
+@@ -43,16 +43,21 @@ def _make_payment(status=Payment.Status.INITIATED):
+     )
+     booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=category.price_etb,
+         visit_date=TOMORROW,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+         booked_quantity=1,
+         total_amount_etb=category.price_etb,
+         status=Booking.Status.AWAITING_PAYMENT,
+     )
++    BookingItem.objects.create(
++        booking=booking,
++        category=category,
++        category_name_en=category.name_en,
++        category_name_am=category.name_am,
++        unit_price_etb=category.price_etb,
++        quantity=1,
++        subtotal_etb=category.price_etb,
++    )
+     return Payment.objects.create(
+         booking=booking,
+         tx_ref="museum-test-tx-ref",
+diff --git a/backend/apps/refunds/services.py b/backend/apps/refunds/services.py
+index 6f8a032..58a303c 100644
+--- a/backend/apps/refunds/services.py
++++ b/backend/apps/refunds/services.py
+@@ -31,7 +31,7 @@ unreachable (NFR-IDEMPOTENT-001).
+ """
+ 
+ import logging
+-from decimal import Decimal
++from decimal import ROUND_HALF_UP, Decimal
+ 
+ import requests
+ from django.conf import settings
+@@ -80,7 +80,22 @@ def compute_refundable_amount(*, booking, reason):
+     if reason == Refund.Reason.PARTIAL_SHORTFALL:
+         attended = booking.attended_quantity or 0
+         shortfall = booking.booked_quantity - attended
+-        return booking.unit_price_etb * shortfall
++        # A booking can now mix categories (`BookingItem`), and
++        # `check_in_booking` records only a single total headcount, never
++        # which category each no-show belonged to -- so there is no
++        # single `unit_price_etb` to multiply by the shortfall anymore.
++        # This uses the booking's blended average price per ticket
++        # instead: total paid divided across every ticket booked, times
++        # however many didn't show up. For a single-category booking
++        # (still the common case) this is exactly the old calculation;
++        # for a mixed booking it's a reasonable, price-neutral
++        # approximation in the absence of per-category attendance data.
++        if booking.booked_quantity == 0:
++            return Decimal("0")
++        average_unit_price = booking.total_amount_etb / booking.booked_quantity
++        return (average_unit_price * shortfall).quantize(
++            Decimal("0.01"), rounding=ROUND_HALF_UP
++        )
+     # (a) cancellation and (c) no-response are always a full refund of
+     # what was actually paid (Document 02 Sec 2.6/§2.4).
+     return booking.total_amount_etb
+diff --git a/backend/apps/refunds/tests/test_services.py b/backend/apps/refunds/tests/test_services.py
+index a1a146c..a02b047 100644
+--- a/backend/apps/refunds/tests/test_services.py
++++ b/backend/apps/refunds/tests/test_services.py
+@@ -18,7 +18,7 @@ from django.utils import timezone
+ from rest_framework.exceptions import PermissionDenied
+ 
+ from apps.accounts.models import Account
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.catalog.models import Category
+ from apps.core.exceptions import Conflict
+ from apps.core.models import AuditLogEntry
+@@ -62,12 +62,8 @@ def _make_booking(
+ ):
+     visitor = visitor or _make_visitor()
+     category = Category.objects.create(name_en="Adult", name_am="Adult", price_etb=unit_price)
+-    return Booking.objects.create(
++    booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=category.price_etb,
+         visit_date=visit_date,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+         booked_quantity=quantity,
+@@ -75,6 +71,16 @@ def _make_booking(
+         total_amount_etb=category.price_etb * quantity,
+         status=status,
+     )
++    BookingItem.objects.create(
++        booking=booking,
++        category=category,
++        category_name_en=category.name_en,
++        category_name_am=category.name_am,
++        unit_price_etb=category.price_etb,
++        quantity=quantity,
++        subtotal_etb=category.price_etb * quantity,
++    )
++    return booking
+ 
+ 
+ def _make_completed_payment(*, booking, tx_ref=None):
+diff --git a/backend/apps/reporting/services.py b/backend/apps/reporting/services.py
+index 2e556ff..adabb86 100644
+--- a/backend/apps/reporting/services.py
++++ b/backend/apps/reporting/services.py
+@@ -36,7 +36,7 @@ from django.db.models import Case, Count, F, Sum, TextField, Value, When
+ from django.db.models.functions import Coalesce
+ from rest_framework.exceptions import ValidationError
+ 
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.payments.models import Payment
+ from apps.refunds.models import Refund
+ 
+@@ -67,45 +67,59 @@ def _reportable_bookings_queryset():
+ 
+ def _net_revenue_by_category(*, bookings_queryset):
+     """Completed-payment total minus completed-refund total, grouped by
+-    `Booking.category_name_en` (the bilingual snapshot taken at booking
+-    time, per `apps.bookings.models.Booking` -- never a live join to
+-    `catalog.Category`, so a since-retired or renamed category still
+-    reports correctly against historical bookings).
+-
+-    Computed as two independent aggregations (payments, then refunds) and
+-    combined in Python rather than one query joining both `payments` and
+-    `refunds` off the same booking -- a single joined query would fan out
+-    across both child tables at once and double-count whichever side has
+-    more than one row per booking (e.g. a booking with two payment
+-    attempts and one refund).
++    `BookingItem.category_name_en` (the bilingual snapshot taken at
++    booking time, per `apps.bookings.models.BookingItem` -- never a live
++    join to `catalog.Category`, so a since-retired or renamed category
++    still reports correctly against historical bookings).
++
++    A `Payment`/`Refund` is still recorded once per *booking*, not once
++    per category (Chapa is only ever charged/refunded a single lump sum
++    per booking, per `apps.payments`/`apps.refunds`) -- so a booking's net
++    revenue is first computed per booking exactly as before, then split
++    across that booking's `BookingItem`s in proportion to each item's
++    share of `Booking.total_amount_etb`. For a single-category booking
++    (still the common case) every cent of its net revenue lands on that
++    one category, unchanged from before; a mixed booking (e.g. one Adult
++    plus two Student tickets) instead attributes its net revenue
++    proportionally across both.
+     """
+-    categories = list(
+-        bookings_queryset.values_list("category_name_en", flat=True).distinct()
+-    )
++    booking_ids = list(bookings_queryset.values_list("id", flat=True))
+ 
+-    payments_by_category = dict(
+-        Payment.objects.filter(
+-            status=Payment.Status.COMPLETED, booking__in=bookings_queryset
+-        )
+-        .values_list("booking__category_name_en")
++    payments_by_booking = dict(
++        Payment.objects.filter(status=Payment.Status.COMPLETED, booking_id__in=booking_ids)
++        .values_list("booking_id")
+         .annotate(total=Sum("amount_etb"))
+     )
+-    refunds_by_category = dict(
+-        Refund.objects.filter(
+-            status=Refund.Status.COMPLETED, booking__in=bookings_queryset
+-        )
+-        .values_list("booking__category_name_en")
++    refunds_by_booking = dict(
++        Refund.objects.filter(status=Refund.Status.COMPLETED, booking_id__in=booking_ids)
++        .values_list("booking_id")
+         .annotate(total=Sum("amount_etb"))
+     )
+-
+-    return {
+-        category: (
+-            payments_by_category.get(category, Decimal("0"))
+-            - refunds_by_category.get(category, Decimal("0"))
++    net_revenue_by_booking = {
++        booking_id: (
++            payments_by_booking.get(booking_id, Decimal("0"))
++            - refunds_by_booking.get(booking_id, Decimal("0"))
+         )
+-        for category in categories
++        for booking_id in set(payments_by_booking) | set(refunds_by_booking)
+     }
+ 
++    items = BookingItem.objects.filter(booking_id__in=booking_ids).values_list(
++        "booking_id", "category_name_en", "subtotal_etb", "booking__total_amount_etb"
++    )
++
++    revenue_by_category = {}
++    for booking_id, category, subtotal, booking_total in items:
++        # Every category on a booking that never had a completed
++        # payment/refund still shows up, at zero, same as the old
++        # per-category `.distinct()` list did.
++        revenue_by_category.setdefault(category, Decimal("0"))
++        net = net_revenue_by_booking.get(booking_id)
++        if not net or not booking_total:
++            continue
++        revenue_by_category[category] += (subtotal / booking_total) * net
++
++    return revenue_by_category
++
+ 
+ def _net_revenue_total(*, bookings_queryset):
+     payments_total = Payment.objects.filter(
+@@ -131,9 +145,14 @@ def get_dashboard():
+     """
+     bookings = _reportable_bookings_queryset()
+ 
++    # Summed over `BookingItem.quantity`, not `Booking.booked_quantity`
++    # directly -- a booking's `booked_quantity` is now a cross-category
++    # total (FR-BOOK-001 no longer limits a booking to one category), so
++    # the per-category breakdown has to come from the line items instead.
+     visitor_counts_by_category = dict(
+-        bookings.values_list("category_name_en")
+-        .annotate(total=Sum("booked_quantity"))
++        BookingItem.objects.filter(booking__in=bookings)
++        .values_list("category_name_en")
++        .annotate(total=Sum("quantity"))
+         .order_by()
+     )
+ 
+diff --git a/backend/apps/reporting/tests/test_services.py b/backend/apps/reporting/tests/test_services.py
+index 6cb4b79..50ca23f 100644
+--- a/backend/apps/reporting/tests/test_services.py
++++ b/backend/apps/reporting/tests/test_services.py
+@@ -13,7 +13,7 @@ from django.utils import timezone
+ from rest_framework.exceptions import ValidationError
+ 
+ from apps.accounts.models import Account
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.catalog.models import Category
+ from apps.payments.models import Payment
+ from apps.refunds.models import Refund
+@@ -59,12 +59,8 @@ def _make_booking(
+ ):
+     visitor = _make_visitor(email=f"visitor-{Account.objects.count()}@example.com")
+     unit_price = unit_price if unit_price is not None else category.price_etb
+-    return Booking.objects.create(
++    booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=unit_price,
+         visit_date=visit_date,
+         booking_type=booking_type,
+         group_name=group_name,
+@@ -72,6 +68,16 @@ def _make_booking(
+         total_amount_etb=unit_price * booked_quantity,
+         status=status,
+     )
++    BookingItem.objects.create(
++        booking=booking,
++        category=category,
++        category_name_en=category.name_en,
++        category_name_am=category.name_am,
++        unit_price_etb=unit_price,
++        quantity=booked_quantity,
++        subtotal_etb=unit_price * booked_quantity,
++    )
++    return booking
+ 
+ 
+ def _make_completed_payment(*, booking, amount=None):
+diff --git a/backend/apps/settlement/tests/test_services.py b/backend/apps/settlement/tests/test_services.py
+index a6fdd25..712d011 100644
+--- a/backend/apps/settlement/tests/test_services.py
++++ b/backend/apps/settlement/tests/test_services.py
+@@ -17,7 +17,7 @@ from django.utils import timezone
+ from rest_framework.exceptions import ValidationError
+ 
+ from apps.accounts.models import Account
+-from apps.bookings.models import Booking
++from apps.bookings.models import Booking, BookingItem
+ from apps.catalog.models import Category
+ from apps.core.models import AuditLogEntry
+ from apps.payments.models import Payment
+@@ -81,12 +81,8 @@ def _make_visited_booking(*, cashier, quantity=1, unit_price=Decimal("100.00"),
+     category = Category.objects.create(
+         name_en="Adult", name_am="Adult", price_etb=unit_price
+     )
+-    return Booking.objects.create(
++    booking = Booking.objects.create(
+         visitor=visitor,
+-        category=category,
+-        category_name_en=category.name_en,
+-        category_name_am=category.name_am,
+-        unit_price_etb=category.price_etb,
+         visit_date=TOMORROW,
+         booking_type=Booking.BookingType.INDIVIDUAL,
+         booked_quantity=quantity,
+@@ -96,6 +92,16 @@ def _make_visited_booking(*, cashier, quantity=1, unit_price=Decimal("100.00"),
+         checked_in_at=timezone.now(),
+         checked_in_by_user_id=cashier,
+     )
++    BookingItem.objects.create(
++        booking=booking,
++        category=category,
++        category_name_en=category.name_en,
++        category_name_am=category.name_am,
++        unit_price_etb=category.price_etb,
++        quantity=quantity,
++        subtotal_etb=category.price_etb * quantity,
++    )
++    return booking
+ 
+ 
+ def _make_completed_refund(*, booking, amount):
+diff --git a/contracts/openapi.yaml b/contracts/openapi.yaml
+index ffdda56..5bebc2d 100644
+--- a/contracts/openapi.yaml
++++ b/contracts/openapi.yaml
+@@ -1221,8 +1221,8 @@ components:
+       type: object
+       description: |-
+         `Booking` (Document 04). Read-only -- every mutation goes through
+-        the Create/Cancel/Reschedule serializers below and services.py, never
+-        through this serializer directly.
++        the Create/Cancel/Reschedule/CategoryCorrection serializers below and
++        services.py, never through this serializer directly.
+       properties:
+         id:
+           type: string
+@@ -1235,15 +1235,10 @@ components:
+           type: string
+           format: uuid
+           readOnly: true
+-        categoryId:
+-          type: string
+-          format: uuid
+-          readOnly: true
+-        categoryNameEn:
+-          type: string
+-          readOnly: true
+-        categoryNameAm:
+-          type: string
++        items:
++          type: array
++          items:
++            $ref: '#/components/schemas/BookingItem'
+           readOnly: true
+         visitDate:
+           type: string
+@@ -1325,15 +1320,13 @@ components:
+       - bookedQuantity
+       - bookingType
+       - categoryCorrectedAt
+-      - categoryId
+-      - categoryNameAm
+-      - categoryNameEn
+       - checkoutUrl
+       - createdAt
+       - groupContactPhone
+       - groupName
+       - id
+       - ifmisVoucherReference
++      - items
+       - noticeSentAt
+       - receiptUrl
+       - reconciliationId
+@@ -1352,19 +1345,23 @@ components:
+         `BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
+         (group). A plain Serializer, not a ModelSerializer: `visitor` is
+         supplied by the view from `request.user`, never from the request
+-        body, and `categoryId`/`bookingType` need their own field names
+-        mapped onto services.create_booking's kwargs rather than a 1:1 model
+-        field mapping.
++        body, and `items`/`bookingType` need their own field names mapped
++        onto services.create_booking's kwargs rather than a 1:1 model field
++        mapping.
++
++        `items` replaces the old single `categoryId`/`quantity` pair -- a
++        booking can now mix categories (one Adult plus two Student tickets in
++        the same checkout) instead of being limited to one category with a
++        plain headcount. `min_length=1`: every booking still needs at least
++        one category, same as before.
+       properties:
+         visitDate:
+           type: string
+           format: date
+-        categoryId:
+-          type: string
+-          format: uuid
+-        quantity:
+-          type: integer
+-          minimum: 1
++        items:
++          type: array
++          items:
++            $ref: '#/components/schemas/BookingCreateItem'
+         bookingType:
+           $ref: '#/components/schemas/BookingTypeEnum'
+         groupName:
+@@ -1375,9 +1372,69 @@ components:
+           nullable: true
+       required:
+       - bookingType
++      - items
++      - visitDate
++    BookingCreateItem:
++      type: object
++      description: |-
++        One `{categoryId, quantity}` entry of a `BookingCreateRequest`'s
++        `items` list -- see `BookingCreateSerializer` below.
++      properties:
++        categoryId:
++          type: string
++          format: uuid
++        quantity:
++          type: integer
++          minimum: 1
++      required:
+       - categoryId
+       - quantity
+-      - visitDate
++    BookingItem:
++      type: object
++      description: |-
++        `BookingItem` (Document 04/05) -- one visitor category plus how
++        many tickets of it were bought, one entry per category on a
++        `Booking`. Read-only, same as `BookingSerializer` itself: line items
++        are only ever created together with their parent booking (in
++        `services.create_booking`) or corrected in place (`services.
++        correct_booking_category`), never mutated directly through this
++        serializer.
++      properties:
++        id:
++          type: string
++          format: uuid
++          readOnly: true
++        categoryId:
++          type: string
++          format: uuid
++          readOnly: true
++        categoryNameEn:
++          type: string
++          readOnly: true
++        categoryNameAm:
++          type: string
++          readOnly: true
++        quantity:
++          type: integer
++          readOnly: true
++        unitPriceEtb:
++          type: string
++          format: decimal
++          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
++          readOnly: true
++        subtotalEtb:
++          type: string
++          format: decimal
++          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
++          readOnly: true
++      required:
++      - categoryId
++      - categoryNameAm
++      - categoryNameEn
++      - id
++      - quantity
++      - subtotalEtb
++      - unitPriceEtb
+     BookingReschedule:
+       type: object
+       description: '`BookingRescheduleRequest` -- FR-BOOK-007.'
+@@ -1649,15 +1706,10 @@ components:
+           type: string
+           format: uuid
+           readOnly: true
+-        categoryId:
+-          type: string
+-          format: uuid
+-          readOnly: true
+-        categoryNameEn:
+-          type: string
+-          readOnly: true
+-        categoryNameAm:
+-          type: string
++        items:
++          type: array
++          items:
++            $ref: '#/components/schemas/BookingItem'
+           readOnly: true
+         visitDate:
+           type: string
+@@ -1755,9 +1807,6 @@ components:
+       - bookedQuantity
+       - bookingType
+       - categoryCorrectedAt
+-      - categoryId
+-      - categoryNameAm
+-      - categoryNameEn
+       - checkoutUrl
+       - createdAt
+       - groupContactPhone
+@@ -1765,6 +1814,7 @@ components:
+       - id
+       - ifmisPurpose
+       - ifmisVoucherReference
++      - items
+       - noticeSentAt
+       - payerName
+       - receiptUrl
+@@ -2000,10 +2050,15 @@ components:
+       type: object
+       description: |-
+         `BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
+-        addendum to Document 02 Sec 2.2). A plain Serializer, not a
+-        ModelSerializer, mirroring `BookingCreateSerializer` above: the
+-        single input is a new category, not a 1:1 model field mapping.
++        addendum to Document 02 Sec 2.2). `itemId` identifies which of the
++        booking's `BookingItem` line items to correct -- see
++        `services.correct_booking_category`'s own docstring for why a
++        mixed-category booking needs this instead of assuming there's only
++        ever one category to correct.
+       properties:
++        itemId:
++          type: string
++          format: uuid
+         categoryId:
+           type: string
+           format: uuid
+diff --git a/frontend/src/app/[lang]/book/page.tsx b/frontend/src/app/[lang]/book/page.tsx
+index 420864b..41d06f5 100644
+--- a/frontend/src/app/[lang]/book/page.tsx
++++ b/frontend/src/app/[lang]/book/page.tsx
+@@ -8,7 +8,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
+ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+ import { StepIndicator } from '@/components/ui/StepIndicator';
+-import { DateCategoryPicker } from '@/features/booking/components/DateCategoryPicker';
++import { DateCategoryPicker, type BookingItemInput } from '@/features/booking/components/DateCategoryPicker';
+ import { AvailabilityDatePicker } from '@/features/booking/components/AvailabilityDatePicker';
+ import { BookingSummary } from '@/features/booking/components/BookingSummary';
+ import { createBooking } from '@/features/booking/api';
+@@ -26,8 +26,11 @@ export default function BookPage() {
+   const [isProcessing, setIsProcessing] = useState(false);
+   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+ 
+-  const [categoryId, setCategoryId] = useState<string | null>(null);
+-  const [quantity, setQuantity] = useState(1);
++  // One entry per category the visitor has put a quantity against -- a
++  // father booking one Adult ticket for himself and two Student tickets
++  // for his kids ends up with two entries here, in one booking, instead
++  // of being limited to a single category/quantity pair.
++  const [items, setItems] = useState<BookingItemInput[]>([]);
+   const [visitDate, setVisitDate] = useState('');
+ 
+   // Login gate -- mirrors group-visits/new/page.tsx, which already does
+@@ -52,7 +55,7 @@ export default function BookPage() {
+   const stepIndex = ['category', 'datetime', 'payment'].indexOf(currentStep);
+ 
+   const handleCategoryNext = () => {
+-    if (categoryId && quantity > 0) {
++    if (items.length > 0) {
+       setCurrentStep('datetime');
+     }
+   };
+@@ -64,14 +67,13 @@ export default function BookPage() {
+   };
+ 
+   const handleConfirmBooking = async () => {
+-    if (!categoryId) return;
++    if (items.length === 0) return;
+ 
+     setIsProcessing(true);
+     try {
+       const booking = await createBooking({
+         visitDate,
+-        categoryId,
+-        quantity,
++        items,
+         bookingType: 'individual',
+       });
+ 
+@@ -100,10 +102,8 @@ export default function BookPage() {
+       case 'category':
+         return (
+           <DateCategoryPicker
+-            selectedCategoryId={categoryId}
+-            selectedQuantity={quantity}
+-            onCategorySelect={setCategoryId}
+-            onQuantityChange={setQuantity}
++            items={items}
++            onItemsChange={setItems}
+             onNext={handleCategoryNext}
+           />
+         );
+@@ -148,8 +148,7 @@ export default function BookPage() {
+       case 'payment':
+         return (
+           <BookingSummary
+-            categoryId={categoryId!}
+-            quantity={quantity}
++            items={items}
+             visitDate={visitDate}
+             visitorName={user?.full_name ?? ''}
+             visitorEmail={user?.email ?? ''}
+diff --git a/frontend/src/app/[lang]/bookings/[id]/page.tsx b/frontend/src/app/[lang]/bookings/[id]/page.tsx
+index 75610fe..18b78c3 100644
+--- a/frontend/src/app/[lang]/bookings/[id]/page.tsx
++++ b/frontend/src/app/[lang]/bookings/[id]/page.tsx
+@@ -187,7 +187,11 @@ export default function BookingDetailPage() {
+             <div>
+               <div className="text-stone-500">{t('category')}</div>
+               <div className="font-medium text-stone-900">
+-                {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
++                {booking.items
++                  .map((item) =>
++                    `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`
++                  )
++                  .join(', ')}
+               </div>
+             </div>
+             <div>
+diff --git a/frontend/src/features/booking/components/BookingDetailCard.tsx b/frontend/src/features/booking/components/BookingDetailCard.tsx
+index 24b1f3d..1cd4be8 100644
+--- a/frontend/src/features/booking/components/BookingDetailCard.tsx
++++ b/frontend/src/features/booking/components/BookingDetailCard.tsx
+@@ -15,8 +15,10 @@ interface BookingDetailCardProps {
+     bookedQuantity: number;
+     attendedQuantity?: number | null;
+     totalAmountEtb: number;
+-    categoryNameEn: string;
+-    categoryNameAm: string;
++    // One entry per category on this booking -- a booking mixing
++    // categories (e.g. one Adult plus two Student tickets bought
++    // together) has more than one entry here.
++    items: { categoryNameEn: string; categoryNameAm: string; quantity: number }[];
+     rescheduledCount: number;
+     receiptUrl?: string | null;
+     createdAt: string;
+@@ -66,7 +68,11 @@ export function BookingDetailCard({
+         <div>
+           <p className="text-stone-500">{t('category')}</p>
+           <p className="font-medium text-stone-900">
+-            {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
++            {booking.items
++              .map((item) =>
++                `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`
++              )
++              .join(', ')}
+           </p>
+         </div>
+         <div>
+diff --git a/frontend/src/features/booking/components/BookingList.tsx b/frontend/src/features/booking/components/BookingList.tsx
+index c289ff6..0684603 100644
+--- a/frontend/src/features/booking/components/BookingList.tsx
++++ b/frontend/src/features/booking/components/BookingList.tsx
+@@ -7,19 +7,21 @@ import { Button } from '@/components/ui/Button';
+ import { EmptyState } from '@/components/ui/EmptyState';
+ import Link from 'next/link';
+ 
+-interface BookingItem {
++interface BookingListItem {
+   id: string;
+   reference: string;
+   status: BookingStatus;
+   visitDate: string;
+   bookedQuantity: number;
+   totalAmountEtb: number;
+-  categoryNameEn: string;
+-  categoryNameAm: string;
++  // One entry per category on this booking -- a booking mixing
++  // categories (e.g. one Adult plus two Student tickets bought
++  // together) has more than one entry here.
++  items: { categoryNameEn: string; categoryNameAm: string; quantity: number }[];
+ }
+ 
+ interface BookingListProps {
+-  bookings: BookingItem[];
++  bookings: BookingListItem[];
+   isLoading?: boolean;
+   onRefresh?: () => void;
+ }
+@@ -99,7 +101,11 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
+                   </span>
+                 </div>
+                 <div className="text-sm text-stone-400 mt-0.5">
+-                  {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
++                  {booking.items
++                    .map((item) =>
++                      `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`
++                    )
++                    .join(', ')}
+                 </div>
+               </div>
+               <Button variant="ghost" size="sm" className="flex-shrink-0">
+diff --git a/frontend/src/features/booking/components/BookingSummary.tsx b/frontend/src/features/booking/components/BookingSummary.tsx
+index 5a436d2..d6de640 100644
+--- a/frontend/src/features/booking/components/BookingSummary.tsx
++++ b/frontend/src/features/booking/components/BookingSummary.tsx
+@@ -6,10 +6,13 @@ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+ import { getCategories } from '@/features/catalog/api';
+ import type { Category } from '@/features/catalog/schemas';
++import type { BookingItemInput } from './DateCategoryPicker';
+ 
+ interface BookingSummaryProps {
+-  categoryId: string;
+-  quantity: number;
++  // One row per category with a quantity against it -- e.g. a father's
++  // booking shows both his one Adult ticket and his kids' two Student
++  // tickets here, not just a single category/quantity pair.
++  items: BookingItemInput[];
+   visitDate: string;
+   // Shown read-only for the visitor's own confirmation, sourced from her
+   // authenticated account -- NOT form fields, and never sent as part of
+@@ -20,7 +23,7 @@ interface BookingSummaryProps {
+   // picker and a special-requests textarea) as editable inputs that were
+   // silently discarded on submit -- decided to strip them rather than
+   // add unneeded backend fields, since a Visitor's booking is already
+-  // fully described by category + quantity + date.
++  // fully described by its items + date.
+   visitorName: string;
+   visitorEmail: string;
+   visitorPhone: string | null;
+@@ -30,8 +33,7 @@ interface BookingSummaryProps {
+ }
+ 
+ export function BookingSummary({
+-  categoryId,
+-  quantity,
++  items,
+   visitDate,
+   visitorName,
+   visitorEmail,
+@@ -42,25 +44,29 @@ export function BookingSummary({
+ }: BookingSummaryProps) {
+   const { t, locale } = useTranslation();
+ 
+-  const [category, setCategory] = useState<Category | null>(null);
++  const [categories, setCategories] = useState<Category[]>([]);
+ 
+   useEffect(() => {
+     let cancelled = false;
+     getCategories()
+-      .then((categories) => {
+-        if (!cancelled) {
+-          setCategory(categories.find((c) => c.id === categoryId) ?? null);
+-        }
++      .then((data) => {
++        if (!cancelled) setCategories(data);
+       })
+       .catch(() => {
+-        if (!cancelled) setCategory(null);
++        if (!cancelled) setCategories([]);
+       });
+     return () => {
+       cancelled = true;
+     };
+-  }, [categoryId]);
++  }, []);
+ 
+-  const totalAmount = category ? (parseFloat(category.price_etb) * quantity).toFixed(2) : '0.00';
++  const rows = items.map((item) => {
++    const category = categories.find((c) => c.id === item.categoryId) ?? null;
++    const unitPrice = category ? parseFloat(category.price_etb) : 0;
++    return { ...item, category, subtotal: unitPrice * item.quantity };
++  });
++  const totalQuantity = rows.reduce((sum, row) => sum + row.quantity, 0);
++  const totalAmount = rows.reduce((sum, row) => sum + row.subtotal, 0).toFixed(2);
+ 
+   const formatDate = (dateStr: string) => {
+     const date = new Date(dateStr);
+@@ -80,14 +86,23 @@ export function BookingSummary({
+         </h3>
+ 
+         <div className="space-y-3 divide-y divide-stone-100">
+-          {/* Category & Quantity */}
+-          <div className="grid grid-cols-2 gap-2 pb-3">
++          {/* One line per category -- see the `items` prop note above. */}
++          <div className="space-y-2 pb-3">
+             <div className="text-stone-500">{t('category')}</div>
+-            <div className="font-medium text-stone-900 text-right">
+-              {locale === 'en' ? category?.name_en : category?.name_am}
++            {rows.map((row) => (
++              <div key={row.categoryId} className="grid grid-cols-3 gap-2 text-sm">
++                <div className="font-medium text-stone-900 col-span-2">
++                  {locale === 'en' ? row.category?.name_en : row.category?.name_am}
++                </div>
++                <div className="font-medium text-stone-900 text-right">
++                  x{row.quantity} = ETB {row.subtotal.toFixed(2)}
++                </div>
++              </div>
++            ))}
++            <div className="grid grid-cols-2 gap-2 pt-1">
++              <div className="text-stone-500">{t('quantity')}</div>
++              <div className="font-medium text-stone-900 text-right">{totalQuantity}</div>
+             </div>
+-            <div className="text-stone-500">{t('quantity')}</div>
+-            <div className="font-medium text-stone-900 text-right">{quantity}</div>
+           </div>
+ 
+           {/* Date */}
+diff --git a/frontend/src/features/booking/components/DateCategoryPicker.tsx b/frontend/src/features/booking/components/DateCategoryPicker.tsx
+index 116455c..4531c42 100644
+--- a/frontend/src/features/booking/components/DateCategoryPicker.tsx
++++ b/frontend/src/features/booking/components/DateCategoryPicker.tsx
+@@ -8,21 +8,22 @@ import { QuantityInput } from '@/components/ui/QuantityInput';
+ import type { Category } from '@/features/catalog/schemas';
+ import { getCategories } from '@/features/catalog/api';
+ 
++export interface BookingItemInput {
++  categoryId: string;
++  quantity: number;
++}
++
+ interface DateCategoryPickerProps {
+-  selectedCategoryId: string | null;
+-  selectedQuantity: number;
+-  onCategorySelect: (categoryId: string) => void;
+-  onQuantityChange: (quantity: number) => void;
++  // One entry per category the visitor has put a quantity against --
++  // e.g. a father booking one Adult ticket for himself and two Student
++  // tickets for his kids ends up with two entries here, not two separate
++  // bookings. A category with quantity 0 simply isn't in this list.
++  items: BookingItemInput[];
++  onItemsChange: (items: BookingItemInput[]) => void;
+   onNext: () => void;
+ }
+ 
+-export function DateCategoryPicker({
+-  selectedCategoryId,
+-  selectedQuantity,
+-  onCategorySelect,
+-  onQuantityChange,
+-  onNext,
+-}: DateCategoryPickerProps) {
++export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategoryPickerProps) {
+   const { t, locale } = useTranslation();
+   const [categories, setCategories] = useState<Category[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
+@@ -47,7 +48,23 @@ export function DateCategoryPicker({
+     loadCategories();
+   }, [t]);
+ 
+-  const isSelected = (categoryId: string) => selectedCategoryId === categoryId;
++  const quantityFor = (categoryId: string) =>
++    items.find((item) => item.categoryId === categoryId)?.quantity ?? 0;
++
++  const setQuantityFor = (categoryId: string, quantity: number) => {
++    const withoutCategory = items.filter((item) => item.categoryId !== categoryId);
++    // A category dropped to 0 leaves the cart entirely rather than
++    // sitting in it as a zero-quantity row -- `items` is exactly the set
++    // of `{categoryId, quantity}` pairs services.create_booking expects,
++    // and it rejects a zero quantity.
++    onItemsChange(quantity > 0 ? [...withoutCategory, { categoryId, quantity }] : withoutCategory);
++  };
++
++  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
++  const totalAmount = items.reduce((sum, item) => {
++    const category = categories.find((c) => c.id === item.categoryId);
++    return sum + (category ? Number(category.price_etb) * item.quantity : 0);
++  }, 0);
+ 
+   if (isLoading) {
+     return (
+@@ -73,55 +90,70 @@ export function DateCategoryPicker({
+ 
+   return (
+     <div className="space-y-6">
+-      {/* Category Selection */}
++      {/* Category + quantity selection -- a father booking one Adult
++          ticket for himself and two Student tickets for his kids sets a
++          quantity against both rows here, in the same booking, rather
++          than having to book each category separately. */}
+       <Card>
+         <h3 className="text-lg font-semibold text-stone-900 mb-4">
+           {t('category')}
+         </h3>
+-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
++        <div className="space-y-3">
+           {categories.map((category) => (
+-            <button
++            <div
+               key={category.id}
+-              onClick={() => onCategorySelect(category.id)}
+               className={`
+-                p-4 rounded-lg border-2 text-left transition-all
+-                ${isSelected(category.id)
++                p-4 rounded-lg border-2 flex flex-wrap items-center justify-between gap-4 transition-all
++                ${quantityFor(category.id) > 0
+                   ? 'border-secondary-600 bg-secondary-50 ring-2 ring-secondary-200'
+-                  : 'border-stone-200 hover:border-stone-400 hover:bg-stone-50'
++                  : 'border-stone-200'
+                 }
+               `}
+             >
+-              <div className="font-semibold text-stone-900">
+-                {locale === 'en' ? category.name_en : category.name_am}
+-              </div>
+-              <div className="text-sm text-stone-500 mt-1">
+-                {locale === 'en' ? category.name_am : category.name_en}
+-              </div>
+-              <div className="mt-2 text-lg font-bold text-primary-600">
+-                {`ETB ${category.price_etb}`}
++              <div>
++                <div className="font-semibold text-stone-900">
++                  {locale === 'en' ? category.name_en : category.name_am}
++                </div>
++                <div className="text-sm text-stone-500 mt-1">
++                  {locale === 'en' ? category.name_am : category.name_en}
++                </div>
++                <div className="mt-2 text-lg font-bold text-primary-600">
++                  {`ETB ${category.price_etb}`}
++                </div>
+               </div>
+-            </button>
++              <QuantityInput
++                value={quantityFor(category.id)}
++                onChange={(quantity) => setQuantityFor(category.id, quantity)}
++                min={0}
++                max={99}
++              />
++            </div>
+           ))}
+         </div>
+       </Card>
+ 
+-      {/* Quantity Selection */}
+-      <Card>
+-        <QuantityInput
+-          label={t('quantity')}
+-          value={selectedQuantity}
+-          onChange={onQuantityChange}
+-          min={1}
+-          max={99}
+-        />
+-      </Card>
++      {/* Cart summary -- only shown once at least one category has a
++          quantity, so a father mixing Adult + Student tickets can see
++          the combined total before moving on. */}
++      {items.length > 0 && (
++        <Card>
++          <div className="flex items-center justify-between text-sm text-stone-600">
++            <span>
++              {totalQuantity} {t('tickets') || 'tickets'}
++            </span>
++            <span className="text-lg font-bold text-primary-600">
++              ETB {totalAmount.toFixed(2)}
++            </span>
++          </div>
++        </Card>
++      )}
+ 
+       {/* Next Button */}
+       <div className="flex justify-end">
+         <Button
+           size="lg"
+           className="bg-brand-primary hover:bg-primary-700"
+-          disabled={!selectedCategoryId}
++          disabled={items.length === 0}
+           onClick={onNext}
+         >
+           {t('continue')} →
+diff --git a/frontend/src/features/entrance/api.ts b/frontend/src/features/entrance/api.ts
+index 5f17b42..fa0dc42 100644
+--- a/frontend/src/features/entrance/api.ts
++++ b/frontend/src/features/entrance/api.ts
+@@ -68,7 +68,11 @@ export async function recordIfmisVoucherReference(
+ // success/failure branch for which direction the correction went.
+ export async function correctBookingCategory(
+   bookingId: string,
++  itemId: string,
+   categoryId: string
+ ): Promise<Booking> {
+-  return apiClient.patch<Booking>(`/bookings/${bookingId}/category-correction/`, { categoryId });
++  return apiClient.patch<Booking>(`/bookings/${bookingId}/category-correction/`, {
++    itemId,
++    categoryId,
++  });
+ }
+diff --git a/frontend/src/features/entrance/components/AttendanceEntryForm.tsx b/frontend/src/features/entrance/components/AttendanceEntryForm.tsx
+index bd4a9af..744a320 100644
+--- a/frontend/src/features/entrance/components/AttendanceEntryForm.tsx
++++ b/frontend/src/features/entrance/components/AttendanceEntryForm.tsx
+@@ -332,7 +332,11 @@ export function AttendanceEntryForm({
+               )}
+             </div>
+             <div className="font-medium text-stone-900">
+-              {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
++              {booking.items
++                .map((item) =>
++                  `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`
++                )
++                .join(', ')}
+             </div>
+           </div>
+           <div>
+diff --git a/frontend/src/features/entrance/components/CategoryCorrectionPanel.tsx b/frontend/src/features/entrance/components/CategoryCorrectionPanel.tsx
+index a5a9804..9f0b5a4 100644
+--- a/frontend/src/features/entrance/components/CategoryCorrectionPanel.tsx
++++ b/frontend/src/features/entrance/components/CategoryCorrectionPanel.tsx
+@@ -29,6 +29,11 @@ export function CategoryCorrectionPanel({
+ }: CategoryCorrectionPanelProps) {
+   const { t, locale } = useTranslation();
+   const [categories, setCategories] = useState<Category[]>([]);
++  // A booking under correction almost always has just one item (the
++  // common single-category case), so default straight to it -- a Cashier
++  // only has to pick which ticket-holder when the booking actually mixes
++  // categories (e.g. one Adult plus two Student tickets).
++  const [selectedItemId, setSelectedItemId] = useState(booking.items[0]?.id ?? '');
+   const [selectedId, setSelectedId] = useState('');
+   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+   const [isSubmitting, setIsSubmitting] = useState(false);
+@@ -54,11 +59,11 @@ export function CategoryCorrectionPanel({
+   }, []);
+ 
+   const handleSubmit = async () => {
+-    if (!selectedId) return;
++    if (!selectedItemId || !selectedId) return;
+     setIsSubmitting(true);
+     setError(null);
+     try {
+-      const updated = await correctBookingCategory(booking.id, selectedId);
++      const updated = await correctBookingCategory(booking.id, selectedItemId, selectedId);
+       onCorrected(updated);
+     } catch (err) {
+       setError(
+@@ -71,8 +76,17 @@ export function CategoryCorrectionPanel({
+     }
+   };
+ 
+-  // The booking already has this category -- nothing to correct it to.
+-  const otherCategories = categories.filter((c) => c.id !== booking.categoryId);
++  const selectedItem = booking.items.find((item) => item.id === selectedItemId);
++  // The item's own current category, plus any category another item on
++  // this same booking already holds, aren't valid corrections for it --
++  // mirrors the same two checks services.correct_booking_category itself
++  // enforces server-side.
++  const otherCategoryIds = new Set(
++    booking.items.filter((item) => item.id !== selectedItemId).map((item) => item.categoryId)
++  );
++  const otherCategories = categories.filter(
++    (c) => c.id !== selectedItem?.categoryId && !otherCategoryIds.has(c.id)
++  );
+ 
+   return (
+     <div className="mt-4 border-t border-stone-200 pt-4">
+@@ -81,6 +95,26 @@ export function CategoryCorrectionPanel({
+           "The visitor's ID doesn't match this category. Select the correct one:"}
+       </div>
+ 
++      {/* Which ticket-holder -- only shown when the booking actually
++          mixes categories; a single-category booking has nothing to
++          choose between. */}
++      {booking.items.length > 1 && (
++        <select
++          value={selectedItemId}
++          onChange={(e) => {
++            setSelectedItemId(e.target.value);
++            setSelectedId('');
++          }}
++          className="w-full px-3 py-2 rounded-lg border border-stone-300 bg-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-secondary-500"
++        >
++          {booking.items.map((item) => (
++            <option key={item.id} value={item.id}>
++              {(locale === 'en' ? item.categoryNameEn : item.categoryNameAm)} x{item.quantity}
++            </option>
++          ))}
++        </select>
++      )}
++
+       {isLoadingCategories ? (
+         <div className="text-sm text-stone-500">{t('loading') || 'Loading...'}</div>
+       ) : (
+@@ -117,7 +151,7 @@ export function CategoryCorrectionPanel({
+           size="sm"
+           className="flex-1 bg-brand-primary hover:bg-primary-700"
+           onClick={handleSubmit}
+-          disabled={isSubmitting || !selectedId}
++          disabled={isSubmitting || !selectedItemId || !selectedId}
+         >
+           {isSubmitting ? t('processing') || 'Processing...' : t('confirm') || 'Confirm'}
+         </Button>
+diff --git a/frontend/src/features/group-bookings/api.ts b/frontend/src/features/group-bookings/api.ts
+index efbb8a5..49e9e63 100644
+--- a/frontend/src/features/group-bookings/api.ts
++++ b/frontend/src/features/group-bookings/api.ts
+@@ -28,8 +28,12 @@ export interface CreateGroupBookingInput {
+ export async function submitGroupBooking(input: CreateGroupBookingInput): Promise<Booking> {
+   const body: components['schemas']['BookingCreate'] = {
+     visitDate: input.visitDate,
+-    categoryId: input.categoryId,
+-    quantity: input.quantity,
++    // A school group visit is a single category for the whole party
++    // (unlike an individual visitor's booking, which can now mix
++    // categories) -- so this still wraps just the one category/quantity
++    // pair CreateGroupBookingInput takes, into the `items` array the
++    // contract now requires.
++    items: [{ categoryId: input.categoryId, quantity: input.quantity }],
+     bookingType: 'group',
+     groupName: input.groupName ?? null,
+     groupContactPhone: input.groupContactPhone ?? null,
+diff --git a/frontend/src/lib/api-types.ts b/frontend/src/lib/api-types.ts
+index 3f06b17..a532233 100644
+--- a/frontend/src/lib/api-types.ts
++++ b/frontend/src/lib/api-types.ts
+@@ -793,8 +793,8 @@ export interface components {
+         };
+         /**
+          * @description `Booking` (Document 04). Read-only -- every mutation goes through
+-         *     the Create/Cancel/Reschedule serializers below and services.py, never
+-         *     through this serializer directly.
++         *     the Create/Cancel/Reschedule/CategoryCorrection serializers below and
++         *     services.py, never through this serializer directly.
+          */
+         Booking: {
+             /** Format: uuid */
+@@ -802,10 +802,7 @@ export interface components {
+             readonly reference: string;
+             /** Format: uuid */
+             readonly visitorId: string;
+-            /** Format: uuid */
+-            readonly categoryId: string;
+-            readonly categoryNameEn: string;
+-            readonly categoryNameAm: string;
++            readonly items: components["schemas"]["BookingItem"][];
+             /** Format: date */
+             readonly visitDate: string;
+             readonly bookingType: string;
+@@ -836,20 +833,55 @@ export interface components {
+          * @description `BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
+          *     (group). A plain Serializer, not a ModelSerializer: `visitor` is
+          *     supplied by the view from `request.user`, never from the request
+-         *     body, and `categoryId`/`bookingType` need their own field names
+-         *     mapped onto services.create_booking's kwargs rather than a 1:1 model
+-         *     field mapping.
++         *     body, and `items`/`bookingType` need their own field names mapped
++         *     onto services.create_booking's kwargs rather than a 1:1 model field
++         *     mapping.
++         *
++         *     `items` replaces the old single `categoryId`/`quantity` pair -- a
++         *     booking can now mix categories (one Adult plus two Student tickets in
++         *     the same checkout) instead of being limited to one category with a
++         *     plain headcount. `min_length=1`: every booking still needs at least
++         *     one category, same as before.
+          */
+         BookingCreate: {
+             /** Format: date */
+             visitDate: string;
+-            /** Format: uuid */
+-            categoryId: string;
+-            quantity: number;
++            items: components["schemas"]["BookingCreateItem"][];
+             bookingType: components["schemas"]["BookingTypeEnum"];
+             groupName?: string | null;
+             groupContactPhone?: string | null;
+         };
++        /**
++         * @description One `{categoryId, quantity}` entry of a `BookingCreateRequest`'s
++         *     `items` list -- see `BookingCreateSerializer` below.
++         */
++        BookingCreateItem: {
++            /** Format: uuid */
++            categoryId: string;
++            quantity: number;
++        };
++        /**
++         * @description `BookingItem` (Document 04/05) -- one visitor category plus how
++         *     many tickets of it were bought, one entry per category on a
++         *     `Booking`. Read-only, same as `BookingSerializer` itself: line items
++         *     are only ever created together with their parent booking (in
++         *     `services.create_booking`) or corrected in place (`services.
++         *     correct_booking_category`), never mutated directly through this
++         *     serializer.
++         */
++        BookingItem: {
++            /** Format: uuid */
++            readonly id: string;
++            /** Format: uuid */
++            readonly categoryId: string;
++            readonly categoryNameEn: string;
++            readonly categoryNameAm: string;
++            readonly quantity: number;
++            /** Format: decimal */
++            readonly unitPriceEtb: string;
++            /** Format: decimal */
++            readonly subtotalEtb: string;
++        };
+         /** @description `BookingRescheduleRequest` -- FR-BOOK-007. */
+         BookingReschedule: {
+             /** Format: date */
+@@ -1001,10 +1033,7 @@ export interface components {
+             readonly reference: string;
+             /** Format: uuid */
+             readonly visitorId: string;
+-            /** Format: uuid */
+-            readonly categoryId: string;
+-            readonly categoryNameEn: string;
+-            readonly categoryNameAm: string;
++            readonly items: components["schemas"]["BookingItem"][];
+             /** Format: date */
+             readonly visitDate: string;
+             readonly bookingType: string;
+@@ -1134,11 +1163,15 @@ export interface components {
+         };
+         /**
+          * @description `BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
+-         *     addendum to Document 02 Sec 2.2). A plain Serializer, not a
+-         *     ModelSerializer, mirroring `BookingCreateSerializer` above: the
+-         *     single input is a new category, not a 1:1 model field mapping.
++         *     addendum to Document 02 Sec 2.2). `itemId` identifies which of the
++         *     booking's `BookingItem` line items to correct -- see
++         *     `services.correct_booking_category`'s own docstring for why a
++         *     mixed-category booking needs this instead of assuming there's only
++         *     ever one category to correct.
+          */
+         PatchedBookingCategoryCorrection: {
++            /** Format: uuid */
++            itemId?: string;
+             /** Format: uuid */
+             categoryId?: string;
+         };

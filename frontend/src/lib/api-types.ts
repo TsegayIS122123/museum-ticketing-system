@@ -793,8 +793,8 @@ export interface components {
         };
         /**
          * @description `Booking` (Document 04). Read-only -- every mutation goes through
-         *     the Create/Cancel/Reschedule serializers below and services.py, never
-         *     through this serializer directly.
+         *     the Create/Cancel/Reschedule/CategoryCorrection serializers below and
+         *     services.py, never through this serializer directly.
          */
         Booking: {
             /** Format: uuid */
@@ -802,10 +802,7 @@ export interface components {
             readonly reference: string;
             /** Format: uuid */
             readonly visitorId: string;
-            /** Format: uuid */
-            readonly categoryId: string;
-            readonly categoryNameEn: string;
-            readonly categoryNameAm: string;
+            readonly items: components["schemas"]["BookingItem"][];
             /** Format: date */
             readonly visitDate: string;
             readonly bookingType: string;
@@ -836,19 +833,54 @@ export interface components {
          * @description `BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
          *     (group). A plain Serializer, not a ModelSerializer: `visitor` is
          *     supplied by the view from `request.user`, never from the request
-         *     body, and `categoryId`/`bookingType` need their own field names
-         *     mapped onto services.create_booking's kwargs rather than a 1:1 model
-         *     field mapping.
+         *     body, and `items`/`bookingType` need their own field names mapped
+         *     onto services.create_booking's kwargs rather than a 1:1 model field
+         *     mapping.
+         *
+         *     `items` replaces the old single `categoryId`/`quantity` pair -- a
+         *     booking can now mix categories (one Adult plus two Student tickets in
+         *     the same checkout) instead of being limited to one category with a
+         *     plain headcount. `min_length=1`: every booking still needs at least
+         *     one category, same as before.
          */
         BookingCreate: {
             /** Format: date */
             visitDate: string;
-            /** Format: uuid */
-            categoryId: string;
-            quantity: number;
+            items: components["schemas"]["BookingCreateItem"][];
             bookingType: components["schemas"]["BookingTypeEnum"];
             groupName?: string | null;
             groupContactPhone?: string | null;
+        };
+        /**
+         * @description One `{categoryId, quantity}` entry of a `BookingCreateRequest`'s
+         *     `items` list -- see `BookingCreateSerializer` below.
+         */
+        BookingCreateItem: {
+            /** Format: uuid */
+            categoryId: string;
+            quantity: number;
+        };
+        /**
+         * @description `BookingItem` (Document 04/05) -- one visitor category plus how
+         *     many tickets of it were bought, one entry per category on a
+         *     `Booking`. Read-only, same as `BookingSerializer` itself: line items
+         *     are only ever created together with their parent booking (in
+         *     `services.create_booking`) or corrected in place (`services.
+         *     correct_booking_category`), never mutated directly through this
+         *     serializer.
+         */
+        BookingItem: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly categoryId: string;
+            readonly categoryNameEn: string;
+            readonly categoryNameAm: string;
+            readonly quantity: number;
+            /** Format: decimal */
+            readonly unitPriceEtb: string;
+            /** Format: decimal */
+            readonly subtotalEtb: string;
         };
         /** @description `BookingRescheduleRequest` -- FR-BOOK-007. */
         BookingReschedule: {
@@ -1001,10 +1033,7 @@ export interface components {
             readonly reference: string;
             /** Format: uuid */
             readonly visitorId: string;
-            /** Format: uuid */
-            readonly categoryId: string;
-            readonly categoryNameEn: string;
-            readonly categoryNameAm: string;
+            readonly items: components["schemas"]["BookingItem"][];
             /** Format: date */
             readonly visitDate: string;
             readonly bookingType: string;
@@ -1134,11 +1163,15 @@ export interface components {
         };
         /**
          * @description `BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
-         *     addendum to Document 02 Sec 2.2). A plain Serializer, not a
-         *     ModelSerializer, mirroring `BookingCreateSerializer` above: the
-         *     single input is a new category, not a 1:1 model field mapping.
+         *     addendum to Document 02 Sec 2.2). `itemId` identifies which of the
+         *     booking's `BookingItem` line items to correct -- see
+         *     `services.correct_booking_category`'s own docstring for why a
+         *     mixed-category booking needs this instead of assuming there's only
+         *     ever one category to correct.
          */
         PatchedBookingCategoryCorrection: {
+            /** Format: uuid */
+            itemId?: string;
             /** Format: uuid */
             categoryId?: string;
         };

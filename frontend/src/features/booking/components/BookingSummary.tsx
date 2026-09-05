@@ -6,10 +6,13 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { getCategories } from '@/features/catalog/api';
 import type { Category } from '@/features/catalog/schemas';
+import type { BookingItemInput } from './DateCategoryPicker';
 
 interface BookingSummaryProps {
-  categoryId: string;
-  quantity: number;
+  // One row per category with a quantity against it -- e.g. a father's
+  // booking shows both his one Adult ticket and his kids' two Student
+  // tickets here, not just a single category/quantity pair.
+  items: BookingItemInput[];
   visitDate: string;
   // Shown read-only for the visitor's own confirmation, sourced from her
   // authenticated account -- NOT form fields, and never sent as part of
@@ -20,7 +23,7 @@ interface BookingSummaryProps {
   // picker and a special-requests textarea) as editable inputs that were
   // silently discarded on submit -- decided to strip them rather than
   // add unneeded backend fields, since a Visitor's booking is already
-  // fully described by category + quantity + date.
+  // fully described by its items + date.
   visitorName: string;
   visitorEmail: string;
   visitorPhone: string | null;
@@ -30,8 +33,7 @@ interface BookingSummaryProps {
 }
 
 export function BookingSummary({
-  categoryId,
-  quantity,
+  items,
   visitDate,
   visitorName,
   visitorEmail,
@@ -42,25 +44,29 @@ export function BookingSummary({
 }: BookingSummaryProps) {
   const { t, locale } = useTranslation();
 
-  const [category, setCategory] = useState<Category | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     getCategories()
-      .then((categories) => {
-        if (!cancelled) {
-          setCategory(categories.find((c) => c.id === categoryId) ?? null);
-        }
+      .then((data) => {
+        if (!cancelled) setCategories(data);
       })
       .catch(() => {
-        if (!cancelled) setCategory(null);
+        if (!cancelled) setCategories([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [categoryId]);
+  }, []);
 
-  const totalAmount = category ? (parseFloat(category.price_etb) * quantity).toFixed(2) : '0.00';
+  const rows = items.map((item) => {
+    const category = categories.find((c) => c.id === item.categoryId) ?? null;
+    const unitPrice = category ? parseFloat(category.price_etb) : 0;
+    return { ...item, category, subtotal: unitPrice * item.quantity };
+  });
+  const totalQuantity = rows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalAmount = rows.reduce((sum, row) => sum + row.subtotal, 0).toFixed(2);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -80,14 +86,23 @@ export function BookingSummary({
         </h3>
 
         <div className="space-y-3 divide-y divide-stone-100">
-          {/* Category & Quantity */}
-          <div className="grid grid-cols-2 gap-2 pb-3">
+          {/* One line per category -- see the `items` prop note above. */}
+          <div className="space-y-2 pb-3">
             <div className="text-stone-500">{t('category')}</div>
-            <div className="font-medium text-stone-900 text-right">
-              {locale === 'en' ? category?.name_en : category?.name_am}
+            {rows.map((row) => (
+              <div key={row.categoryId} className="grid grid-cols-3 gap-2 text-sm">
+                <div className="font-medium text-stone-900 col-span-2">
+                  {locale === 'en' ? row.category?.name_en : row.category?.name_am}
+                </div>
+                <div className="font-medium text-stone-900 text-right">
+                  x{row.quantity} = ETB {row.subtotal.toFixed(2)}
+                </div>
+              </div>
+            ))}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="text-stone-500">{t('quantity')}</div>
+              <div className="font-medium text-stone-900 text-right">{totalQuantity}</div>
             </div>
-            <div className="text-stone-500">{t('quantity')}</div>
-            <div className="font-medium text-stone-900 text-right">{quantity}</div>
           </div>
 
           {/* Date */}

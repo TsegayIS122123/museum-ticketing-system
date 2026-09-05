@@ -8,7 +8,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StepIndicator } from '@/components/ui/StepIndicator';
-import { DateCategoryPicker } from '@/features/booking/components/DateCategoryPicker';
+import { DateCategoryPicker, type BookingItemInput } from '@/features/booking/components/DateCategoryPicker';
 import { AvailabilityDatePicker } from '@/features/booking/components/AvailabilityDatePicker';
 import { BookingSummary } from '@/features/booking/components/BookingSummary';
 import { createBooking } from '@/features/booking/api';
@@ -26,8 +26,11 @@ export default function BookPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  // One entry per category the visitor has put a quantity against -- a
+  // father booking one Adult ticket for himself and two Student tickets
+  // for his kids ends up with two entries here, in one booking, instead
+  // of being limited to a single category/quantity pair.
+  const [items, setItems] = useState<BookingItemInput[]>([]);
   const [visitDate, setVisitDate] = useState('');
 
   // Login gate -- mirrors group-visits/new/page.tsx, which already does
@@ -52,7 +55,7 @@ export default function BookPage() {
   const stepIndex = ['category', 'datetime', 'payment'].indexOf(currentStep);
 
   const handleCategoryNext = () => {
-    if (categoryId && quantity > 0) {
+    if (items.length > 0) {
       setCurrentStep('datetime');
     }
   };
@@ -64,14 +67,13 @@ export default function BookPage() {
   };
 
   const handleConfirmBooking = async () => {
-    if (!categoryId) return;
+    if (items.length === 0) return;
 
     setIsProcessing(true);
     try {
       const booking = await createBooking({
         visitDate,
-        categoryId,
-        quantity,
+        items,
         bookingType: 'individual',
       });
 
@@ -100,10 +102,8 @@ export default function BookPage() {
       case 'category':
         return (
           <DateCategoryPicker
-            selectedCategoryId={categoryId}
-            selectedQuantity={quantity}
-            onCategorySelect={setCategoryId}
-            onQuantityChange={setQuantity}
+            items={items}
+            onItemsChange={setItems}
             onNext={handleCategoryNext}
           />
         );
@@ -148,8 +148,7 @@ export default function BookPage() {
       case 'payment':
         return (
           <BookingSummary
-            categoryId={categoryId!}
-            quantity={quantity}
+            items={items}
             visitDate={visitDate}
             visitorName={user?.full_name ?? ''}
             visitorEmail={user?.email ?? ''}

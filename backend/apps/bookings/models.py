@@ -118,21 +118,17 @@ class Booking(TimeStampedModel):
         related_name="bookings",
         db_column="visitor_id",
     )
-    category = models.ForeignKey(
-        "catalog.Category",
-        on_delete=models.PROTECT,
-        related_name="bookings",
-        db_column="category_id",
-    )
 
-    # Snapshot of the category's bilingual name/price at booking time
-    # (Sec 3.3) -- a later Museum Manager price edit (FR-CAT-002) never
-    # touches an already-issued booking. Declared as its own fields per
-    # `core.BilingualNameMixin`'s own docstring: a differently-named
-    # bilingual pair declares its own fields rather than using the mixin.
-    category_name_en = models.TextField()
-    category_name_am = models.TextField()
-    unit_price_etb = models.DecimalField(max_digits=12, decimal_places=2)
+    # A booking can cover more than one visitor category in one go (e.g.
+    # a father booking one Adult ticket and two Student tickets for his
+    # kids in a single checkout) -- see `BookingItem` below, which is
+    # where the per-category category FK / bilingual name+price snapshot
+    # / quantity now live, one row per category in this booking.
+    # `booked_quantity` and `total_amount_etb` below stay on `Booking`
+    # itself as the denormalized sum across its items -- every existing
+    # consumer (entrance check-in's headcount, settlement/payments'
+    # single lump-sum amount) only ever needs the booking-level total,
+    # never a per-category breakdown.
 
     visit_date = models.DateField()
 
@@ -140,9 +136,13 @@ class Booking(TimeStampedModel):
     group_name = models.TextField(null=True, blank=True)
     group_contact_phone = models.TextField(null=True, blank=True)
 
+    # Sum of every BookingItem.quantity on this booking.
     booked_quantity = models.PositiveIntegerField()
     attended_quantity = models.PositiveIntegerField(null=True, blank=True)
 
+    # Sum of every BookingItem.subtotal_etb on this booking -- the single
+    # amount actually charged/refunded through Chapa (apps.payments/
+    # apps.refunds never charge per category, only per booking).
     total_amount_etb = models.DecimalField(max_digits=12, decimal_places=2)
 
     status = models.CharField(
@@ -260,3 +260,86 @@ class Booking(TimeStampedModel):
 
     def __str__(self):
         return self.reference
+
+
+class BookingItem(TimeStampedModel):
+    """
+    One line of a `Booking` -- one visitor category plus how many tickets
+    of it were bought, e.g. "1 x Adult" or "2 x Student". A `Booking`
+    always has at least one `BookingItem`; it has more than one exactly
+    when the same checkout mixes categories (the "father booking one
+    Adult + two Student tickets" case) rather than requiring a separate
+    `Booking` per category.
+
+    Mirrors `Booking`'s own pre-existing fields 1:1 (this is literally
+    what used to live directly on `Booking` before it could hold more
+    than one category) -- same snapshot rationale: `category_name_en`/
+    `category_name_am`/`unit_price_etb` are copied from `catalog.Category`
+    at booking time so a later price edit or retirement (FR-CAT-002)
+    never changes an already-issued line item.
+
+    A single item's category/price can later be overwritten in place by
+    the Cashier-only gate-side correction (ID-verification addendum,
+    `apps.bookings.services.correct_booking_category`) -- e.g. one of
+    three ticket-holders in a party turns out not to have a valid student
+    ID. `Booking.category_corrected_at`/`category_corrected_by_user_id`
+    record *that this booking was touched* at the gate (used by the
+    Visitor-facing "why do I owe more" messaging); which item and what
+    changed is in the audit log (`booking.category_corrected`), matching
+    this codebase's existing convention of using the audit log for
+    "what changed" rather than a dedicated column per change.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    booking = models.ForeignKey(
+        Booking,
+        on_delete=models.CASCADE,
+        related_name="items",
+        db_column="booking_id",
+    )
+    category = models.ForeignKey(
+        "catalog.Category",
+        on_delete=models.PROTECT,
+        related_name="booking_items",
+        db_column="category_id",
+    )
+
+    category_name_en = models.TextField()
+    category_name_am = models.TextField()
+    unit_price_etb = models.DecimalField(max_digits=12, decimal_places=2)
+
+    quantity = models.PositiveIntegerField()
+    # unit_price_etb * quantity, snapshotted alongside it rather than
+    # computed on read -- consistent with `Booking.total_amount_etb`
+    # never being recomputed from a live join either.
+    subtotal_etb = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        app_label = "bookings"
+        db_table = "booking_item"
+        ordering = ["created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=1),
+                name="booking_item_quantity_at_least_one",
+            ),
+            # One row per category per booking -- a visitor adding more
+            # Adult tickets increases this row's quantity, it never gets
+            # a second Adult row on the same booking. A gate-side
+            # correction (see class docstring) is exempt in practice:
+            # correct_booking_category rejects correcting an item *into*
+            # a category another item on the same booking already holds,
+            # for the same reason it rejects "correcting" into the
+            # item's own current category -- there's nothing to merge,
+            # the Cashier picked a category already represented.
+            models.UniqueConstraint(
+                fields=["booking", "category"], name="booking_item_unique_category_per_booking"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["booking"], name="booking_item_booking_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.category_name_en} x{self.quantity} ({self.booking.reference})"

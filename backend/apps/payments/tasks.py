@@ -68,7 +68,17 @@ def _render_receipt_pdf(*, booking) -> bytes:
 
     write_row("Booking reference", "የቦታ ማስያዣ ቁጥር", booking.reference)
     write_row("Visitor", "ጎብኚ", booking.visitor.full_name)
-    write_row("Category", "ምድብ", f"{booking.category_name_en} / {booking.category_name_am}")
+    # One row per category on this booking (a checkout may now mix more
+    # than one, e.g. one Adult plus two Student tickets) instead of the
+    # single "Category" row this receipt used to have back when a
+    # booking could only ever hold one.
+    for item in booking.items.all():
+        write_row(
+            "Category",
+            "ምድብ",
+            f"{item.category_name_en} / {item.category_name_am} x{item.quantity} "
+            f"(ETB {item.unit_price_etb} each)",
+        )
     write_row("Visit date", "የጉብኝት ቀን", booking.visit_date.isoformat())
     write_row("Quantity", "ብዛት", booking.booked_quantity)
     write_row("Amount paid (ETB)", "የተከፈለ መጠን (ብር)", booking.total_amount_etb)

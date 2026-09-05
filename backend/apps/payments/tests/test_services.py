@@ -17,7 +17,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import Account
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, BookingItem
 from apps.catalog.models import Category
 from apps.core.exceptions import Conflict
 from apps.payments import services
@@ -45,18 +45,24 @@ def _make_booking(*, visitor=None, status=Booking.Status.AWAITING_PAYMENT, quant
     category = Category.objects.create(
         name_en="Adult", name_am="Adult", price_etb=Decimal("100.00")
     )
-    return Booking.objects.create(
+    booking = Booking.objects.create(
         visitor=visitor,
-        category=category,
-        category_name_en=category.name_en,
-        category_name_am=category.name_am,
-        unit_price_etb=category.price_etb,
         visit_date=TOMORROW,
         booking_type=Booking.BookingType.INDIVIDUAL,
         booked_quantity=quantity,
         total_amount_etb=category.price_etb * quantity,
         status=status,
     )
+    BookingItem.objects.create(
+        booking=booking,
+        category=category,
+        category_name_en=category.name_en,
+        category_name_am=category.name_am,
+        unit_price_etb=category.price_etb,
+        quantity=quantity,
+        subtotal_etb=category.price_etb * quantity,
+    )
+    return booking
 
 
 # --------------------------------------------------------------------------

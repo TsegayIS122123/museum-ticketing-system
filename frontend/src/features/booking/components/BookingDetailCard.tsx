@@ -15,8 +15,10 @@ interface BookingDetailCardProps {
     bookedQuantity: number;
     attendedQuantity?: number | null;
     totalAmountEtb: number;
-    categoryNameEn: string;
-    categoryNameAm: string;
+    // One entry per category on this booking -- a booking mixing
+    // categories (e.g. one Adult plus two Student tickets bought
+    // together) has more than one entry here.
+    items: { categoryNameEn: string; categoryNameAm: string; quantity: number }[];
     rescheduledCount: number;
     receiptUrl?: string | null;
     createdAt: string;
@@ -66,7 +68,11 @@ export function BookingDetailCard({
         <div>
           <p className="text-stone-500">{t('category')}</p>
           <p className="font-medium text-stone-900">
-            {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
+            {booking.items
+              .map((item) =>
+                `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`
+              )
+              .join(', ')}
           </p>
         </div>
         <div>

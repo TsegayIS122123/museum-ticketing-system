@@ -18,7 +18,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.models import Account
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, BookingItem
 from apps.catalog.models import Category
 from apps.core.exceptions import Conflict
 from apps.core.models import AuditLogEntry
@@ -62,12 +62,8 @@ def _make_booking(
 ):
     visitor = visitor or _make_visitor()
     category = Category.objects.create(name_en="Adult", name_am="Adult", price_etb=unit_price)
-    return Booking.objects.create(
+    booking = Booking.objects.create(
         visitor=visitor,
-        category=category,
-        category_name_en=category.name_en,
-        category_name_am=category.name_am,
-        unit_price_etb=category.price_etb,
         visit_date=visit_date,
         booking_type=Booking.BookingType.INDIVIDUAL,
         booked_quantity=quantity,
@@ -75,6 +71,16 @@ def _make_booking(
         total_amount_etb=category.price_etb * quantity,
         status=status,
     )
+    BookingItem.objects.create(
+        booking=booking,
+        category=category,
+        category_name_en=category.name_en,
+        category_name_am=category.name_am,
+        unit_price_etb=category.price_etb,
+        quantity=quantity,
+        subtotal_etb=category.price_etb * quantity,
+    )
+    return booking
 
 
 def _make_completed_payment(*, booking, tx_ref=None):

@@ -68,11 +68,10 @@ def _authed_client(account):
     return client
 
 
-def _create_booking_payload(category, booking_type="individual", **overrides):
+def _create_booking_payload(category, booking_type="individual", quantity=1, **overrides):
     payload = {
         "visitDate": TOMORROW.isoformat(),
-        "categoryId": str(category.id),
-        "quantity": 1,
+        "items": [{"categoryId": str(category.id), "quantity": quantity}],
         "bookingType": booking_type,
     }
     payload.update(overrides)
@@ -378,13 +377,14 @@ def test_category_correction_rejected_for_non_cashier():
     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, student)
+    item = booking.items.get()
     manager_client = _authed_client(
         _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
     )
 
     response = manager_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
-        {"categoryId": str(non_resident.id)},
+        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
         format="json",
     )
 
@@ -396,11 +396,12 @@ def test_category_correction_undercharge_reopens_payment():
     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, student)
+    item = booking.items.get()
     cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
 
     response = cashier_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
-        {"categoryId": str(non_resident.id)},
+        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
         format="json",
     )
 
@@ -420,11 +421,12 @@ def test_category_correction_overcharge_issues_refund_and_stays_pending():
     student = _make_category(name_en="Student", price_etb="50.00")
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, non_resident)
+    item = booking.items.get()
     cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
 
     response = cashier_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
-        {"categoryId": str(student.id)},
+        {"itemId": str(item.id), "categoryId": str(student.id)},
         format="json",
     )
 
@@ -443,13 +445,14 @@ def test_category_correction_rejected_once_no_longer_pending():
     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, student)
+    item = booking.items.get()
     booking.status = Booking.Status.VISITED
     booking.save(update_fields=["status"])
     cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
 
     response = cashier_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
-        {"categoryId": str(non_resident.id)},
+        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
         format="json",
     )
 

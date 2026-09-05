@@ -17,7 +17,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import Account
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, BookingItem
 from apps.catalog.models import Category
 from apps.core.models import AuditLogEntry
 from apps.payments.models import Payment
@@ -81,12 +81,8 @@ def _make_visited_booking(*, cashier, quantity=1, unit_price=Decimal("100.00"), 
     category = Category.objects.create(
         name_en="Adult", name_am="Adult", price_etb=unit_price
     )
-    return Booking.objects.create(
+    booking = Booking.objects.create(
         visitor=visitor,
-        category=category,
-        category_name_en=category.name_en,
-        category_name_am=category.name_am,
-        unit_price_etb=category.price_etb,
         visit_date=TOMORROW,
         booking_type=Booking.BookingType.INDIVIDUAL,
         booked_quantity=quantity,
@@ -96,6 +92,16 @@ def _make_visited_booking(*, cashier, quantity=1, unit_price=Decimal("100.00"), 
         checked_in_at=timezone.now(),
         checked_in_by_user_id=cashier,
     )
+    BookingItem.objects.create(
+        booking=booking,
+        category=category,
+        category_name_en=category.name_en,
+        category_name_am=category.name_am,
+        unit_price_etb=category.price_etb,
+        quantity=quantity,
+        subtotal_etb=category.price_etb * quantity,
+    )
+    return booking
 
 
 def _make_completed_refund(*, booking, amount):

@@ -1221,8 +1221,8 @@ components:
       type: object
       description: |-
         `Booking` (Document 04). Read-only -- every mutation goes through
-        the Create/Cancel/Reschedule serializers below and services.py, never
-        through this serializer directly.
+        the Create/Cancel/Reschedule/CategoryCorrection serializers below and
+        services.py, never through this serializer directly.
       properties:
         id:
           type: string
@@ -1235,15 +1235,10 @@ components:
           type: string
           format: uuid
           readOnly: true
-        categoryId:
-          type: string
-          format: uuid
-          readOnly: true
-        categoryNameEn:
-          type: string
-          readOnly: true
-        categoryNameAm:
-          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingItem'
           readOnly: true
         visitDate:
           type: string
@@ -1325,15 +1320,13 @@ components:
       - bookedQuantity
       - bookingType
       - categoryCorrectedAt
-      - categoryId
-      - categoryNameAm
-      - categoryNameEn
       - checkoutUrl
       - createdAt
       - groupContactPhone
       - groupName
       - id
       - ifmisVoucherReference
+      - items
       - noticeSentAt
       - receiptUrl
       - reconciliationId
@@ -1352,19 +1345,23 @@ components:
         `BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
         (group). A plain Serializer, not a ModelSerializer: `visitor` is
         supplied by the view from `request.user`, never from the request
-        body, and `categoryId`/`bookingType` need their own field names
-        mapped onto services.create_booking's kwargs rather than a 1:1 model
-        field mapping.
+        body, and `items`/`bookingType` need their own field names mapped
+        onto services.create_booking's kwargs rather than a 1:1 model field
+        mapping.
+
+        `items` replaces the old single `categoryId`/`quantity` pair -- a
+        booking can now mix categories (one Adult plus two Student tickets in
+        the same checkout) instead of being limited to one category with a
+        plain headcount. `min_length=1`: every booking still needs at least
+        one category, same as before.
       properties:
         visitDate:
           type: string
           format: date
-        categoryId:
-          type: string
-          format: uuid
-        quantity:
-          type: integer
-          minimum: 1
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingCreateItem'
         bookingType:
           $ref: '#/components/schemas/BookingTypeEnum'
         groupName:
@@ -1375,9 +1372,69 @@ components:
           nullable: true
       required:
       - bookingType
+      - items
+      - visitDate
+    BookingCreateItem:
+      type: object
+      description: |-
+        One `{categoryId, quantity}` entry of a `BookingCreateRequest`'s
+        `items` list -- see `BookingCreateSerializer` below.
+      properties:
+        categoryId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+      required:
       - categoryId
       - quantity
-      - visitDate
+    BookingItem:
+      type: object
+      description: |-
+        `BookingItem` (Document 04/05) -- one visitor category plus how
+        many tickets of it were bought, one entry per category on a
+        `Booking`. Read-only, same as `BookingSerializer` itself: line items
+        are only ever created together with their parent booking (in
+        `services.create_booking`) or corrected in place (`services.
+        correct_booking_category`), never mutated directly through this
+        serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        categoryId:
+          type: string
+          format: uuid
+          readOnly: true
+        categoryNameEn:
+          type: string
+          readOnly: true
+        categoryNameAm:
+          type: string
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+        unitPriceEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        subtotalEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - categoryId
+      - categoryNameAm
+      - categoryNameEn
+      - id
+      - quantity
+      - subtotalEtb
+      - unitPriceEtb
     BookingReschedule:
       type: object
       description: '`BookingRescheduleRequest` -- FR-BOOK-007.'
@@ -1649,15 +1706,10 @@ components:
           type: string
           format: uuid
           readOnly: true
-        categoryId:
-          type: string
-          format: uuid
-          readOnly: true
-        categoryNameEn:
-          type: string
-          readOnly: true
-        categoryNameAm:
-          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingItem'
           readOnly: true
         visitDate:
           type: string
@@ -1755,9 +1807,6 @@ components:
       - bookedQuantity
       - bookingType
       - categoryCorrectedAt
-      - categoryId
-      - categoryNameAm
-      - categoryNameEn
       - checkoutUrl
       - createdAt
       - groupContactPhone
@@ -1765,6 +1814,7 @@ components:
       - id
       - ifmisPurpose
       - ifmisVoucherReference
+      - items
       - noticeSentAt
       - payerName
       - receiptUrl
@@ -2000,10 +2050,15 @@ components:
       type: object
       description: |-
         `BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
-        addendum to Document 02 Sec 2.2). A plain Serializer, not a
-        ModelSerializer, mirroring `BookingCreateSerializer` above: the
-        single input is a new category, not a 1:1 model field mapping.
+        addendum to Document 02 Sec 2.2). `itemId` identifies which of the
+        booking's `BookingItem` line items to correct -- see
+        `services.correct_booking_category`'s own docstring for why a
+        mixed-category booking needs this instead of assuming there's only
+        ever one category to correct.
       properties:
+        itemId:
+          type: string
+          format: uuid
         categoryId:
           type: string
           format: uuid

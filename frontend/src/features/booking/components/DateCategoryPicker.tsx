@@ -8,21 +8,22 @@ import { QuantityInput } from '@/components/ui/QuantityInput';
 import type { Category } from '@/features/catalog/schemas';
 import { getCategories } from '@/features/catalog/api';
 
+export interface BookingItemInput {
+  categoryId: string;
+  quantity: number;
+}
+
 interface DateCategoryPickerProps {
-  selectedCategoryId: string | null;
-  selectedQuantity: number;
-  onCategorySelect: (categoryId: string) => void;
-  onQuantityChange: (quantity: number) => void;
+  // One entry per category the visitor has put a quantity against --
+  // e.g. a father booking one Adult ticket for himself and two Student
+  // tickets for his kids ends up with two entries here, not two separate
+  // bookings. A category with quantity 0 simply isn't in this list.
+  items: BookingItemInput[];
+  onItemsChange: (items: BookingItemInput[]) => void;
   onNext: () => void;
 }
 
-export function DateCategoryPicker({
-  selectedCategoryId,
-  selectedQuantity,
-  onCategorySelect,
-  onQuantityChange,
-  onNext,
-}: DateCategoryPickerProps) {
+export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategoryPickerProps) {
   const { t, locale } = useTranslation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +48,23 @@ export function DateCategoryPicker({
     loadCategories();
   }, [t]);
 
-  const isSelected = (categoryId: string) => selectedCategoryId === categoryId;
+  const quantityFor = (categoryId: string) =>
+    items.find((item) => item.categoryId === categoryId)?.quantity ?? 0;
+
+  const setQuantityFor = (categoryId: string, quantity: number) => {
+    const withoutCategory = items.filter((item) => item.categoryId !== categoryId);
+    // A category dropped to 0 leaves the cart entirely rather than
+    // sitting in it as a zero-quantity row -- `items` is exactly the set
+    // of `{categoryId, quantity}` pairs services.create_booking expects,
+    // and it rejects a zero quantity.
+    onItemsChange(quantity > 0 ? [...withoutCategory, { categoryId, quantity }] : withoutCategory);
+  };
+
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = items.reduce((sum, item) => {
+    const category = categories.find((c) => c.id === item.categoryId);
+    return sum + (category ? Number(category.price_etb) * item.quantity : 0);
+  }, 0);
 
   if (isLoading) {
     return (
@@ -73,55 +90,70 @@ export function DateCategoryPicker({
 
   return (
     <div className="space-y-6">
-      {/* Category Selection */}
+      {/* Category + quantity selection -- a father booking one Adult
+          ticket for himself and two Student tickets for his kids sets a
+          quantity against both rows here, in the same booking, rather
+          than having to book each category separately. */}
       <Card>
         <h3 className="text-lg font-semibold text-stone-900 mb-4">
           {t('category')}
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="space-y-3">
           {categories.map((category) => (
-            <button
+            <div
               key={category.id}
-              onClick={() => onCategorySelect(category.id)}
               className={`
-                p-4 rounded-lg border-2 text-left transition-all
-                ${isSelected(category.id)
+                p-4 rounded-lg border-2 flex flex-wrap items-center justify-between gap-4 transition-all
+                ${quantityFor(category.id) > 0
                   ? 'border-secondary-600 bg-secondary-50 ring-2 ring-secondary-200'
-                  : 'border-stone-200 hover:border-stone-400 hover:bg-stone-50'
+                  : 'border-stone-200'
                 }
               `}
             >
-              <div className="font-semibold text-stone-900">
-                {locale === 'en' ? category.name_en : category.name_am}
+              <div>
+                <div className="font-semibold text-stone-900">
+                  {locale === 'en' ? category.name_en : category.name_am}
+                </div>
+                <div className="text-sm text-stone-500 mt-1">
+                  {locale === 'en' ? category.name_am : category.name_en}
+                </div>
+                <div className="mt-2 text-lg font-bold text-primary-600">
+                  {`ETB ${category.price_etb}`}
+                </div>
               </div>
-              <div className="text-sm text-stone-500 mt-1">
-                {locale === 'en' ? category.name_am : category.name_en}
-              </div>
-              <div className="mt-2 text-lg font-bold text-primary-600">
-                {`ETB ${category.price_etb}`}
-              </div>
-            </button>
+              <QuantityInput
+                value={quantityFor(category.id)}
+                onChange={(quantity) => setQuantityFor(category.id, quantity)}
+                min={0}
+                max={99}
+              />
+            </div>
           ))}
         </div>
       </Card>
 
-      {/* Quantity Selection */}
-      <Card>
-        <QuantityInput
-          label={t('quantity')}
-          value={selectedQuantity}
-          onChange={onQuantityChange}
-          min={1}
-          max={99}
-        />
-      </Card>
+      {/* Cart summary -- only shown once at least one category has a
+          quantity, so a father mixing Adult + Student tickets can see
+          the combined total before moving on. */}
+      {items.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between text-sm text-stone-600">
+            <span>
+              {totalQuantity} {t('tickets') || 'tickets'}
+            </span>
+            <span className="text-lg font-bold text-primary-600">
+              ETB {totalAmount.toFixed(2)}
+            </span>
+          </div>
+        </Card>
+      )}
 
       {/* Next Button */}
       <div className="flex justify-end">
         <Button
           size="lg"
           className="bg-brand-primary hover:bg-primary-700"
-          disabled={!selectedCategoryId}
+          disabled={items.length === 0}
           onClick={onNext}
         >
           {t('continue')} →

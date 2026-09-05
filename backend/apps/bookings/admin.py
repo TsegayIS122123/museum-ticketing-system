@@ -7,7 +7,32 @@ governed), so those fields are read-only here.
 
 from django.contrib import admin
 
-from .models import Booking, DateAvailability
+from .models import Booking, BookingItem, DateAvailability
+
+
+class BookingItemInline(admin.TabularInline):
+    """Read-only -- line items are only ever created together with their
+    parent booking, or corrected in place via the Cashier-only gate
+    correction flow, never edited here."""
+
+    model = BookingItem
+    extra = 0
+    can_delete = False
+    fields = ["category_name_en", "category_name_am", "quantity", "unit_price_etb", "subtotal_etb"]
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+def _categories_summary(booking):
+    """e.g. \"Adult x1, Student x2\" -- list_display has no easy way to
+    show a related-row breakdown itself, so this composes the same
+    summary the visitor-facing UI shows for each row."""
+    return ", ".join(f"{item.category_name_en} x{item.quantity}" for item in booking.items.all())
+
+
+_categories_summary.short_description = "Categories"
 
 
 @admin.register(Booking)
@@ -16,7 +41,7 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = [
         "reference",
         "visitor",
-        "category_name_en",
+        _categories_summary,
         "visit_date",
         "booking_type",
         "status",
@@ -25,6 +50,13 @@ class BookingAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status", "booking_type", "visit_date"]
     search_fields = ["reference", "visitor__email", "group_name"]
+    inlines = [BookingItemInline]
+
+    def get_queryset(self, request):
+        # _categories_summary above reads `booking.items.all()` for every
+        # row in the changelist -- prefetch once instead of N+1.
+        return super().get_queryset(request).prefetch_related("items")
+
     readonly_fields = [
         "id",
         "reference",

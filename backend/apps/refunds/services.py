@@ -31,7 +31,7 @@ unreachable (NFR-IDEMPOTENT-001).
 """
 
 import logging
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import requests
 from django.conf import settings
@@ -80,7 +80,22 @@ def compute_refundable_amount(*, booking, reason):
     if reason == Refund.Reason.PARTIAL_SHORTFALL:
         attended = booking.attended_quantity or 0
         shortfall = booking.booked_quantity - attended
-        return booking.unit_price_etb * shortfall
+        # A booking can now mix categories (`BookingItem`), and
+        # `check_in_booking` records only a single total headcount, never
+        # which category each no-show belonged to -- so there is no
+        # single `unit_price_etb` to multiply by the shortfall anymore.
+        # This uses the booking's blended average price per ticket
+        # instead: total paid divided across every ticket booked, times
+        # however many didn't show up. For a single-category booking
+        # (still the common case) this is exactly the old calculation;
+        # for a mixed booking it's a reasonable, price-neutral
+        # approximation in the absence of per-category attendance data.
+        if booking.booked_quantity == 0:
+            return Decimal("0")
+        average_unit_price = booking.total_amount_etb / booking.booked_quantity
+        return (average_unit_price * shortfall).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
     # (a) cancellation and (c) no-response are always a full refund of
     # what was actually paid (Document 02 Sec 2.6/§2.4).
     return booking.total_amount_etb

@@ -28,8 +28,12 @@ export interface CreateGroupBookingInput {
 export async function submitGroupBooking(input: CreateGroupBookingInput): Promise<Booking> {
   const body: components['schemas']['BookingCreate'] = {
     visitDate: input.visitDate,
-    categoryId: input.categoryId,
-    quantity: input.quantity,
+    // A school group visit is a single category for the whole party
+    // (unlike an individual visitor's booking, which can now mix
+    // categories) -- so this still wraps just the one category/quantity
+    // pair CreateGroupBookingInput takes, into the `items` array the
+    // contract now requires.
+    items: [{ categoryId: input.categoryId, quantity: input.quantity }],
     bookingType: 'group',
     groupName: input.groupName ?? null,
     groupContactPhone: input.groupContactPhone ?? null,
