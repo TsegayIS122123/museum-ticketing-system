@@ -37,10 +37,16 @@ class Refund(TimeStampedModel):
 
     class Reason(models.TextChoices):
         # Mirrors FR-REFUND-001(a)/(b)/(c) directly -- one value per
-        # trigger, never a free-text column.
+        # trigger, never a free-text column. CATEGORY_CORRECTION is the
+        # one exception: it isn't an FR-REFUND-001 trigger at all, but
+        # the ID-verification addendum's overcharge case (Document 02
+        # Sec 2.2) reuses this same Refund/process_refund machinery, so
+        # it needs its own Reason value rather than being misfiled under
+        # one of the three above.
         CANCELLATION = "cancellation", "Cancellation"
         PARTIAL_SHORTFALL = "partial_shortfall", "Partial shortfall"
         NO_RESPONSE = "no_response", "No response"
+        CATEGORY_CORRECTION = "category_correction", "Category correction"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"

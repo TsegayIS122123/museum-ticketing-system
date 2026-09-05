@@ -85,15 +85,24 @@ def _split_name(full_name):
     return parts[0], parts[1]
 
 
-def _initialize_chapa_checkout(*, tx_ref, booking):
+def _initialize_chapa_checkout(*, tx_ref, booking, amount):
     """The one function that actually talks to Chapa -- isolated so
     services-level tests can monkeypatch this instead of the network
     (mirrors how `apps.notifications.tasks.send_notification` is mocked
     at its call site in `apps.accounts`' tests, applied here to an
-    outbound HTTP call instead of a Celery task)."""
+    outbound HTTP call instead of a Celery task).
+
+    `amount` is charged to Chapa, not read from `booking.total_amount_etb`
+    directly -- for a booking's first-ever payment the two are the same
+    (see `create_checkout_session`'s default below), but a category-
+    correction top-up (ID-verification addendum) charges only the
+    outstanding *difference*, while `booking.total_amount_etb` already
+    holds the new, corrected *total* by the time this runs -- charging
+    that instead would double-bill the portion the visitor already
+    paid."""
     first_name, last_name = _split_name(booking.visitor.full_name)
     payload = {
-        "amount": str(booking.total_amount_etb),
+        "amount": str(amount),
         "currency": "ETB",
         "email": booking.visitor.email,
         "first_name": first_name,
@@ -134,19 +143,39 @@ def _initialize_chapa_checkout(*, tx_ref, booking):
 
 
 @transaction.atomic
-def create_checkout_session(*, booking):
+def create_checkout_session(*, booking, amount=None):
     """Implements FR-PAY-001 and Document 04's "response includes a
     checkout URL" on `POST /bookings` (individual or group alike).
+
+    `amount` defaults to `booking.total_amount_etb` -- correct for a
+    booking's first-ever payment, since nothing has been paid yet. The
+    ID-verification addendum's category-correction flow
+    (`apps.bookings.views.BookingCategoryCorrectionView`) passes an
+    explicit `amount` instead: just the outstanding difference for an
+    undercharge, since part of the (now higher) `total_amount_etb` was
+    already paid and confirmed before the correction. Either way, this
+    is a *second* `Payment` row against the same booking in the
+    correction case -- `Payment`'s own docstring already documents a
+    booking accumulating more than one row (a retried checkout after a
+    failed attempt is the other case), so no model change was needed for
+    this to work.
 
     Idempotency guard: if this booking already has an open (`initiated`)
     payment with a `checkout_url`, that session is reused instead of
     opening a second one with Chapa -- covers a retried request, in the
     same spirit as NFR-IDEMPOTENT-001 even though FR-PAY-004's own
     DB-level guarantee (`tx_ref` UNIQUE) is specifically about the
-    *webhook* side.
+    *webhook* side. Reused as-is, correction included: by the time a
+    correction runs, the booking's original payment is always already
+    `completed` (the booking had to be `Pending` to be corrected), so this
+    guard can only ever find an `initiated` row left behind by a retried
+    attempt at the *same* correction, never the original payment.
     """
     if booking.status != Booking.Status.AWAITING_PAYMENT:
         raise Conflict("This booking is not awaiting payment.")
+
+    if amount is None:
+        amount = booking.total_amount_etb
 
     existing = (
         Payment.objects.select_for_update()
@@ -158,12 +187,12 @@ def create_checkout_session(*, booking):
         return existing
 
     tx_ref = _generate_tx_ref(booking)
-    checkout_url = _initialize_chapa_checkout(tx_ref=tx_ref, booking=booking)
+    checkout_url = _initialize_chapa_checkout(tx_ref=tx_ref, booking=booking, amount=amount)
 
     payment = Payment.objects.create(
         booking=booking,
         tx_ref=tx_ref,
-        amount_etb=booking.total_amount_etb,
+        amount_etb=amount,
         currency="ETB",
         checkout_url=checkout_url,
     )

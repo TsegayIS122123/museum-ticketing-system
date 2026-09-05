@@ -235,8 +235,11 @@ export default function BookingDetailPage() {
                   {t('payment_required') || 'Payment Required'}
                 </div>
                 <p className="text-sm text-stone-600 mt-1">
-                  {t('payment_required_description') ||
-                    'This booking is not confirmed until payment is complete.'}
+                  {booking.categoryCorrectedAt
+                    ? t('payment_required_correction_description') ||
+                      "Your category was corrected at the gate, and there's an outstanding balance for the difference."
+                    : t('payment_required_description') ||
+                      'This booking is not confirmed until payment is complete.'}
                 </p>
                 {booking.checkoutUrl ? (
                   <Button

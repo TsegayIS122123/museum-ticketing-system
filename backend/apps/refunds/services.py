@@ -189,10 +189,20 @@ def _ensure_no_existing_refund(*, booking):
     never reaches `Visited`, and a `Visited` booking can't be cancelled).
     A `failed` refund does NOT block a fresh attempt, since that Visitor
     is still owed money.
+
+    A `category_correction` refund (ID-verification addendum) does NOT
+    count as "this booking's refund" either, and is excluded here for a
+    different reason than `failed`: it's an earlier-stage price
+    adjustment, not the booking's terminal outcome, so it must never
+    block a later legitimate FR-REFUND-001 trigger -- e.g. a booking
+    corrected (and partially refunded) at the gate can still have an
+    attendance shortfall at check-in, and that Visitor is still entitled
+    to request a `partial_shortfall` refund afterward.
     """
     exists = (
         Refund.objects.filter(booking=booking)
         .exclude(status=Refund.Status.FAILED)
+        .exclude(reason=Refund.Reason.CATEGORY_CORRECTION)
         .exists()
     )
     if exists:
@@ -200,11 +210,17 @@ def _ensure_no_existing_refund(*, booking):
 
 
 @transaction.atomic
-def _create_refund_and_enqueue(*, booking, reason, requested_by=None, note=None):
+def _create_refund_and_enqueue(
+    *, booking, reason, requested_by=None, note=None, amount_override=None
+):
     _ensure_no_existing_refund(booking=booking)
     payment = _get_completed_payment(booking=booking)
 
-    gross_amount = compute_refundable_amount(booking=booking, reason=reason)
+    gross_amount = (
+        amount_override
+        if amount_override is not None
+        else compute_refundable_amount(booking=booking, reason=reason)
+    )
     if gross_amount <= 0:
         raise Conflict("There is nothing to refund for this booking.")
 
@@ -300,6 +316,38 @@ def trigger_no_response_refund(*, booking):
     for each `Pending` booking whose visit date has passed and whose
     no-show notice went unanswered for seven days."""
     return _create_refund_and_enqueue(booking=booking, reason=Refund.Reason.NO_RESPONSE)
+
+
+# --------------------------------------------------------------------------
+# Category correction (ID-verification addendum to Document 02 Sec 2.2)
+# --------------------------------------------------------------------------
+
+
+def trigger_category_correction_refund(*, booking, amount, actor):
+    """Called by `apps.bookings.views.BookingCategoryCorrectionView` right
+    after `apps.bookings.services.correct_booking_category` finds the
+    visitor was overcharged (booked a pricier category than their ID
+    supports) -- `amount` is that difference (`old_total - new_total`),
+    computed by the caller from the booking's price fields *before* they
+    were overwritten with the corrected values, since by the time this
+    runs `booking.total_amount_etb` already reflects the new, lower
+    total and can no longer be diffed against the old one on its own.
+    This is why `_create_refund_and_enqueue` takes an explicit
+    `amount_override` here instead of computing it itself the way the
+    three FR-REFUND-001 triggers above do via `compute_refundable_amount`.
+
+    Unlike `trigger_cancellation_refund`/`trigger_no_response_refund`,
+    this never changes `booking.status` to `Refunded` --
+    `apps.refunds.tasks.process_refund`'s own reason check already
+    excludes `category_correction` from that (see its module docstring):
+    the booking is still very much alive, mid check-in at the gate, not
+    resolved."""
+    return _create_refund_and_enqueue(
+        booking=booking,
+        reason=Refund.Reason.CATEGORY_CORRECTION,
+        requested_by=actor,
+        amount_override=amount,
+    )
 
 
 # --------------------------------------------------------------------------

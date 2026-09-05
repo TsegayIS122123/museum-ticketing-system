@@ -502,6 +502,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/Booking'
           description: ''
+  /api/v1/bookings/{id}/category-correction/:
+    patch:
+      operationId: v1_bookings_category_correction_partial_update
+      description: |-
+        PATCH /bookings/{id}/category-correction -- Cashier only
+        (ID-verification addendum to Document 02 Sec 2.2).
+
+        Corrects a booking's category when the visitor's ID at the gate
+        doesn't match what they booked under, then either reopens payment
+        for the difference (undercharge) or issues a refund for the
+        difference (overcharge). Lives here, not in `apps.entrance` -- even
+        though it's a gate-side, Cashier-only action -- because this is where
+        that composition with `apps.payments`/`apps.refunds` already happens
+        (`BookingListCreateView.post`/`BookingCancelView` above); `entrance`
+        depends on `bookings` only, with no dependency of its own on
+        `refunds`/`payments` (`apps.entrance.services`' own module
+        docstring), so putting this endpoint there would violate that
+        boundary. See `services.correct_booking_category`'s own docstring for
+        the full rationale.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingCategoryCorrection'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingCategoryCorrection'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingCategoryCorrection'
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
   /api/v1/bookings/{id}/check-in/:
     post:
       operationId: checkInBooking
@@ -1236,6 +1284,11 @@ components:
         rescheduledCount:
           type: integer
           readOnly: true
+        categoryCorrectedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         noticeSentAt:
           type: string
           format: date-time
@@ -1271,6 +1324,7 @@ components:
       - attendedQuantity
       - bookedQuantity
       - bookingType
+      - categoryCorrectedAt
       - categoryId
       - categoryNameAm
       - categoryNameEn
@@ -1644,6 +1698,11 @@ components:
         rescheduledCount:
           type: integer
           readOnly: true
+        categoryCorrectedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         noticeSentAt:
           type: string
           format: date-time
@@ -1695,6 +1754,7 @@ components:
       - attendedQuantity
       - bookedQuantity
       - bookingType
+      - categoryCorrectedAt
       - categoryId
       - categoryNameAm
       - categoryNameEn
@@ -1936,6 +1996,17 @@ components:
       required:
       - data
       - meta
+    PatchedBookingCategoryCorrection:
+      type: object
+      description: |-
+        `BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
+        addendum to Document 02 Sec 2.2). A plain Serializer, not a
+        ModelSerializer, mirroring `BookingCreateSerializer` above: the
+        single input is a new category, not a 1:1 model field mapping.
+      properties:
+        categoryId:
+          type: string
+          format: uuid
     PatchedIfmisVoucherUpdate:
       type: object
       description: |-
@@ -1965,11 +2036,13 @@ components:
       - cancellation
       - partial_shortfall
       - no_response
+      - category_correction
       type: string
       description: |-
         * `cancellation` - Cancellation
         * `partial_shortfall` - Partial shortfall
         * `no_response` - No response
+        * `category_correction` - Category correction
     Refund:
       type: object
       description: |-

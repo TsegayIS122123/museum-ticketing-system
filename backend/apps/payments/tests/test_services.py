@@ -111,6 +111,35 @@ def test_create_checkout_session_surfaces_gateway_failure(mock_init):
     assert Payment.objects.filter(booking=booking).count() == 0
 
 
+@mock.patch("apps.payments.services._initialize_chapa_checkout", return_value=FAKE_CHECKOUT_URL)
+def test_create_checkout_session_charges_explicit_amount_not_the_booking_total(mock_init):
+    """The ID-verification addendum's category-correction top-up: the
+    booking's own total_amount_etb already reflects the new, corrected
+    (higher) total by the time this runs -- only the outstanding
+    difference should ever be charged again, never the full total a
+    second time."""
+    booking = _make_booking(quantity=1)  # total_amount_etb = 100.00 ETB
+
+    payment = services.create_checkout_session(booking=booking, amount=Decimal("30.00"))
+
+    assert payment.amount_etb == Decimal("30.00")
+    mock_init.assert_called_once_with(
+        tx_ref=mock.ANY, booking=booking, amount=Decimal("30.00")
+    )
+
+
+@mock.patch("apps.payments.services._initialize_chapa_checkout", return_value=FAKE_CHECKOUT_URL)
+def test_create_checkout_session_defaults_amount_to_booking_total(mock_init):
+    booking = _make_booking(quantity=1)
+
+    payment = services.create_checkout_session(booking=booking)
+
+    assert payment.amount_etb == booking.total_amount_etb
+    mock_init.assert_called_once_with(
+        tx_ref=mock.ANY, booking=booking, amount=booking.total_amount_etb
+    )
+
+
 # --------------------------------------------------------------------------
 # verify_webhook_signature (NFR-SEC-001)
 # --------------------------------------------------------------------------

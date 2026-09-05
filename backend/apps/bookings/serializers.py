@@ -68,6 +68,12 @@ class BookingSerializer(serializers.ModelSerializer):
         source="attended_quantity", read_only=True, allow_null=True
     )
     rescheduledCount = serializers.IntegerField(source="rescheduled_count", read_only=True)
+    # Set only once a Cashier has corrected this booking's category at
+    # the gate (ID-verification addendum) -- null on every booking that
+    # was never corrected.
+    categoryCorrectedAt = serializers.DateTimeField(
+        source="category_corrected_at", read_only=True, allow_null=True
+    )
     noticeSentAt = serializers.DateTimeField(source="notice_sent_at", read_only=True, allow_null=True)
     checkoutUrl = serializers.CharField(
         source="chapa_checkout_url", read_only=True, allow_null=True
@@ -109,6 +115,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "attendedQuantity",
             "status",
             "rescheduledCount",
+            "categoryCorrectedAt",
             "noticeSentAt",
             "checkoutUrl",
             "receiptUrl",
@@ -157,3 +164,15 @@ class BookingRescheduleSerializer(serializers.Serializer):
     """`BookingRescheduleRequest` -- FR-BOOK-007."""
 
     newVisitDate = serializers.DateField()
+
+
+class BookingCategoryCorrectionSerializer(serializers.Serializer):
+    """`BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
+    addendum to Document 02 Sec 2.2). A plain Serializer, not a
+    ModelSerializer, mirroring `BookingCreateSerializer` above: the
+    single input is a new category, not a 1:1 model field mapping."""
+
+    categoryId = serializers.UUIDField()
+
+    def to_service_kwargs(self):
+        return {"category_id": self.validated_data["categoryId"]}

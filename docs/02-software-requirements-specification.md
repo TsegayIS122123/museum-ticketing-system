@@ -175,15 +175,31 @@ Every digital booking moves through a defined lifecycle:
 - **FR-TICKET-005**: If more visitors show up than were booked, the extra visitors are not admitted
   under the original booking — they must book/pay separately, either online or through the existing
   manual/cash counter, exactly as any other new visitor would.
+- **FR-TICKET-006** (ID-verification addendum): A Visitor's stated category (Student,
+  Foreign Resident, Exempt, etc.) is a self-declared claim at booking time, attested to rather than
+  proven with an uploaded document — a teacher booking for 30 students, or a family of 5, should
+  never be required to upload ID for every person online. The actual proof is checked in person,
+  at the gate, before check-in: if the Cashier finds a booking's category doesn't match the ID
+  presented, she corrects the category on a still-`Pending` booking. If the corrected category
+  costs more, the booking is reopened for payment (§2.4's `awaiting_payment`, exactly like a fresh
+  booking) for just the difference — the Visitor pays it themselves, from their own device, before
+  check-in can proceed; nothing is collected as cash by the Cashier. If the corrected category costs
+  less, the difference is refunded automatically (§2.6) and check-in proceeds immediately. Either
+  way, the booking's `booked_quantity`/`visitor` are unchanged — only the category and its price.
 
 ### 2.6 Refunds
 
 - **FR-REFUND-001**: A refund can be triggered by:
   (a) the Visitor cancelling a `Pending` booking — full refund, automatic, no request needed;
   (b) the Visitor/group leader requesting a refund for a partial-attendance shortfall — requires
-  the Visitor to ask; or
+  the Visitor to ask;
   (c) the system's own no-response refund (FR-PAY-005) — triggered automatically, with no request
-  needed, one week after the no-show notice if the Visitor neither rescheduled nor responded.
+  needed, one week after the no-show notice if the Visitor neither rescheduled nor responded; or
+  (d) a Cashier's category correction (FR-TICKET-006) finding the Visitor was overcharged — the
+  difference is refunded automatically, with no request needed. Unlike (a)/(c), this never changes
+  the booking's own status (it's still open, mid check-in) — only (b)'s partial-shortfall refund
+  shares that same "booking stays as it is" property, for the same reason: the booking isn't
+  actually over.
 - **FR-REFUND-002**: Whenever a refund is triggered, the system determines the refundable amount by
   checking the booking's recorded visit status first (booked quantity vs. attended quantity) — this
   calculation must not depend on a person working it out by hand.

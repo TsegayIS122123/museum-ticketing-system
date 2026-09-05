@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toast } from '@/components/ui/Toast';
 import { QRCodeSVG } from '@/components/ui/QRCodeSVG';
 import { TextField } from '@/components/ui/TextField';
+import { CategoryCorrectionPanel } from './CategoryCorrectionPanel';
 import {
   checkInBooking,
   recordIfmisVoucherReference,
@@ -23,16 +24,23 @@ interface AttendanceEntryFormProps {
 }
 
 export function AttendanceEntryForm({
-  booking,
+  booking: initialBooking,
   onCheckInComplete,
   onCancel,
 }: AttendanceEntryFormProps) {
   const { t, locale } = useTranslation();
 
+  // Local, not derived from a prop on every render: a category
+  // correction (ID-verification addendum) changes this booking's
+  // category/price/status server-side, and the response from that PATCH
+  // is the fastest, most reliable way to reflect the new state -- no
+  // extra round trip back through `lookupBooking`.
+  const [booking, setBooking] = useState<BookingLookupResponse>(initialBooking);
   const [attendedQuantity, setAttendedQuantity] = useState<number>(booking.bookedQuantity);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showCorrection, setShowCorrection] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Just-completed check-in, still on screen so the Cashier can key the
@@ -311,7 +319,18 @@ export function AttendanceEntryForm({
             <div className="font-medium text-stone-900">{formatDate(booking.visitDate)}</div>
           </div>
           <div>
-            <div className="text-stone-500">{t('category')}</div>
+            <div className="text-stone-500 flex items-center justify-between gap-2">
+              <span>{t('category')}</span>
+              {canCheckIn && (
+                <button
+                  type="button"
+                  onClick={() => setShowCorrection((v) => !v)}
+                  className="text-xs font-medium text-secondary-600 hover:text-secondary-700 underline"
+                >
+                  {t('correct_category') || 'Correct'}
+                </button>
+              )}
+            </div>
             <div className="font-medium text-stone-900">
               {locale === 'en' ? booking.categoryNameEn : booking.categoryNameAm}
             </div>
@@ -325,6 +344,32 @@ export function AttendanceEntryForm({
             <div className="font-medium text-stone-900">ETB {booking.totalAmountEtb}</div>
           </div>
         </div>
+
+        {showCorrection && (
+          <CategoryCorrectionPanel
+            booking={booking}
+            onCancel={() => setShowCorrection(false)}
+            onCorrected={(updated) => {
+              setBooking(updated);
+              setShowCorrection(false);
+              setToast(
+                updated.status === 'awaiting_payment'
+                  ? {
+                      message:
+                        t('correction_needs_payment') ||
+                        "Category corrected. The visitor now owes the difference online before they can be checked in -- they'll see a Pay Now button on their own booking page.",
+                      type: 'success',
+                    }
+                  : {
+                      message:
+                        t('correction_refund_issued') ||
+                        'Category corrected. The overcharge is being refunded automatically.',
+                      type: 'success',
+                    }
+              );
+            }}
+          />
+        )}
       </Card>
 
       {/* Attendance Entry */}

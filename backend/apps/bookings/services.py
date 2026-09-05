@@ -6,24 +6,26 @@ lives here. This is the layer that enforces the business rules from
 Document 02 and is unit-tested directly (NFR-MAINT-001) without spinning
 up HTTP requests.
 
-Authorization (Museum-Manager-only for approval decisions and date
-closure, Visitor-only for creation/cancel/reschedule) is the view layer's
-job (permission classes), not this module's -- services assume the caller
-has already been authorized, mirroring accounts/services.py and
-catalog/services.py's own division of labor. What this module *does*
-check is ownership (a Visitor can only cancel/reschedule their own
-booking) and state (only a `Pending` booking can be cancelled/rescheduled)
--- those are business rules, not authorization.
+Authorization (Museum-Manager-only for date closure, Visitor-only for
+creation/cancel/reschedule, Cashier-only for a gate-side category
+correction) is the view layer's job (permission classes), not this
+module's -- services assume the caller has already been authorized,
+mirroring accounts/services.py and catalog/services.py's own division of
+labor. What this module *does* check is ownership (a Visitor can only
+cancel/reschedule their own booking) and state (only a `Pending` booking
+can be cancelled/rescheduled/category-corrected) -- those are business
+rules, not authorization.
 
 Payment-gateway integration (Chapa checkout session creation) is
 deliberately absent here: per Design Spec Sec 3.2, `payments` depends on
 `bookings`, not the reverse. A booking this app creates is left in
-`awaiting_payment` (individual) or `pending_approval` (group) with
-`chapa_checkout_url` unset; `apps.payments` is what populates it once
-that app exists (Sec 4.2's sequence). Likewise, cancellation/no-response
-here only transitions `status` and writes an audit-log entry -- the
-actual refund call (FR-REFUND-001a/c) is `apps.refunds`' job, which
-depends on `bookings`, not the reverse.
+`awaiting_payment` with `chapa_checkout_url` unset; `apps.payments` is
+what populates it once that app exists (Sec 4.2's sequence). Likewise,
+cancellation/no-response/category-correction here only transition
+`status`/pricing fields and write an audit-log entry -- the actual
+refund/top-up-checkout call (FR-REFUND-001a/c, and the ID-verification
+category-correction addendum) is `apps.refunds`'/`apps.payments`' job,
+called from the view layer, not from this module (Sec 3.2).
 """
 
 from datetime import timedelta
@@ -184,6 +186,109 @@ def create_booking(
         metadata={"booking_type": booking_type, "visit_date": visit_date.isoformat()},
     )
     return booking
+
+
+# --------------------------------------------------------------------------
+# Cashier-only category correction (ID-verification addendum)
+# --------------------------------------------------------------------------
+
+
+def correct_booking_category(*, booking, category_id, actor):
+    """Implements the Cashier-only `PATCH /bookings/{id}/category-correction`
+    (ID-verification addendum to Document 02 Sec 2.2): at the gate, before
+    check-in, a Cashier discovers the visitor's ID doesn't match the
+    category they booked under (e.g. booked as Student, no valid student
+    ID) and corrects it here.
+
+    Only ever on a `Pending` booking -- i.e. paid, but not yet checked
+    in. Once `apps.entrance.services.check_in_booking` has run, the
+    booking is `Visited` and this is no longer reachable, mirroring how
+    `_require_own_pending_booking` above already gates cancel/reschedule
+    the same way (both are "before the Cashier has acted" windows, just
+    for different actors).
+
+    This function only ever mutates the booking's own category/price
+    fields (and, for an undercharge, reopens `status` for payment) -- it
+    never calls into `apps.payments` or `apps.refunds` itself. Creating
+    the follow-up top-up checkout session (undercharge) or issuing the
+    refund (overcharge) is the view layer's job, exactly like
+    `BookingCancelView`/`BookingListCreateView.post` already compose
+    `apps.refunds`/`apps.payments` at that layer, never from this module
+    (Design Spec Sec 3.2).
+
+    Returns `(booking, delta)`, where `delta = new_total - old_total`:
+    positive means the visitor now owes the difference (undercharge),
+    negative means they're owed a refund (overcharge), zero means the
+    corrected category happens to cost the same as the original one.
+    """
+    if booking.status != Booking.Status.PENDING:
+        raise Conflict("Only a Pending booking's category can be corrected.")
+
+    try:
+        category = Category.objects.get(id=category_id, active=True)
+    except Category.DoesNotExist:
+        raise ValidationError({"categoryId": "Not a known, active category."})
+
+    if category.id == booking.category_id:
+        raise ValidationError({"categoryId": "This is already the booking's category."})
+
+    old_category_id = booking.category_id
+    old_total = booking.total_amount_etb
+    new_total = category.price_etb * booking.booked_quantity
+    delta = new_total - old_total
+
+    booking.category = category
+    booking.category_name_en = category.name_en
+    booking.category_name_am = category.name_am
+    booking.unit_price_etb = category.price_etb
+    booking.total_amount_etb = new_total
+    booking.category_corrected_at = timezone.now()
+    booking.category_corrected_by_user_id = actor
+
+    update_fields = [
+        "category",
+        "category_name_en",
+        "category_name_am",
+        "unit_price_etb",
+        "total_amount_etb",
+        "category_corrected_at",
+        "category_corrected_by_user_id",
+        "updated_at",
+    ]
+
+    if delta > 0:
+        # Undercharge: reopen payment for just the difference, exactly
+        # like a fresh booking's first payment -- see
+        # apps.payments.services.create_checkout_session's own
+        # `amount` parameter for why this is a *second* Payment against
+        # the same booking, not a re-charge of the full corrected total.
+        # FR-TICKET-003's Pending-only check-in guard then does the rest:
+        # this booking cannot be checked in again until that top-up
+        # payment is confirmed and this status moves back to Pending.
+        booking.status = Booking.Status.AWAITING_PAYMENT
+        update_fields.append("status")
+    # delta <= 0 (overcharge or exact match): status is left untouched --
+    # a `Pending` booking that's owed a refund is still checkable-in right
+    # away, it just also gets money back (delta == 0 needs neither a
+    # top-up nor a refund, but the category/price fields are still
+    # corrected for accuracy at the gate and on any future receipt).
+
+    booking.save(update_fields=update_fields)
+
+    write_audit_log(
+        actor_id=actor.id,
+        action="booking.category_corrected",
+        target_type="booking",
+        target_id=booking.id,
+        metadata={
+            "old_category_id": str(old_category_id),
+            "new_category_id": str(category.id),
+            "old_total_amount_etb": str(old_total),
+            "new_total_amount_etb": str(new_total),
+            "delta_etb": str(delta),
+        },
+    )
+    return booking, delta
 
 
 # --------------------------------------------------------------------------

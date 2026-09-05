@@ -163,6 +163,29 @@ class Booking(TimeStampedModel):
         related_name="+",
     )
 
+    # Set by a Cashier at the gate (before check-in) when the visitor's
+    # ID doesn't match the category they booked under -- the ID-
+    # verification addendum to Document 02 Sec 2.2. `category`/
+    # `category_name_en`/`category_name_am`/`unit_price_etb`/
+    # `total_amount_etb` above are overwritten in place to the corrected
+    # values; the *original* values are not kept as separate columns --
+    # they're only ever needed for an audit trail, and the audit log
+    # (apps.core.services.write_audit_log) already records the
+    # before/after category and amount for `booking.category_corrected`,
+    # matching this codebase's existing convention (e.g.
+    # `booking.checked_in`, `payment.confirmed`) of using the audit log
+    # for "what changed", not a dedicated column per change. Only ever
+    # set on a `Pending` booking -- see
+    # `apps.bookings.services.correct_booking_category`.
+    category_corrected_at = models.DateTimeField(null=True, blank=True)
+    category_corrected_by_user_id = models.ForeignKey(
+        "accounts.Account",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
     # Populated by apps.payments once it exists (Sec 4.2's sequence) --
     # null here until that app creates a Chapa checkout session.
     chapa_checkout_url = models.TextField(null=True, blank=True)

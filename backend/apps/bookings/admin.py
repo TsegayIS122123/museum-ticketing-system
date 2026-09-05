@@ -32,6 +32,8 @@ class BookingAdmin(admin.ModelAdmin):
         "rescheduled_count",
         "checked_in_at",
         "checked_in_by_user_id",
+        "category_corrected_at",
+        "category_corrected_by_user_id",
         "chapa_checkout_url",
         "receipt_url",
         "ifmis_voucher_reference",

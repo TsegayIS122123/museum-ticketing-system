@@ -13,11 +13,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.pagination import EnvelopeLimitOffsetPagination
-from apps.core.permissions import IsMuseumManager, IsStaff, IsVisitor
+from apps.core.permissions import IsCashier, IsMuseumManager, IsStaff, IsVisitor
 
 from . import services
 from .models import Booking
 from .serializers import (
+    BookingCategoryCorrectionSerializer,
     BookingCreateSerializer,
     BookingRescheduleSerializer,
     BookingSerializer,
@@ -188,6 +189,53 @@ class BookingRescheduleView(APIView):
             visitor=request.user,
             new_visit_date=serializer.validated_data["newVisitDate"],
         )
+        return Response(BookingSerializer(booking).data)
+
+
+class BookingCategoryCorrectionView(APIView):
+    """PATCH /bookings/{id}/category-correction -- Cashier only
+    (ID-verification addendum to Document 02 Sec 2.2).
+
+    Corrects a booking's category when the visitor's ID at the gate
+    doesn't match what they booked under, then either reopens payment
+    for the difference (undercharge) or issues a refund for the
+    difference (overcharge). Lives here, not in `apps.entrance` -- even
+    though it's a gate-side, Cashier-only action -- because this is where
+    that composition with `apps.payments`/`apps.refunds` already happens
+    (`BookingListCreateView.post`/`BookingCancelView` above); `entrance`
+    depends on `bookings` only, with no dependency of its own on
+    `refunds`/`payments` (`apps.entrance.services`' own module
+    docstring), so putting this endpoint there would violate that
+    boundary. See `services.correct_booking_category`'s own docstring for
+    the full rationale."""
+
+    permission_classes = [IsCashier]
+
+    @extend_schema(
+        request=BookingCategoryCorrectionSerializer, responses=BookingSerializer
+    )
+    def patch(self, request, id):
+        booking = get_object_or_404(Booking, id=id)
+        serializer = BookingCategoryCorrectionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        booking, delta = services.correct_booking_category(
+            booking=booking, actor=request.user, **serializer.to_service_kwargs()
+        )
+
+        # Local imports: see BookingListCreateView.post/BookingCancelView
+        # above for why apps.payments/apps.refunds are only ever imported
+        # here, at the view layer, never from bookings/services.py.
+        if delta > 0:
+            from apps.payments.services import create_checkout_session
+
+            create_checkout_session(booking=booking, amount=delta)
+        elif delta < 0:
+            from apps.refunds.services import trigger_category_correction_refund
+
+            trigger_category_correction_refund(
+                booking=booking, amount=-delta, actor=request.user
+            )
+
         return Response(BookingSerializer(booking).data)
 
 

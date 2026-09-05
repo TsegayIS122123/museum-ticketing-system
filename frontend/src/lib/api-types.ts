@@ -319,6 +319,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookings/{id}/category-correction/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description PATCH /bookings/{id}/category-correction -- Cashier only
+         *     (ID-verification addendum to Document 02 Sec 2.2).
+         *
+         *     Corrects a booking's category when the visitor's ID at the gate
+         *     doesn't match what they booked under, then either reopens payment
+         *     for the difference (undercharge) or issues a refund for the
+         *     difference (overcharge). Lives here, not in `apps.entrance` -- even
+         *     though it's a gate-side, Cashier-only action -- because this is where
+         *     that composition with `apps.payments`/`apps.refunds` already happens
+         *     (`BookingListCreateView.post`/`BookingCancelView` above); `entrance`
+         *     depends on `bookings` only, with no dependency of its own on
+         *     `refunds`/`payments` (`apps.entrance.services`' own module
+         *     docstring), so putting this endpoint there would violate that
+         *     boundary. See `services.correct_booking_category`'s own docstring for
+         *     the full rationale.
+         */
+        patch: operations["v1_bookings_category_correction_partial_update"];
+        trace?: never;
+    };
     "/api/v1/bookings/{id}/check-in/": {
         parameters: {
             query?: never;
@@ -786,6 +819,8 @@ export interface components {
             readonly status: components["schemas"]["BookingStatusEnum"];
             readonly rescheduledCount: number;
             /** Format: date-time */
+            readonly categoryCorrectedAt: string | null;
+            /** Format: date-time */
             readonly noticeSentAt: string | null;
             readonly checkoutUrl: string | null;
             readonly receiptUrl: string | null;
@@ -983,6 +1018,8 @@ export interface components {
             readonly status: components["schemas"]["BookingStatusEnum"];
             readonly rescheduledCount: number;
             /** Format: date-time */
+            readonly categoryCorrectedAt: string | null;
+            /** Format: date-time */
             readonly noticeSentAt: string | null;
             readonly checkoutUrl: string | null;
             readonly receiptUrl: string | null;
@@ -1096,6 +1133,16 @@ export interface components {
             };
         };
         /**
+         * @description `BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
+         *     addendum to Document 02 Sec 2.2). A plain Serializer, not a
+         *     ModelSerializer, mirroring `BookingCreateSerializer` above: the
+         *     single input is a new category, not a 1:1 model field mapping.
+         */
+        PatchedBookingCategoryCorrection: {
+            /** Format: uuid */
+            categoryId?: string;
+        };
+        /**
          * @description `IfmisVoucherUpdateRequest` -- Cashier only. The real Document
          *     No/Ref No she gets back from IFMIS after keying the check-in
          *     transaction in herself (services.record_ifmis_voucher_reference
@@ -1117,9 +1164,10 @@ export interface components {
          * @description * `cancellation` - Cancellation
          *     * `partial_shortfall` - Partial shortfall
          *     * `no_response` - No response
+         *     * `category_correction` - Category correction
          * @enum {string}
          */
-        ReasonEnum: "cancellation" | "partial_shortfall" | "no_response";
+        ReasonEnum: "cancellation" | "partial_shortfall" | "no_response" | "category_correction";
         /**
          * @description `Refund` (Document 04). Read-only -- every mutation goes through
          *     `RefundRequestCreateSerializer` and services.py, never through this
@@ -1665,6 +1713,33 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Booking"];
+                };
+            };
+        };
+    };
+    v1_bookings_category_correction_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedBookingCategoryCorrection"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedBookingCategoryCorrection"];
+                "multipart/form-data": components["schemas"]["PatchedBookingCategoryCorrection"];
+            };
+        };
         responses: {
             200: {
                 headers: {

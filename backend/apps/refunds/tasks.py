@@ -114,6 +114,11 @@ def process_refund(self, *, refund_id):
             # Refunded. A partial_shortfall refund does NOT change
             # booking.status -- the booking is already resolved
             # (Visited); the refund is just for the unattended portion.
+            # A category_correction refund (ID-verification addendum)
+            # doesn't either, for the opposite reason: the booking isn't
+            # resolved yet at all -- this refund fires mid check-in, for
+            # an overcharge found at the gate, while the booking is still
+            # very much `Pending`.
             booking.status = Booking.Status.REFUNDED
             booking.save(update_fields=["status", "updated_at"])
 

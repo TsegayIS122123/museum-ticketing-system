@@ -222,6 +222,114 @@ def test_create_booking_rejected_for_closed_date():
 
 
 # --------------------------------------------------------------------------
+# correct_booking_category (ID-verification addendum to Document 02 Sec 2.2)
+# --------------------------------------------------------------------------
+
+
+def _make_cashier(email="cashier@example.com"):
+    account = Account(email=email, full_name="Cashier Person", role=Account.Role.CASHIER)
+    account.set_password("a-strong-password-1")
+    account.save()
+    return account
+
+
+def _make_correctable_booking(category, quantity=1):
+    visitor = _make_visitor()
+    booking = services.create_booking(
+        visitor=visitor,
+        category_id=category.id,
+        visit_date=TOMORROW,
+        quantity=quantity,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+    )
+    # Skip apps.payments entirely -- these tests only exercise
+    # bookings/services.py, which never imports it (Design Spec Sec 3.2).
+    booking.status = Booking.Status.PENDING
+    booking.save(update_fields=["status", "updated_at"])
+    return booking
+
+
+def test_correct_category_to_a_pricier_one_reopens_payment_for_the_difference():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    booking = _make_correctable_booking(student)
+    cashier = _make_cashier()
+
+    booking, delta = services.correct_booking_category(
+        booking=booking, category_id=non_resident.id, actor=cashier
+    )
+
+    assert delta == Decimal("450.00")
+    assert booking.category_id == non_resident.id
+    assert booking.unit_price_etb == Decimal("500.00")
+    assert booking.total_amount_etb == Decimal("500.00")
+    assert booking.status == Booking.Status.AWAITING_PAYMENT
+    assert booking.category_corrected_by_user_id_id == cashier.id
+    assert booking.category_corrected_at is not None
+
+
+def test_correct_category_to_a_cheaper_one_leaves_booking_pending():
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(non_resident)
+    cashier = _make_cashier()
+
+    booking, delta = services.correct_booking_category(
+        booking=booking, category_id=student.id, actor=cashier
+    )
+
+    assert delta == Decimal("-450.00")
+    assert booking.total_amount_etb == Decimal("50.00")
+    # Overcharge doesn't block check-in -- only an undercharge does.
+    assert booking.status == Booking.Status.PENDING
+
+
+def test_correct_category_scales_with_booked_quantity():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult / Teacher", price_etb="100.00")
+    booking = _make_correctable_booking(student, quantity=30)
+    cashier = _make_cashier()
+
+    booking, delta = services.correct_booking_category(
+        booking=booking, category_id=adult.id, actor=cashier
+    )
+
+    assert delta == Decimal("1500.00")
+    assert booking.total_amount_etb == Decimal("3000.00")
+
+
+def test_correct_category_rejected_once_no_longer_pending():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult / Teacher", price_etb="100.00")
+    booking = _make_correctable_booking(student)
+    booking.status = Booking.Status.VISITED
+    booking.save(update_fields=["status", "updated_at"])
+    cashier = _make_cashier()
+
+    with pytest.raises(Conflict):
+        services.correct_booking_category(booking=booking, category_id=adult.id, actor=cashier)
+
+
+def test_correct_category_rejects_the_same_category():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(student)
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.correct_booking_category(booking=booking, category_id=student.id, actor=cashier)
+
+
+def test_correct_category_rejects_an_inactive_category():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    retired = _make_category(name_en="Retired Category", price_etb="10.00", active=False)
+    booking = _make_correctable_booking(student)
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.correct_booking_category(booking=booking, category_id=retired.id, actor=cashier)
+
+
+# --------------------------------------------------------------------------
 # cancel_booking (FR-BOOK-005/006)
 # --------------------------------------------------------------------------
 

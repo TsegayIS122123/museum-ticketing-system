@@ -36,7 +36,7 @@ C4Context
     title System Context — Museum Ticketing & Booking Platform
 
     Person(visitor, "Visitor", "Books and pays for a ticket online, or pays cash at the counter")
-    Person(cashier, "Cashier", "Verifies headcount at the gate, keys each visitor's transaction into IFMIS herself, and settles her own outstanding balance via a Chapa transfer")
+    Person(cashier, "Cashier", "Verifies headcount and category at the gate, corrects a booking's category when it doesn't match, keys each visitor's transaction into IFMIS herself, and settles her own outstanding balance via a Chapa transfer")
     Person(manager, "Museum Manager", "Controls date availability, configures ticket categories/prices, views reporting")
     Person(admin, "Platform Admin", "Provisions staff accounts")
 
@@ -47,7 +47,7 @@ C4Context
     System_Ext(sms, "SMS Gateway", "Delivers SMS fallback notifications to Ethiopian carriers")
 
     Rel(visitor, platform, "Books, pays, cancels/reschedules, views receipts")
-    Rel(cashier, platform, "Confirms attendance, records IFMIS voucher references, requests her own reconciliation transfer")
+    Rel(cashier, platform, "Confirms attendance, corrects a category, records IFMIS voucher references, requests her own reconciliation transfer")
     Rel(manager, platform, "Opens/closes dates, configures categories/prices, views dashboard")
     Rel(admin, platform, "Manages staff accounts")
 

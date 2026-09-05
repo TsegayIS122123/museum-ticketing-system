@@ -350,6 +350,113 @@ def test_reschedule_succeeds_once_pending():
 
 
 # --------------------------------------------------------------------------
+# PATCH /bookings/{id}/category-correction -- ID-verification addendum
+# --------------------------------------------------------------------------
+
+
+def _make_pending_booking_via_api(client, category, quantity=1):
+    created = client.post(
+        "/api/v1/bookings/",
+        _create_booking_payload(category, quantity=quantity),
+        format="json",
+    ).data
+    booking = Booking.objects.get(id=created["id"])
+    booking.status = Booking.Status.PENDING
+    booking.save(update_fields=["status"])
+    Payment.objects.create(
+        booking=booking,
+        tx_ref=f"museum-{booking.id.hex}-test",
+        amount_etb=booking.total_amount_etb,
+        status=Payment.Status.COMPLETED,
+        confirmed_at=timezone.now(),
+    )
+    return booking
+
+
+def test_category_correction_rejected_for_non_cashier():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student)
+    manager_client = _authed_client(
+        _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
+    )
+
+    response = manager_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"categoryId": str(non_resident.id)},
+        format="json",
+    )
+
+    assert response.status_code == 403
+
+
+def test_category_correction_undercharge_reopens_payment():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student)
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"categoryId": str(non_resident.id)},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "awaiting_payment"
+    assert response.data["totalAmountEtb"] == "500.00"
+    assert response.data["checkoutUrl"]
+    assert response.data["categoryCorrectedAt"]
+    # The check-in gate reuses the existing Pending-only guard -- this
+    # booking cannot be checked in again until the top-up is paid.
+    booking.refresh_from_db()
+    assert booking.status == Booking.Status.AWAITING_PAYMENT
+
+
+def test_category_correction_overcharge_issues_refund_and_stays_pending():
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    student = _make_category(name_en="Student", price_etb="50.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, non_resident)
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"categoryId": str(student.id)},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "pending"
+    assert response.data["totalAmountEtb"] == "50.00"
+    from apps.refunds.models import Refund
+
+    refund = Refund.objects.get(booking=booking)
+    assert refund.reason == Refund.Reason.CATEGORY_CORRECTION
+    assert refund.amount_etb == Decimal("450.00")
+
+
+def test_category_correction_rejected_once_no_longer_pending():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student)
+    booking.status = Booking.Status.VISITED
+    booking.save(update_fields=["status"])
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"categoryId": str(non_resident.id)},
+        format="json",
+    )
+
+    assert response.status_code == 409
+
+
+# --------------------------------------------------------------------------
 # GET /users/me/bookings -- FR-ACC-004
 # --------------------------------------------------------------------------
 

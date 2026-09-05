@@ -263,6 +263,99 @@ def test_trigger_no_response_refund_creates_pending_refund(mock_delay):
 
 
 # --------------------------------------------------------------------------
+# trigger_category_correction_refund (ID-verification addendum)
+# --------------------------------------------------------------------------
+
+
+def _make_cashier(email="cashier@example.com"):
+    account = Account(email=email, full_name="Cashier Person", role=Account.Role.CASHIER)
+    account.set_password("a-strong-password-1")
+    account.save()
+    return account
+
+
+@mock.patch("apps.refunds.tasks.process_refund.delay")
+def test_trigger_category_correction_refund_uses_the_given_amount_not_the_full_booking(
+    mock_delay,
+):
+    """Unlike the three FR-REFUND-001 triggers, the refundable amount
+    here is an explicit `amount` -- the overcharge difference the caller
+    already computed *before* correcting the booking's own price fields
+    (booking.total_amount_etb is the new, lower total by the time this
+    runs, so it can no longer be diffed against the old one)."""
+    cashier = _make_cashier()
+    # Booking is Pending (still checking in), total already corrected
+    # down to 50.00 by the caller -- the overcharge being refunded (450)
+    # is unrelated to the booking's current total.
+    booking = _make_booking(status=Booking.Status.PENDING, quantity=1, unit_price=Decimal("50"))
+    _make_completed_payment(booking=booking, tx_ref="museum-original-payment")
+
+    refund = services.trigger_category_correction_refund(
+        booking=booking, amount=Decimal("450.00"), actor=cashier
+    )
+
+    assert refund.reason == Refund.Reason.CATEGORY_CORRECTION
+    assert refund.amount_etb == Decimal("450.00")
+    assert refund.requested_by_user_id_id == cashier.id
+    mock_delay.assert_called_once_with(refund_id=str(refund.id))
+
+
+@mock.patch("apps.refunds.tasks.process_refund.delay")
+def test_category_correction_refund_does_not_block_a_later_shortfall_refund(mock_delay):
+    """The one real interaction to get right: a booking corrected (and
+    partially refunded) at the gate can still, later, have an attendance
+    shortfall at check-in -- that Visitor must still be able to request a
+    partial_shortfall refund afterward. `_ensure_no_existing_refund`
+    excludes `category_correction` from the "one refund per booking" cap
+    specifically so this sequence works."""
+    visitor = _make_visitor()
+    cashier = _make_cashier()
+    booking = _make_booking(
+        visitor=visitor, status=Booking.Status.PENDING, quantity=1, unit_price=Decimal("50")
+    )
+    _make_completed_payment(booking=booking)
+    services.trigger_category_correction_refund(
+        booking=booking, amount=Decimal("450.00"), actor=cashier
+    )
+
+    # ... time passes, the visitor is checked in with a shortfall ...
+    booking.status = Booking.Status.VISITED
+    booking.booked_quantity = 20
+    booking.attended_quantity = 15
+    booking.save(update_fields=["status", "booked_quantity", "attended_quantity"])
+
+    refund = services.request_partial_shortfall_refund(booking=booking, visitor=visitor)
+
+    assert refund.reason == Refund.Reason.PARTIAL_SHORTFALL
+    assert Refund.objects.filter(booking=booking).count() == 2
+
+
+@mock.patch("apps.notifications.tasks.send_notification.delay")
+@mock.patch("apps.refunds.services.call_chapa_refund_api", return_value=FAKE_REF_ID)
+@mock.patch("apps.refunds.services.fetch_chapa_transaction_fee", return_value=Decimal("2.00"))
+@mock.patch("apps.refunds.tasks.process_refund.delay")
+def test_process_refund_category_correction_does_not_change_booking_status(
+    mock_enqueue, mock_fee, mock_refund_call, mock_notify
+):
+    """Unlike cancellation/no_response, and just like partial_shortfall,
+    a category-correction refund must never flip the booking to
+    `Refunded` -- it fires mid check-in, on a booking that's still very
+    much alive."""
+    cashier = _make_cashier()
+    booking = _make_booking(status=Booking.Status.PENDING, quantity=1, unit_price=Decimal("50"))
+    _make_completed_payment(booking=booking)
+    refund = services.trigger_category_correction_refund(
+        booking=booking, amount=Decimal("450.00"), actor=cashier
+    )
+
+    result = _process(refund)
+
+    booking.refresh_from_db()
+    assert result.status == Refund.Status.COMPLETED
+    assert booking.status == Booking.Status.PENDING
+
+
+# --------------------------------------------------------------------------
 # process_refund task (FR-REFUND-003, FR-REFUND-004, NFR-IDEMPOTENT-001)
 # --------------------------------------------------------------------------
 

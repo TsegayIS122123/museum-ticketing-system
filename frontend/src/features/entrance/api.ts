@@ -55,3 +55,20 @@ export async function recordIfmisVoucherReference(
 ): Promise<Booking> {
   return apiClient.patch<Booking>(`/bookings/${bookingId}/ifmis-voucher/`, { voucherReference });
 }
+
+// PATCH /bookings/{id}/category-correction/ -- Cashier only, and only on
+// a Pending booking (apps.bookings.services.correct_booking_category
+// enforces both). ID-verification addendum: called when the visitor's ID
+// at the gate doesn't match the category they booked under. The backend
+// resolves the money side on its own -- an undercharge reopens the
+// booking for payment (status becomes 'awaiting_payment' again, with a
+// fresh checkoutUrl for just the difference), an overcharge issues a
+// refund for the difference and leaves the booking Pending -- so the
+// caller only ever needs the returned Booking, never a separate
+// success/failure branch for which direction the correction went.
+export async function correctBookingCategory(
+  bookingId: string,
+  categoryId: string
+): Promise<Booking> {
+  return apiClient.patch<Booking>(`/bookings/${bookingId}/category-correction/`, { categoryId });
+}

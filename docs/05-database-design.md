@@ -39,6 +39,7 @@ This document covers the relational schema for PostgreSQL (the system of record 
 erDiagram
     ACCOUNT ||--o{ BOOKING : "books (visitor_id)"
     ACCOUNT ||--o{ BOOKING : "checks in (checked_in_by_user_id)"
+    ACCOUNT ||--o{ BOOKING : "corrects category (category_corrected_by_user_id)"
     ACCOUNT ||--o{ REFUND : requests
     ACCOUNT ||--o{ CASHIER_RECONCILIATION : "is the cashier for"
     ACCOUNT ||--o{ DATE_AVAILABILITY : "opens/closes"
@@ -155,7 +156,9 @@ Implements FR-BOOK-001 – FR-BOOK-008 and the lifecycle mechanics of FR-PAY-002
 | `notice_sent_at` | TIMESTAMPTZ | | Set the day the visit date has passed while still `Pending` (FR-PAY-005, step 1). |
 | `checked_in_at` | TIMESTAMPTZ | | FR-TICKET-001. |
 | `checked_in_by_user_id` | UUID | `FK → account.id` | The Cashier who recorded attendance (NFR-AUDIT-001). |
-| `chapa_checkout_url` | TEXT | | Present only while `awaiting_payment`; cleared once payment is confirmed. |
+| `category_corrected_at` | TIMESTAMPTZ | | Set only if a Cashier corrected this booking's category at the gate before check-in (FR-TICKET-006, ID-verification addendum). Null on every booking that was never corrected. |
+| `category_corrected_by_user_id` | UUID | `FK → account.id` | The Cashier who made the correction. The *previous* category/price aren't kept as their own columns -- only ever needed for an audit trail, and the audit log already records the before/after values for `booking.category_corrected`, matching this schema's existing convention of using the audit log for "what changed" rather than a column per change. |
+| `chapa_checkout_url` | TEXT | | Present only while `awaiting_payment`; cleared once payment is confirmed. A category correction that finds an undercharge (FR-TICKET-006) reopens this exactly like a brand-new booking's first payment -- `status` goes back to `awaiting_payment` and this is repopulated -- except the amount charged is only the outstanding difference, not the full (now higher) `total_amount_etb`. |
 | `receipt_url` | TEXT | | Pointer into object storage (`receipts/temporary/{booking_id}.pdf`, Document 03 §6.3). Populated once, at payment confirmation, and never regenerated (ADR-009). |
 | `ifmis_voucher_reference` | TEXT | `NULLABLE` | The real Document No/Ref No the Cashier gets back from IFMIS after keying this check-in's transaction into IFMIS herself. Not known at the instant check-in happens — she reports it back separately (`PATCH /bookings/{id}/ifmis-voucher`, `apps.entrance`); the platform never generates or calls IFMIS for this value (FR-GOV-001). |
 | `reconciliation_id` | UUID | `FK → cashier_reconciliation.id ON DELETE RESTRICT` | Set once, only when this booking's amount has been included in a *completed* per-cashier reconciliation (Section 3.6) — never at the moment a reconciliation is merely initiated. `RESTRICT` (not `SET NULL`/`CASCADE`): a reconciliation with bookings attributed to it must never be deleted out from under them. |
@@ -172,7 +175,7 @@ Implements FR-PAY-001 – FR-PAY-004 and NFR-SEC-001 / NFR-IDEMPOTENT-001.
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | UUID | PK | |
-| `booking_id` | UUID | `NOT NULL, FK → booking.id` | |
+| `booking_id` | UUID | `NOT NULL, FK → booking.id` | Not unique -- a booking can have more than one `payment` row: a retried checkout after a failed attempt is one case, and a category-correction top-up (FR-TICKET-006, ID-verification addendum) charging just the outstanding difference is another. `amount_etb` on that second row is the difference, never the booking's full `total_amount_etb` again. |
 | `tx_ref` | TEXT | `UNIQUE NOT NULL` | Chapa's own transaction reference — the value a retried or duplicated webhook call is checked against before any state change is applied, satisfying FR-PAY-004 and NFR-IDEMPOTENT-001 as a database-level guarantee, not just an application-level `if`. |
 | `gateway` | TEXT | `CHECK (gateway IN ('chapa')) NOT NULL DEFAULT 'chapa'` | A closed vocabulary of one today, kept as a `CHECK` (per the enumeration convention) so a second aggregator is a migration, not a rewrite. |
 | `amount_etb` | NUMERIC(12,2) | `NOT NULL, CHECK (amount_etb > 0)` | |
@@ -199,9 +202,9 @@ Implements FR-REFUND-001 – FR-REFUND-005 and NFR-AUDIT-001.
 | `payment_id` | UUID | `NOT NULL, FK → payment.id` | The original charge being reversed — needed so a booking's net amount (charge − fee − refund) is reconstructable per booking, per FR-REFUND-004. |
 | `amount_etb` | NUMERIC(12,2) | `NOT NULL, CHECK (amount_etb > 0)` | Net of the aggregator's own transaction charge (FR-REFUND-003). |
 | `aggregator_fee_etb` | NUMERIC(12,2) | `NOT NULL DEFAULT 0, CHECK (aggregator_fee_etb >= 0)` | Chapa's non-refundable charge, stored explicitly rather than only implied, so it never has to be recomputed to explain a discrepancy. |
-| `reason` | TEXT | `CHECK (reason IN ('cancellation','partial_shortfall','no_response')) NOT NULL` | Corresponds directly to FR-REFUND-001(a)/(b)/(c). |
+| `reason` | TEXT | `CHECK (reason IN ('cancellation','partial_shortfall','no_response','category_correction')) NOT NULL` | The first three correspond directly to FR-REFUND-001(a)/(b)/(c); `category_correction` is FR-REFUND-001(d) -- the ID-verification addendum's overcharge case, not one of the original three FR-REFUND-001 triggers. |
 | `status` | TEXT | `CHECK (status IN ('pending','completed','failed')) NOT NULL DEFAULT 'pending'` | |
-| `requested_by_user_id` | UUID | `FK → account.id` | Nullable — the two automatic paths (cancellation, no-response) have no requester; only `partial_shortfall` (FR-REFUND-001b) is Visitor-initiated. |
+| `requested_by_user_id` | UUID | `FK → account.id` | Nullable — the two fully-automatic paths (cancellation, no-response) have no requester; `partial_shortfall` (FR-REFUND-001b) is Visitor-initiated, and `category_correction` (FR-REFUND-001d) is the Cashier who made the correction (`apps.bookings.services.correct_booking_category`'s `actor`). |
 | `note` | TEXT | | Free-text context supplied with a shortfall request. |
 | `chapa_refund_reference` | TEXT | | External reference once Chapa confirms the refund (ADR-008). |
 | `deducted_in_transfer_id` | UUID | `FK → cashier_reconciliation.id ON DELETE RESTRICT` | Set only when this refund concerns a booking whose amount had **already** been included in an earlier, *completed* per-cashier reconciliation (Section 3.6). FR-REFUND-005 requires the figure a Cashier settles to be *net* of her own refunds, never an overstated gross one — this column is what marks a refund as already accounted for, once that reconciliation nets it off. Kept as `deducted_in_transfer_id` (not renamed) per this schema's convention for actor/target columns whose own name already ends in `_id` (e.g. `requested_by_user_id`). |
@@ -352,6 +355,7 @@ Schema changes are applied as Django migrations, one migration file per app per 
 | FR-PAY-001 – FR-PAY-004 | `payment`, `booking` |
 | FR-PAY-005 | `booking.notice_sent_at`, `refund` (reason=`no_response`), `notification` |
 | FR-TICKET-001 – FR-TICKET-005 | `booking` (`attended_quantity`, `checked_in_at`, `checked_in_by_user_id`, `ifmis_voucher_reference`) |
+| FR-TICKET-006 (ID-verification addendum) | `booking` (`category_corrected_at`, `category_corrected_by_user_id`), `payment` (a second row for an undercharge top-up), `refund` (reason=`category_correction`, for an overcharge) |
 | FR-REFUND-001 – FR-REFUND-005 | `refund`, `payment`, `cashier_reconciliation.id` (via `deducted_in_transfer_id`) |
 | FR-SETTLE | `cashier_reconciliation`, `booking.reconciliation_id` / `checked_in_by_user_id` — per-cashier, never a platform-wide batch (see the IFMIS decision) |
 | FR-REPORT-001 – FR-REPORT-003 | Derived from `booking`, `payment`, `cashier_reconciliation` (no dedicated table — see Document 03 §3.2, the `reporting` app is a query layer only) |

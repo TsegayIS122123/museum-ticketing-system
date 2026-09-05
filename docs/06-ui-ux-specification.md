@@ -167,9 +167,13 @@ cross-references to them elsewhere in this document and in Documents 03/05.
 
 | Screen | Route | Rendering | Role(s) | FR IDs exposed |
 |---|---|---|---|---|
-| Gate lookup & check-in | `/staff/gate` | CSR | Cashier | FR-TICKET-001 – FR-TICKET-005 |
+| Gate lookup & check-in | `/staff/gate` | CSR | Cashier | FR-TICKET-001 – FR-TICKET-006 |
 
-This is a single screen, not a multi-step flow: one reference-lookup field, a result card showing booked quantity, and an attendance-count field to submit (Section 6.4).
+This is a single screen, not a multi-step flow: one reference-lookup field, a result card showing
+booked quantity, and an attendance-count field to submit (Section 6.4). The result card also has an
+inline "Correct" action next to the category (FR-TICKET-006, ID-verification addendum), available
+only before check-in -- it opens a category picker in place, and the outcome (reopen-for-payment or
+automatic refund) is reported back in a toast; there is no separate screen or route for it.
 
 ### 5.6 Refunds
 
@@ -264,6 +268,10 @@ check-in has occurred.
 flowchart TD
     A["Gate Check-In\n/staff/gate"] --> B["Type or scan reference\n(same field, ADR-007)"]
     B --> C["Booking found — booked quantity shown"]
+    C -->|"ID doesn't match category"| J["Correct category inline\n(FR-TICKET-006)"]
+    J -->|"Costs more"| K["Reopened for payment —\nVisitor pays the difference\nfrom their own device"]
+    J -->|"Costs less"| L["Refund issued automatically —\ncheck-in proceeds right away"]
+    K -.->|"once paid"| C
     C --> D["Enter actual attendee count"]
     D --> E{"Count vs. booked"}
     E -->|"= booked"| F["Fully attended — confirmed"]
@@ -272,7 +280,7 @@ flowchart TD
     B -->|"Reference not found / not presentable"| I["Manual lookup by name/payment details\n(FR-TICKET-004)"]
 ```
 
-*UI note:* because a keyboard-wedge scanner emulates keyboard input, the reference field at B never has a separate "scan" mode or camera viewfinder — a scan and a typed entry are visually and functionally identical to the Cashier, matching ADR-007 exactly.
+*UI note:* because a keyboard-wedge scanner emulates keyboard input, the reference field at B never has a separate "scan" mode or camera viewfinder — a scan and a typed entry are visually and functionally identical to the Cashier, matching ADR-007 exactly. The category-correction branch (J) is only ever offered before D — once attendance is recorded the booking is no longer `Pending` (FR-TICKET-003) and the "Correct" action is hidden, not just disabled, matching how every other Pending-only action in this UI (cancel, reschedule) already behaves once a booking moves on.
 
 ### 6.5 Cashier: settlement transfer
 
@@ -299,7 +307,7 @@ Mirrors the frontend module boundaries fixed in [Document 03, Section 7.3](03-so
 | `features/catalog` | Category browsing and Museum Manager category management | CategoryCard, CategoryEditor |
 | `features/booking` | Visitor booking flow and booking detail | DateCategoryPicker, BookingSummary, BookingDetailCard, CancelRescheduleControls |
 | `features/group-bookings` | Group/school request | GroupVisitRequestForm |
-| `features/entrance` | Cashier gate console | ReferenceLookupField, AttendanceEntryForm |
+| `features/entrance` | Cashier gate console | ReferenceLookupField, AttendanceEntryForm, CategoryCorrectionPanel |
 | `features/refunds` | Refund request and staff visibility | RefundRequestButton, RefundHistoryTable |
 | `features/settlement` | Cashier settlement flow | PendingSettlementTable, TransferConfirmationCard, TransferReceiptViewer |
 | `features/reporting` | Dashboard and periodic reports | RevenueSummaryCard, StatusMixChart, CategoryBreakdownTable |
@@ -360,8 +368,8 @@ Document 02 does not enumerate dedicated accessibility (`NFR-ACC-*`) or usabilit
 | FR-BOOK-008 | Section 5.2, Flow 6.1 |
 | FR-PAY-001 – FR-PAY-004 | Section 5.3, Flow 6.1 |
 | FR-PAY-005 | Flow 6.1 (no-show notice on Booking Detail) |
-| FR-TICKET-001 – FR-TICKET-005 | Section 5.5, Flow 6.4 |
-| FR-REFUND-001 – FR-REFUND-005 | Section 5.6 |
+| FR-TICKET-001 – FR-TICKET-006 | Section 5.5, Flow 6.4 |
+| FR-REFUND-001 – FR-REFUND-005 | Section 5.6, Section 5.5 (FR-REFUND-001d is surfaced inline in the gate console, not a separate refunds screen) |
 | FR-SETTLE-001 – FR-SETTLE-004 | Section 5.7, Flow 6.5 |
 | FR-REPORT-001 – FR-REPORT-003 | Section 5.7 (Pending Settlement), Section 5.8 |
 | FR-GOV-001 – FR-GOV-002 | No screen — deliberately no IFMIS-facing UI exists (Document 02 §2.9) |

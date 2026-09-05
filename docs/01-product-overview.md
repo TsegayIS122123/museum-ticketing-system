@@ -44,7 +44,7 @@ The platform serves the museum's own staff and the visitors who choose to use it
 | Role | Represents | Primary goal on the platform |
 |---|---|---|
 | **Visitor** | An individual, family, or school/group representative | Book a visit ahead of time, pay online, and get in without queuing to pay in person |
-| **Cashier** | Front-counter and gate staff | Verify a digital booking's headcount at the gate, and periodically settle collected digital revenue to the Finance Office |
+| **Cashier** | Front-counter and gate staff | Verify a digital booking's headcount and category (against ID) at the gate, correct a booking's category when it doesn't match, and periodically settle collected digital revenue to the Finance Office |
 | **Museum Manager** | Museum administration | Control which dates are open for online booking, configure ticket categories and prices, and monitor bookings and revenue |
 | **Platform Admin** | Whoever operates the platform technically | Provision staff accounts |
 

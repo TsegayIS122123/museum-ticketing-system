@@ -21,6 +21,11 @@ urlpatterns = [
         views.BookingRescheduleView.as_view(),
         name="booking-reschedule",
     ),
+    path(
+        "<uuid:id>/category-correction/",
+        views.BookingCategoryCorrectionView.as_view(),
+        name="booking-category-correction",
+    ),
 ]
 
 # Included at /api/v1/ directly (config/urls.py) -- top-level, like
