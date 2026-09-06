@@ -153,6 +153,15 @@ export function AttendanceEntryForm({
               <span className="text-stone-500">{t('payer_name') || 'Payer Name'}</span>
               <span className="font-medium text-stone-900">{justCheckedIn.payerName}</span>
             </div>
+            {/* Only present for a group booking's institutional payer --
+                CheckInResponseSerializer.get_payerTin returns null for
+                an individual Visitor, who has no TIN on file. */}
+            {justCheckedIn.payerTin && (
+              <div className="flex justify-between">
+                <span className="text-stone-500">{t('payer_tin') || 'Payer TIN'}</span>
+                <span className="font-medium text-stone-900">{justCheckedIn.payerTin}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-stone-500">{t('amount_figures') || 'Amount (figures)'}</span>
               <span className="font-medium text-stone-900">ETB {justCheckedIn.amountFigures}</span>
@@ -302,6 +311,16 @@ export function AttendanceEntryForm({
             {contactLine && (
               <div className="text-sm text-stone-500 mt-1">
                 {contactLine}
+              </div>
+            )}
+            {/* The institutional payer's TIN -- alongside groupName/
+                groupContactPhone above, for the same IFMIS receipt
+                voucher reconciliation (e.g. "Received From: BS School
+                Group, Tin 0000900158"). Group bookings only; an
+                individual Visitor has no TIN on file. */}
+            {booking.bookingType === 'group' && booking.groupTin && (
+              <div className="text-sm text-stone-500 mt-0.5">
+                {(t('tin') || 'TIN')}: {booking.groupTin}
               </div>
             )}
           </div>

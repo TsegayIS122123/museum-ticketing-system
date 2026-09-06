@@ -161,6 +161,38 @@ def test_check_in_succeeds_for_cashier():
     assert response.data["attendedQuantity"] == 15
 
 
+def test_check_in_group_booking_includes_payer_name_and_tin_for_ifmis_voucher():
+    booking = _make_pending_booking(quantity=25)
+    booking.booking_type = Booking.BookingType.GROUP
+    booking.group_name = "BS School Group"
+    booking.group_tin = "0000900158"
+    booking.save(update_fields=["booking_type", "group_name", "group_tin"])
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+
+    response = client.post(
+        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 25}, format="json"
+    )
+
+    assert response.status_code == 200
+    assert response.data["payerName"] == "BS School Group"
+    assert response.data["payerTin"] == "0000900158"
+
+
+def test_check_in_individual_booking_has_no_payer_tin():
+    booking = _make_pending_booking(quantity=1)
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+
+    response = client.post(
+        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 1}, format="json"
+    )
+
+    assert response.status_code == 200
+    assert response.data["payerName"] == booking.visitor.full_name
+    assert response.data["payerTin"] is None
+
+
 def test_check_in_excess_attendance_is_bad_request():
     booking = _make_pending_booking(quantity=20)
     cashier = _make_account(Account.Role.CASHIER)

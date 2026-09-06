@@ -197,12 +197,14 @@ class BookingCategoryCorrectionView(APIView):
     """PATCH /bookings/{id}/category-correction -- Cashier only
     (ID-verification addendum to Document 02 Sec 2.2).
 
-    Corrects a booking's category when the visitor's ID at the gate
-    doesn't match what they booked under, then either reopens payment
-    for the difference (undercharge) or issues a refund for the
-    difference (overcharge). Lives here, not in `apps.entrance` -- even
-    though it's a gate-side, Cashier-only action -- because this is where
-    that composition with `apps.payments`/`apps.refunds` already happens
+    Corrects a booking item's category and/or quantity -- category, when
+    the visitor's ID at the gate doesn't match what they booked under;
+    quantity, when the actual headcount for that item doesn't match what
+    was booked (either direction) -- then either reopens payment for the
+    difference (undercharge) or issues a refund for the difference
+    (overcharge). Lives here, not in `apps.entrance` -- even though it's
+    a gate-side, Cashier-only action -- because this is where that
+    composition with `apps.payments`/`apps.refunds` already happens
     (`BookingListCreateView.post`/`BookingCancelView` above); `entrance`
     depends on `bookings` only, with no dependency of its own on
     `refunds`/`payments` (`apps.entrance.services`' own module

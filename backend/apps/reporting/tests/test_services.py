@@ -53,17 +53,27 @@ def _make_booking(
     status,
     booking_type=Booking.BookingType.INDIVIDUAL,
     group_name=None,
+    group_tin=None,
     booked_quantity=1,
     visit_date=TODAY,
     unit_price=None,
 ):
     visitor = _make_visitor(email=f"visitor-{Account.objects.count()}@example.com")
     unit_price = unit_price if unit_price is not None else category.price_etb
+    # `booking_group_requires_group_tin` requires a TIN on every group
+    # booking (same as `group_name`) -- default one in here whenever
+    # `group_name` was given without an explicit `group_tin`, so this
+    # ORM-level test helper (unlike `services.create_booking`, which
+    # enforces this itself) doesn't leave a caller free to accidentally
+    # build a constraint-violating row.
+    if group_tin is None and group_name is not None:
+        group_tin = "0000900158"
     booking = Booking.objects.create(
         visitor=visitor,
         visit_date=visit_date,
         booking_type=booking_type,
         group_name=group_name,
+        group_tin=group_tin,
         booked_quantity=booked_quantity,
         total_amount_etb=unit_price * booked_quantity,
         status=status,

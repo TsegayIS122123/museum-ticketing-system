@@ -336,12 +336,14 @@ export interface paths {
          * @description PATCH /bookings/{id}/category-correction -- Cashier only
          *     (ID-verification addendum to Document 02 Sec 2.2).
          *
-         *     Corrects a booking's category when the visitor's ID at the gate
-         *     doesn't match what they booked under, then either reopens payment
-         *     for the difference (undercharge) or issues a refund for the
-         *     difference (overcharge). Lives here, not in `apps.entrance` -- even
-         *     though it's a gate-side, Cashier-only action -- because this is where
-         *     that composition with `apps.payments`/`apps.refunds` already happens
+         *     Corrects a booking item's category and/or quantity -- category, when
+         *     the visitor's ID at the gate doesn't match what they booked under;
+         *     quantity, when the actual headcount for that item doesn't match what
+         *     was booked (either direction) -- then either reopens payment for the
+         *     difference (undercharge) or issues a refund for the difference
+         *     (overcharge). Lives here, not in `apps.entrance` -- even though it's
+         *     a gate-side, Cashier-only action -- because this is where that
+         *     composition with `apps.payments`/`apps.refunds` already happens
          *     (`BookingListCreateView.post`/`BookingCancelView` above); `entrance`
          *     depends on `bookings` only, with no dependency of its own on
          *     `refunds`/`payments` (`apps.entrance.services`' own module
@@ -808,6 +810,7 @@ export interface components {
             readonly bookingType: string;
             readonly groupName: string | null;
             readonly groupContactPhone: string | null;
+            readonly groupTin: string | null;
             readonly visitorName: string;
             readonly visitorEmail: string;
             readonly visitorPhone: string | null;
@@ -850,6 +853,7 @@ export interface components {
             bookingType: components["schemas"]["BookingTypeEnum"];
             groupName?: string | null;
             groupContactPhone?: string | null;
+            groupTin?: string | null;
         };
         /**
          * @description One `{categoryId, quantity}` entry of a `BookingCreateRequest`'s
@@ -1039,6 +1043,7 @@ export interface components {
             readonly bookingType: string;
             readonly groupName: string | null;
             readonly groupContactPhone: string | null;
+            readonly groupTin: string | null;
             readonly visitorName: string;
             readonly visitorEmail: string;
             readonly visitorPhone: string | null;
@@ -1060,6 +1065,7 @@ export interface components {
             /** Format: date-time */
             readonly createdAt: string;
             readonly payerName: string;
+            readonly payerTin: string;
             /** Format: decimal */
             readonly amountFigures: string;
             readonly amountWords: string;
@@ -1168,12 +1174,20 @@ export interface components {
          *     `services.correct_booking_category`'s own docstring for why a
          *     mixed-category booking needs this instead of assuming there's only
          *     ever one category to correct.
+         *
+         *     `categoryId`/`quantity` are each optional at this field-shape layer
+         *     -- a Cashier may be fixing just the category (bad ID), just the
+         *     headcount for that item (e.g. 3 tickets bought under it but only 2
+         *     people showed up), or both together. Requiring at least one of them
+         *     is a cross-field rule, not a per-field one, so it's enforced in
+         *     `validate` below rather than with `required=True` on either field.
          */
         PatchedBookingCategoryCorrection: {
             /** Format: uuid */
             itemId?: string;
             /** Format: uuid */
             categoryId?: string;
+            quantity?: number;
         };
         /**
          * @description `IfmisVoucherUpdateRequest` -- Cashier only. The real Document

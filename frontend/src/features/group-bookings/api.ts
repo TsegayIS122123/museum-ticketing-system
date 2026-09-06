@@ -17,9 +17,9 @@ export type BookingStatus = components['schemas']['BookingStatusEnum'];
 
 export interface CreateGroupBookingInput {
   visitDate: string;
-  categoryId: string;
-  quantity: number;
-  groupName?: string | null;
+  items: { categoryId: string; quantity: number }[];
+  groupName: string;
+  groupTin: string;
   groupContactPhone?: string | null;
 }
 
@@ -28,14 +28,18 @@ export interface CreateGroupBookingInput {
 export async function submitGroupBooking(input: CreateGroupBookingInput): Promise<Booking> {
   const body: components['schemas']['BookingCreate'] = {
     visitDate: input.visitDate,
-    // A school group visit is a single category for the whole party
-    // (unlike an individual visitor's booking, which can now mix
-    // categories) -- so this still wraps just the one category/quantity
-    // pair CreateGroupBookingInput takes, into the `items` array the
-    // contract now requires.
-    items: [{ categoryId: input.categoryId, quantity: input.quantity }],
+    // A school group visit can mix categories the same way an
+    // individual visitor's booking can (e.g. 25 Student tickets plus 2
+    // Adult/Teacher tickets for the accompanying staff, in one booking)
+    // -- so this passes through whatever rows the requester built in
+    // the form, not a single hard-coded category/quantity pair.
+    items: input.items.map((item) => ({ categoryId: item.categoryId, quantity: item.quantity })),
     bookingType: 'group',
-    groupName: input.groupName ?? null,
+    groupName: input.groupName,
+    // Required alongside groupName for a group booking -- the
+    // institutional payer's TIN, needed for the finance office's IFMIS
+    // receipt voucher reconciliation.
+    groupTin: input.groupTin,
     groupContactPhone: input.groupContactPhone ?? null,
   };
   return apiClient.post<Booking>('/bookings/', body);

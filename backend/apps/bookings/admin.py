@@ -49,7 +49,7 @@ class BookingAdmin(admin.ModelAdmin):
         "created_at",
     ]
     list_filter = ["status", "booking_type", "visit_date"]
-    search_fields = ["reference", "visitor__email", "group_name"]
+    search_fields = ["reference", "visitor__email", "group_name", "group_tin"]
     inlines = [BookingItemInline]
 
     def get_queryset(self, request):

@@ -174,7 +174,20 @@ def test_create_group_booking_requires_group_name():
 
     response = client.post(
         "/api/v1/bookings/",
-        _create_booking_payload(category, booking_type="group", quantity=20),
+        _create_booking_payload(category, booking_type="group", quantity=20, groupTin="0000900158"),
+        format="json",
+    )
+
+    assert response.status_code == 400
+
+
+def test_create_group_booking_requires_group_tin():
+    category = _make_category()
+    client = _authed_client(_make_visitor())
+
+    response = client.post(
+        "/api/v1/bookings/",
+        _create_booking_payload(category, booking_type="group", quantity=20, groupName="A School"),
         format="json",
     )
 
@@ -264,12 +277,15 @@ def test_group_booking_goes_straight_to_awaiting_payment():
     visitor_client = _authed_client(_make_visitor())
     created = visitor_client.post(
         "/api/v1/bookings/",
-        _create_booking_payload(category, booking_type="group", quantity=20, groupName="A School"),
+        _create_booking_payload(
+            category, booking_type="group", quantity=20, groupName="A School", groupTin="0000900158"
+        ),
         format="json",
     ).data
 
     assert created["status"] == "awaiting_payment"
     assert created["checkoutUrl"]
+    assert created["groupTin"] == "0000900158"
 
     response = visitor_client.put(
         f"/api/v1/bookings/{created['id']}/approval/", {"decision": "approve"}, format="json"
@@ -457,6 +473,99 @@ def test_category_correction_rejected_once_no_longer_pending():
     )
 
     assert response.status_code == 409
+
+
+# --------------------------------------------------------------------------
+# PATCH /bookings/{id}/category-correction -- quantity correction
+# --------------------------------------------------------------------------
+
+
+def test_quantity_correction_undercharge_reopens_payment():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student, quantity=2)
+    item = booking.items.get()
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"itemId": str(item.id), "quantity": 3},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "awaiting_payment"
+    assert response.data["totalAmountEtb"] == "150.00"
+    assert response.data["bookedQuantity"] == 3
+    assert response.data["checkoutUrl"]
+    assert response.data["categoryCorrectedAt"]
+    booking.refresh_from_db()
+    assert booking.status == Booking.Status.AWAITING_PAYMENT
+
+
+def test_quantity_correction_overcharge_issues_refund_and_stays_pending():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student, quantity=3)
+    item = booking.items.get()
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"itemId": str(item.id), "quantity": 2},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "pending"
+    assert response.data["totalAmountEtb"] == "100.00"
+    assert response.data["bookedQuantity"] == 2
+    from apps.refunds.models import Refund
+
+    refund = Refund.objects.get(booking=booking)
+    assert refund.reason == Refund.Reason.CATEGORY_CORRECTION
+    assert refund.amount_etb == Decimal("50.00")
+
+
+def test_quantity_and_category_correction_together_in_one_request():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student, quantity=3)
+    item = booking.items.get()
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    # old: 3 x 50 = 150.00; new: 1 x 100 = 100.00 -> overcharge, refund 50
+    response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"itemId": str(item.id), "categoryId": str(adult.id), "quantity": 1},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "pending"
+    assert response.data["totalAmountEtb"] == "100.00"
+    assert response.data["bookedQuantity"] == 1
+    from apps.refunds.models import Refund
+
+    refund = Refund.objects.get(booking=booking)
+    assert refund.amount_etb == Decimal("50.00")
+
+
+def test_quantity_correction_rejects_missing_category_and_quantity():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student, quantity=2)
+    item = booking.items.get()
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"itemId": str(item.id)},
+        format="json",
+    )
+
+    assert response.status_code == 400
 
 
 # --------------------------------------------------------------------------

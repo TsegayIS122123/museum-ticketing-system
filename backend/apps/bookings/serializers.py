@@ -86,6 +86,11 @@ class BookingSerializer(serializers.ModelSerializer):
     groupContactPhone = serializers.CharField(
         source="group_contact_phone", read_only=True, allow_null=True
     )
+    # The institutional payer's TIN (Tax Identification Number) --
+    # required on a group booking, always null on an individual one. See
+    # `Booking.group_tin`'s own field comment for why (IFMIS
+    # reconciliation).
+    groupTin = serializers.CharField(source="group_tin", read_only=True, allow_null=True)
     # The booking's own Visitor -- who a Cashier reaches for an
     # *individual* booking (a group booking instead has its own
     # `groupContactPhone` above, since the requester need not be one of
@@ -138,6 +143,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "bookingType",
             "groupName",
             "groupContactPhone",
+            "groupTin",
             "visitorName",
             "visitorEmail",
             "visitorPhone",
@@ -185,11 +191,22 @@ class BookingCreateSerializer(serializers.Serializer):
     bookingType = serializers.ChoiceField(choices=Booking.BookingType.choices)
     groupName = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     groupContactPhone = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    # Required alongside groupName for a group booking -- the
+    # institutional payer's TIN, needed for the finance office's IFMIS
+    # receipt voucher (see `Booking.group_tin`'s own field comment).
+    # Optional/blank here at the field level for the same reason
+    # groupName is: the real requiredness is bookingType-conditional,
+    # enforced below in `validate`, not a plain `required=True`.
+    groupTin = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     def validate(self, attrs):
         if attrs["bookingType"] == Booking.BookingType.GROUP and not attrs.get("groupName"):
             raise serializers.ValidationError(
                 {"groupName": "Required when bookingType is group."}
+            )
+        if attrs["bookingType"] == Booking.BookingType.GROUP and not attrs.get("groupTin"):
+            raise serializers.ValidationError(
+                {"groupTin": "Required when bookingType is group."}
             )
         return attrs
 
@@ -203,6 +220,7 @@ class BookingCreateSerializer(serializers.Serializer):
             "booking_type": self.validated_data["bookingType"],
             "group_name": self.validated_data.get("groupName") or None,
             "group_contact_phone": self.validated_data.get("groupContactPhone") or None,
+            "group_tin": self.validated_data.get("groupTin") or None,
         }
 
 
@@ -218,13 +236,30 @@ class BookingCategoryCorrectionSerializer(serializers.Serializer):
     booking's `BookingItem` line items to correct -- see
     `services.correct_booking_category`'s own docstring for why a
     mixed-category booking needs this instead of assuming there's only
-    ever one category to correct."""
+    ever one category to correct.
+
+    `categoryId`/`quantity` are each optional at this field-shape layer
+    -- a Cashier may be fixing just the category (bad ID), just the
+    headcount for that item (e.g. 3 tickets bought under it but only 2
+    people showed up), or both together. Requiring at least one of them
+    is a cross-field rule, not a per-field one, so it's enforced in
+    `validate` below rather than with `required=True` on either field.
+    """
 
     itemId = serializers.UUIDField()
-    categoryId = serializers.UUIDField()
+    categoryId = serializers.UUIDField(required=False)
+    quantity = serializers.IntegerField(required=False, min_value=1)
+
+    def validate(self, attrs):
+        if "categoryId" not in attrs and "quantity" not in attrs:
+            raise serializers.ValidationError(
+                {"categoryId": "Provide categoryId, quantity, or both -- at least one is required."}
+            )
+        return attrs
 
     def to_service_kwargs(self):
         return {
             "item_id": self.validated_data["itemId"],
-            "category_id": self.validated_data["categoryId"],
+            "category_id": self.validated_data.get("categoryId"),
+            "quantity": self.validated_data.get("quantity"),
         }

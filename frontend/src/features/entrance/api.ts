@@ -69,10 +69,11 @@ export async function recordIfmisVoucherReference(
 export async function correctBookingCategory(
   bookingId: string,
   itemId: string,
-  categoryId: string
+  correction: { categoryId?: string; quantity?: number }
 ): Promise<Booking> {
   return apiClient.patch<Booking>(`/bookings/${bookingId}/category-correction/`, {
     itemId,
-    categoryId,
+    ...(correction.categoryId ? { categoryId: correction.categoryId } : {}),
+    ...(correction.quantity !== undefined ? { quantity: correction.quantity } : {}),
   });
 }

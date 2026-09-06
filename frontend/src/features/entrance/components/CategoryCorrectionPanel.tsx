@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Button } from '@/components/ui/Button';
+import { QuantityInput } from '@/components/ui/QuantityInput';
 import { getCategories } from '@/features/catalog/api';
 import type { Category } from '@/features/catalog/schemas';
 import { correctBookingCategory } from '../api';
@@ -17,11 +18,16 @@ interface CategoryCorrectionPanelProps {
 
 // ID-verification addendum to Document 02 Sec 2.2: shown inline on the
 // gate check-in screen (AttendanceEntryForm), before check-in, when the
-// visitor's ID doesn't match the category they booked under. The backend
+// visitor's ID doesn't match the category they booked under, and/or the
+// actual headcount for that item doesn't match what was booked (either
+// direction -- e.g. a party of 3 booked under one line but only 2
+// actually show up under it, or the reverse). The backend
 // (apps.bookings.services.correct_booking_category) does all the money
-// math -- an undercharge reopens the booking for payment, an overcharge
-// issues a refund -- this component only needs to submit the new
-// category and hand the resulting Booking back up.
+// math for either or both together against a single combined delta --
+// an undercharge reopens the booking for payment, an overcharge issues
+// a refund -- this component only needs to submit whichever of the new
+// category/new quantity the Cashier actually changed and hand the
+// resulting Booking back up.
 export function CategoryCorrectionPanel({
   booking,
   onCancel,
@@ -35,6 +41,14 @@ export function CategoryCorrectionPanel({
   // categories (e.g. one Adult plus two Student tickets).
   const [selectedItemId, setSelectedItemId] = useState(booking.items[0]?.id ?? '');
   const [selectedId, setSelectedId] = useState('');
+  // Quantity starts at the item's own current quantity, not empty/0 --
+  // "no change" is a valid outcome for this field on its own (the
+  // Cashier may only be correcting the category), unlike categoryId
+  // which starts unselected since there's no sensible "current" option
+  // to default to in that dropdown (the item's own category is
+  // deliberately excluded from it below).
+  const currentItem = booking.items.find((item) => item.id === selectedItemId);
+  const [quantity, setQuantity] = useState(currentItem?.quantity ?? 1);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,12 +72,32 @@ export function CategoryCorrectionPanel({
     };
   }, []);
 
+  const handleItemChange = (itemId: string) => {
+    setSelectedItemId(itemId);
+    setSelectedId('');
+    // Reset the quantity input to the newly-selected item's own current
+    // quantity, same reasoning as the initial state above.
+    setQuantity(booking.items.find((item) => item.id === itemId)?.quantity ?? 1);
+  };
+
+  // A change is only actually being requested if the category picker
+  // has a real selection, or the quantity differs from the item's own
+  // current one -- mirrors services.correct_booking_category's own
+  // "at least one of categoryId/quantity" + "not already this
+  // quantity" rules server-side, so the Confirm button doesn't invite a
+  // no-op submission that the backend would just reject anyway.
+  const quantityChanged = !!currentItem && quantity !== currentItem.quantity;
+  const hasChange = !!selectedId || quantityChanged;
+
   const handleSubmit = async () => {
-    if (!selectedItemId || !selectedId) return;
+    if (!selectedItemId || !hasChange) return;
     setIsSubmitting(true);
     setError(null);
     try {
-      const updated = await correctBookingCategory(booking.id, selectedItemId, selectedId);
+      const updated = await correctBookingCategory(booking.id, selectedItemId, {
+        categoryId: selectedId || undefined,
+        quantity: quantityChanged ? quantity : undefined,
+      });
       onCorrected(updated);
     } catch (err) {
       setError(
@@ -92,7 +126,7 @@ export function CategoryCorrectionPanel({
     <div className="mt-4 border-t border-stone-200 pt-4">
       <div className="text-sm font-medium text-stone-700 mb-2">
         {t('correct_category_prompt') ||
-          "The visitor's ID doesn't match this category. Select the correct one:"}
+          "The visitor's ID doesn't match this category, or the headcount is off. Correct either or both:"}
       </div>
 
       {/* Which ticket-holder -- only shown when the booking actually
@@ -101,10 +135,7 @@ export function CategoryCorrectionPanel({
       {booking.items.length > 1 && (
         <select
           value={selectedItemId}
-          onChange={(e) => {
-            setSelectedItemId(e.target.value);
-            setSelectedId('');
-          }}
+          onChange={(e) => handleItemChange(e.target.value)}
           className="w-full px-3 py-2 rounded-lg border border-stone-300 bg-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-secondary-500"
         >
           {booking.items.map((item) => (
@@ -123,7 +154,9 @@ export function CategoryCorrectionPanel({
           onChange={(e) => setSelectedId(e.target.value)}
           className="w-full px-3 py-2 rounded-lg border border-stone-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500"
         >
-          <option value="">{t('select_category') || 'Select a category'}</option>
+          <option value="">
+            {t('keep_current_category') || "Don't change category"}
+          </option>
           {otherCategories.map((category) => (
             <option key={category.id} value={category.id}>
               {(locale === 'en' ? category.name_en : category.name_am)} -- ETB{' '}
@@ -132,6 +165,17 @@ export function CategoryCorrectionPanel({
           ))}
         </select>
       )}
+
+      {/* Headcount correction for this same item -- e.g. 3 tickets
+          bought under it but only 2 people actually show up, or the
+          reverse. Independent of the category picker above; either or
+          both can be changed in the same request. */}
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="text-sm text-stone-600">
+          {t('correct_quantity_prompt') || 'Quantity'}
+        </span>
+        <QuantityInput value={quantity} onChange={setQuantity} min={1} max={999} />
+      </div>
 
       {error && <div className="text-sm text-red-600 mt-2">{error}</div>}
 
@@ -151,7 +195,7 @@ export function CategoryCorrectionPanel({
           size="sm"
           className="flex-1 bg-brand-primary hover:bg-primary-700"
           onClick={handleSubmit}
-          disabled={isSubmitting || !selectedItemId || !selectedId}
+          disabled={isSubmitting || !selectedItemId || !hasChange}
         >
           {isSubmitting ? t('processing') || 'Processing...' : t('confirm') || 'Confirm'}
         </Button>

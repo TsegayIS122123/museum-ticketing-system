@@ -135,6 +135,16 @@ class Booking(TimeStampedModel):
     booking_type = models.CharField(max_length=10, choices=BookingType.choices)
     group_name = models.TextField(null=True, blank=True)
     group_contact_phone = models.TextField(null=True, blank=True)
+    # The institutional payer's Tax Identification Number for a group
+    # booking -- the university finance office's IFMIS receipt voucher
+    # needs it alongside the payer name (e.g. "Received From: BS School
+    # Group, Tin 0000900158") for reconciliation. Required for a group
+    # booking (see `booking_group_requires_group_tin` below), never set
+    # for an individual one -- same null-for-individual/required-for-
+    # group shape as `group_name` just above. A `TextField`, not an
+    # integer, since a real TIN can carry leading zeros that a numeric
+    # type would silently drop.
+    group_tin = models.TextField(null=True, blank=True)
 
     # Sum of every BookingItem.quantity on this booking.
     booked_quantity = models.PositiveIntegerField()
@@ -164,18 +174,24 @@ class Booking(TimeStampedModel):
     )
 
     # Set by a Cashier at the gate (before check-in) when the visitor's
-    # ID doesn't match the category they booked under -- the ID-
+    # ID doesn't match the category they booked under, and/or the actual
+    # headcount for one item doesn't match what was booked -- the ID-
     # verification addendum to Document 02 Sec 2.2. `category`/
-    # `category_name_en`/`category_name_am`/`unit_price_etb`/
+    # `category_name_en`/`category_name_am`/`unit_price_etb`/`quantity`/
     # `total_amount_etb` above are overwritten in place to the corrected
     # values; the *original* values are not kept as separate columns --
     # they're only ever needed for an audit trail, and the audit log
     # (apps.core.services.write_audit_log) already records the
-    # before/after category and amount for `booking.category_corrected`,
-    # matching this codebase's existing convention (e.g.
-    # `booking.checked_in`, `payment.confirmed`) of using the audit log
-    # for "what changed", not a dedicated column per change. Only ever
-    # set on a `Pending` booking -- see
+    # before/after category, quantity, and amount for
+    # `booking.category_corrected`, matching this codebase's existing
+    # convention (e.g. `booking.checked_in`, `payment.confirmed`) of
+    # using the audit log for "what changed", not a dedicated column per
+    # change. This same pair of columns (name kept as-is rather than
+    # renamed to something quantity-neutral, to avoid a disruptive
+    # rename across the API contract/frontend for a single addendum)
+    # doubles as the "was this booking touched at the gate at all" flag
+    # regardless of whether category, quantity, or both were corrected.
+    # Only ever set on a `Pending` booking -- see
     # `apps.bookings.services.correct_booking_category`.
     category_corrected_at = models.DateTimeField(null=True, blank=True)
     category_corrected_by_user_id = models.ForeignKey(
@@ -236,6 +252,17 @@ class Booking(TimeStampedModel):
                     | models.Q(group_name__isnull=False)
                 ),
                 name="booking_group_requires_group_name",
+            ),
+            models.CheckConstraint(
+                # The institutional payer's TIN, required for the same
+                # reason and at the same "group only" granularity as
+                # `group_name` immediately above -- see `group_tin`'s own
+                # field comment for why (IFMIS reconciliation).
+                condition=(
+                    models.Q(booking_type="individual")
+                    | models.Q(group_tin__isnull=False)
+                ),
+                name="booking_group_requires_group_tin",
             ),
             models.CheckConstraint(
                 # FR-BOOK-007's "at most once" cap, enforced as a database

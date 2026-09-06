@@ -44,6 +44,12 @@ class CheckInResponseSerializer(BookingSerializer):
     """
 
     payerName = serializers.SerializerMethodField()
+    # The institutional payer's TIN, for the same "Received From: <name>,
+    # Tin <tin>" line on the IFMIS receipt voucher that `payerName` feeds
+    # -- present only for a group booking (`booking_group_requires_group_
+    # tin` guarantees it's set whenever `payerName` resolves to a group
+    # name), null for an individual one, same shape as `payerName` itself.
+    payerTin = serializers.SerializerMethodField()
     amountFigures = serializers.DecimalField(
         source="total_amount_etb", read_only=True, max_digits=12, decimal_places=2
     )
@@ -53,6 +59,7 @@ class CheckInResponseSerializer(BookingSerializer):
     class Meta(BookingSerializer.Meta):
         fields = BookingSerializer.Meta.fields + [
             "payerName",
+            "payerTin",
             "amountFigures",
             "amountWords",
             "ifmisPurpose",
@@ -68,6 +75,16 @@ class CheckInResponseSerializer(BookingSerializer):
         if booking.booking_type == booking.BookingType.GROUP:
             return booking.group_name
         return booking.visitor.full_name
+
+    @extend_schema_field(serializers.CharField)
+    def get_payerTin(self, booking) -> str | None:
+        """The institutional payer's TIN, alongside `payerName` above, on
+        a group booking's IFMIS voucher (e.g. "Received From: BS School
+        Group, Tin 0000900158"). `None` for an individual booking -- an
+        individual Visitor isn't issued a TIN by this system."""
+        if booking.booking_type == booking.BookingType.GROUP:
+            return booking.group_tin
+        return None
 
     @extend_schema_field(serializers.CharField)
     def get_amountWords(self, booking) -> str:

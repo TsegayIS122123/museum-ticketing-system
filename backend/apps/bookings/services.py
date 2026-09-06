@@ -171,6 +171,7 @@ def create_booking(
     booking_type,
     group_name=None,
     group_contact_phone=None,
+    group_tin=None,
 ):
     """Implements FR-BOOK-001 (individual) and FR-BOOK-003 (group).
 
@@ -188,7 +189,11 @@ def create_booking(
     group, by rejecting the request outright when the date is closed.
     `group_name`/`group_contact_phone` are retained purely as manifest
     metadata for the Cashier at the gate (FR-BOOK-003), not as a workflow
-    gate.
+    gate. `group_tin` -- the institutional payer's Tax Identification
+    Number -- is required alongside `group_name` for a group booking: the
+    finance office's IFMIS receipt voucher for one of these bookings
+    needs it for reconciliation (see `Booking.group_tin`'s own field
+    comment). It's never set for an individual booking.
     """
     if not visitor.email_verified_at or not visitor.phone_verified_at:
         # FR-ACC-003: both must be verified before an online booking can
@@ -200,6 +205,8 @@ def create_booking(
 
     if booking_type == Booking.BookingType.GROUP and not group_name:
         raise ValidationError({"groupName": "Required for a group booking."})
+    if booking_type == Booking.BookingType.GROUP and not group_tin:
+        raise ValidationError({"groupTin": "Required for a group booking."})
 
     resolved_items = _resolve_items(items)
 
@@ -218,6 +225,7 @@ def create_booking(
         booking_type=booking_type,
         group_name=group_name if is_group else None,
         group_contact_phone=group_contact_phone,
+        group_tin=group_tin if is_group else None,
         booked_quantity=booked_quantity,
         total_amount_etb=total_amount_etb,
         status=Booking.Status.AWAITING_PAYMENT,
@@ -247,27 +255,36 @@ def create_booking(
 
 
 # --------------------------------------------------------------------------
-# Cashier-only category correction (ID-verification addendum)
+# Cashier-only category/quantity correction (ID-verification addendum)
 # --------------------------------------------------------------------------
 
 
-def correct_booking_category(*, booking, item_id, category_id, actor):
+def correct_booking_category(*, booking, item_id, actor, category_id=None, quantity=None):
     """Implements the Cashier-only `PATCH /bookings/{id}/category-correction`
     (ID-verification addendum to Document 02 Sec 2.2): at the gate, before
     check-in, a Cashier discovers one of the booking's ticket-holders'
     ID doesn't match the category they booked under (e.g. booked as
-    Student, no valid student ID) and corrects it here.
+    Student, no valid student ID), or that the party's actual headcount
+    for one line item doesn't match what was booked (e.g. 3 tickets
+    bought under one category but only 2 people show up under it, or the
+    reverse), and corrects it here.
 
     `item_id` identifies *which* `BookingItem` on this booking to correct
     -- a party booked under a single category still has exactly one item
     to pick from, but a mixed-category booking (e.g. one Adult plus two
     Student tickets) can have the Cashier discover the problem is with
-    just one of several ticket-holders, not the whole party. Only that
-    one item's category/price/subtotal is corrected; the booking's
-    `total_amount_etb` is then recomputed as the sum across every item
-    (corrected or not) -- `booked_quantity` is untouched, since
-    correcting a category never changes how many tickets were bought,
-    only what they cost.
+    just one of several ticket-holders, not the whole party.
+
+    `category_id`/`quantity` are each optional, but at least one must be
+    given -- a Cashier may be fixing just the category (a bad ID), just
+    the quantity (a headcount mismatch), or both at once (e.g. one of
+    three "Student" ticket-holders lacks an ID *and* it turns out only
+    one of the remaining two actually showed up under that ticket).
+    Whichever is omitted is left exactly as it was; there's no "no
+    correction" default to fall back on for either field individually.
+    Only that one item's category/quantity/price/subtotal is corrected;
+    `Booking.total_amount_etb`/`booked_quantity` are then recomputed as
+    the sum across every item (corrected or not).
 
     Only ever on a `Pending` booking -- i.e. paid, but not yet checked
     in. Once `apps.entrance.services.check_in_booking` has run, the
@@ -276,57 +293,88 @@ def correct_booking_category(*, booking, item_id, category_id, actor):
     the same way (both are "before the Cashier has acted" windows, just
     for different actors).
 
-    This function only ever mutates the item's own category/price fields
-    and the booking's aggregate total (and, for an undercharge, reopens
-    `status` for payment) -- it never calls into `apps.payments` or
-    `apps.refunds` itself. Creating the follow-up top-up checkout session
-    (undercharge) or issuing the refund (overcharge) is the view layer's
-    job, exactly like `BookingCancelView`/`BookingListCreateView.post`
-    already compose `apps.refunds`/`apps.payments` at that layer, never
-    from this module (Design Spec Sec 3.2).
+    This function only ever mutates the item's own category/quantity/
+    price fields and the booking's aggregate total/headcount (and, for
+    an undercharge, reopens `status` for payment) -- it never calls into
+    `apps.payments` or `apps.refunds` itself. Creating the follow-up
+    top-up checkout session (undercharge) or issuing the refund
+    (overcharge) is the view layer's job, exactly like
+    `BookingCancelView`/`BookingListCreateView.post` already compose
+    `apps.refunds`/`apps.payments` at that layer, never from this module
+    (Design Spec Sec 3.2). This is deliberately the same money-math path
+    for a category correction, a quantity correction, or both together
+    -- the view layer only ever looks at the returned `delta`, never at
+    which field(s) changed, so there's exactly one undercharge/overcharge
+    code path to keep correct rather than two nearly-identical ones.
 
     Returns `(booking, delta)`, where `delta = new_total - old_total`:
     positive means the visitor now owes the difference (undercharge),
     negative means they're owed a refund (overcharge), zero means the
-    corrected category happens to cost the same as the original one.
+    correction happens to leave the total unchanged.
     """
     if booking.status != Booking.Status.PENDING:
         raise Conflict("Only a Pending booking's category can be corrected.")
+
+    if category_id is None and quantity is None:
+        raise ValidationError(
+            {"categoryId": "Provide categoryId, quantity, or both -- at least one is required."}
+        )
+
+    if quantity is not None and quantity < 1:
+        raise ValidationError({"quantity": "Must be at least 1."})
 
     try:
         item = booking.items.get(id=item_id)
     except BookingItem.DoesNotExist:
         raise ValidationError({"itemId": "Not one of this booking's line items."})
 
-    try:
-        category = Category.objects.get(id=category_id, active=True)
-    except Category.DoesNotExist:
-        raise ValidationError({"categoryId": "Not a known, active category."})
+    category = item.category
+    if category_id is not None:
+        try:
+            category = Category.objects.get(id=category_id, active=True)
+        except Category.DoesNotExist:
+            raise ValidationError({"categoryId": "Not a known, active category."})
 
-    if category.id == item.category_id:
-        raise ValidationError({"categoryId": "This is already the item's category."})
-    if booking.items.filter(category=category).exclude(id=item.id).exists():
-        # This booking already has a separate line for that category --
-        # merging into it would collide with `BookingItem`'s own
-        # `booking_item_unique_category_per_booking` constraint, and
-        # simply bumping that other line's quantity instead is a
-        # different operation than "correct this ticket-holder's
-        # category" (it would also misattribute this item's price
-        # history). Not expected to come up often in practice, but
-        # rejected explicitly rather than left to the DB constraint to
-        # surface as an opaque IntegrityError.
-        raise ValidationError(
-            {"categoryId": "This booking already has a separate line for that category."}
-        )
+        if category.id == item.category_id:
+            raise ValidationError({"categoryId": "This is already the item's category."})
+        if booking.items.filter(category=category).exclude(id=item.id).exists():
+            # This booking already has a separate line for that category
+            # -- merging into it would collide with `BookingItem`'s own
+            # `booking_item_unique_category_per_booking` constraint, and
+            # simply bumping that other line's quantity instead is a
+            # different operation than "correct this ticket-holder's
+            # category" (it would also misattribute this item's price
+            # history). Not expected to come up often in practice, but
+            # rejected explicitly rather than left to the DB constraint
+            # to surface as an opaque IntegrityError.
+            raise ValidationError(
+                {"categoryId": "This booking already has a separate line for that category."}
+            )
+
+    new_quantity = item.quantity if quantity is None else quantity
+    if quantity is not None and category_id is None and new_quantity == item.quantity:
+        raise ValidationError({"quantity": "This is already the item's quantity."})
 
     old_total = booking.total_amount_etb
+    old_booked_quantity = booking.booked_quantity
     old_item_subtotal = item.subtotal_etb
-    new_item_subtotal = category.price_etb * item.quantity
+    old_item_quantity = item.quantity
+    old_category_id = item.category_id
+    # `category.price_etb` is the category's *current* active price --
+    # deliberately re-snapshotted here even when `category_id` wasn't
+    # given (i.e. `category is item.category`), for the same reason the
+    # category-change branch above always did: at the gate, this is a
+    # correction to what's actually true right now, not a re-application
+    # of whatever price happened to be in effect when the booking was
+    # first made.
+    new_unit_price = category.price_etb
+    new_item_subtotal = new_unit_price * new_quantity
 
     item.category = category
     item.category_name_en = category.name_en
     item.category_name_am = category.name_am
-    item.unit_price_etb = category.price_etb
+    item.unit_price_etb = new_unit_price
+    item.quantity = new_quantity
     item.subtotal_etb = new_item_subtotal
     item.save(
         update_fields=[
@@ -334,20 +382,24 @@ def correct_booking_category(*, booking, item_id, category_id, actor):
             "category_name_en",
             "category_name_am",
             "unit_price_etb",
+            "quantity",
             "subtotal_etb",
             "updated_at",
         ]
     )
 
     new_total = old_total - old_item_subtotal + new_item_subtotal
+    new_booked_quantity = old_booked_quantity - old_item_quantity + new_quantity
     delta = new_total - old_total
 
     booking.total_amount_etb = new_total
+    booking.booked_quantity = new_booked_quantity
     booking.category_corrected_at = timezone.now()
     booking.category_corrected_by_user_id = actor
 
     update_fields = [
         "total_amount_etb",
+        "booked_quantity",
         "category_corrected_at",
         "category_corrected_by_user_id",
         "updated_at",
@@ -367,8 +419,9 @@ def correct_booking_category(*, booking, item_id, category_id, actor):
     # delta <= 0 (overcharge or exact match): status is left untouched --
     # a `Pending` booking that's owed a refund is still checkable-in right
     # away, it just also gets money back (delta == 0 needs neither a
-    # top-up nor a refund, but the item's category/price fields are still
-    # corrected for accuracy at the gate and on any future receipt).
+    # top-up nor a refund, but the item's category/quantity/price fields
+    # are still corrected for accuracy at the gate and on any future
+    # receipt).
 
     booking.save(update_fields=update_fields)
 
@@ -379,12 +432,16 @@ def correct_booking_category(*, booking, item_id, category_id, actor):
         target_id=booking.id,
         metadata={
             "item_id": str(item.id),
-            "old_category_id": str(item.category_id),
+            "old_category_id": str(old_category_id),
             "new_category_id": str(category.id),
+            "old_quantity": old_item_quantity,
+            "new_quantity": new_quantity,
             "old_item_subtotal_etb": str(old_item_subtotal),
             "new_item_subtotal_etb": str(new_item_subtotal),
             "old_total_amount_etb": str(old_total),
             "new_total_amount_etb": str(new_total),
+            "old_booked_quantity": old_booked_quantity,
+            "new_booked_quantity": new_booked_quantity,
             "delta_etb": str(delta),
         },
     )

@@ -155,9 +155,11 @@ def test_create_group_booking_starts_awaiting_payment():
         visit_date=TOMORROW,
         booking_type=Booking.BookingType.GROUP,
         group_name="Example Primary School",
+        group_tin="0000900158",
     )
 
     assert booking.status == Booking.Status.AWAITING_PAYMENT
+    assert booking.group_tin == "0000900158"
 
 
 def test_create_group_booking_requires_group_name():
@@ -170,7 +172,36 @@ def test_create_group_booking_requires_group_name():
             items=[{"category_id": category.id, "quantity": 30}],
             visit_date=TOMORROW,
             booking_type=Booking.BookingType.GROUP,
+            group_tin="0000900158",
         )
+
+
+def test_create_group_booking_requires_group_tin():
+    visitor = _make_visitor()
+    category = _make_category()
+
+    with pytest.raises(ValidationError):
+        services.create_booking(
+            visitor=visitor,
+            items=[{"category_id": category.id, "quantity": 30}],
+            visit_date=TOMORROW,
+            booking_type=Booking.BookingType.GROUP,
+            group_name="Example Primary School",
+        )
+
+
+def test_create_individual_booking_never_sets_group_tin():
+    visitor = _make_visitor()
+    category = _make_category()
+
+    booking = services.create_booking(
+        visitor=visitor,
+        items=[{"category_id": category.id, "quantity": 1}],
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+    )
+
+    assert booking.group_tin is None
 
 
 def test_create_booking_rejected_for_unverified_visitor():
@@ -226,8 +257,8 @@ def _make_cashier(email="cashier@example.com"):
     return account
 
 
-def _make_correctable_booking(category, quantity=1):
-    visitor = _make_visitor()
+def _make_correctable_booking(category, quantity=1, visitor=None):
+    visitor = visitor or _make_visitor()
     booking = services.create_booking(
         visitor=visitor,
         items=[{"category_id": category.id, "quantity": quantity}],
@@ -362,6 +393,166 @@ def test_correct_category_rejects_the_same_category():
         )
 
 
+# --------------------------------------------------------------------------
+# correct_booking_category: quantity correction (over/under/combined)
+# --------------------------------------------------------------------------
+
+
+def test_correct_quantity_upward_reopens_payment_for_the_difference():
+    """3 people show up under a ticket line originally booked for 2."""
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(student, quantity=2)
+    item = booking.items.get()
+    cashier = _make_cashier()
+
+    booking, delta = services.correct_booking_category(
+        booking=booking, item_id=item.id, quantity=3, actor=cashier
+    )
+
+    item.refresh_from_db()
+    assert delta == Decimal("50.00")  # (3 - 2) x 50
+    assert item.quantity == 3
+    assert item.category_id == student.id  # untouched
+    assert item.subtotal_etb == Decimal("150.00")
+    assert booking.total_amount_etb == Decimal("150.00")
+    assert booking.booked_quantity == 3
+    assert booking.status == Booking.Status.AWAITING_PAYMENT
+    assert booking.category_corrected_by_user_id_id == cashier.id
+    assert booking.category_corrected_at is not None
+
+
+def test_correct_quantity_downward_issues_a_refund_and_leaves_booking_pending():
+    """Party of 3 booked under one line, but only 2 actually show up
+    under it."""
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(student, quantity=3)
+    item = booking.items.get()
+    cashier = _make_cashier()
+
+    booking, delta = services.correct_booking_category(
+        booking=booking, item_id=item.id, quantity=2, actor=cashier
+    )
+
+    item.refresh_from_db()
+    assert delta == Decimal("-50.00")  # (2 - 3) x 50
+    assert item.quantity == 2
+    assert item.subtotal_etb == Decimal("100.00")
+    assert booking.total_amount_etb == Decimal("100.00")
+    assert booking.booked_quantity == 2
+    # Overcharge doesn't block check-in -- only an undercharge does.
+    assert booking.status == Booking.Status.PENDING
+
+
+def test_correct_quantity_and_category_together_computes_a_single_combined_delta():
+    """One of three "Student" ticket-holders has no valid student ID
+    *and* it turns out only one of the remaining two actually showed up
+    under that ticket -- both are corrected in the same request, against
+    a single combined delta rather than two separate ones."""
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    booking = _make_correctable_booking(student, quantity=3)
+    item = booking.items.get()
+    cashier = _make_cashier()
+
+    # old subtotal: 3 x 50 = 150.00; new subtotal: 1 x 100 = 100.00
+    booking, delta = services.correct_booking_category(
+        booking=booking, item_id=item.id, category_id=adult.id, quantity=1, actor=cashier
+    )
+
+    item.refresh_from_db()
+    assert delta == Decimal("-50.00")
+    assert item.category_id == adult.id
+    assert item.quantity == 1
+    assert item.unit_price_etb == Decimal("100.00")
+    assert item.subtotal_etb == Decimal("100.00")
+    assert booking.total_amount_etb == Decimal("100.00")
+    assert booking.booked_quantity == 1
+    assert booking.status == Booking.Status.PENDING
+
+
+def test_correct_quantity_on_a_mixed_booking_only_touches_the_given_item():
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    student = _make_category(name_en="Student", price_etb="50.00")
+    visitor = _make_visitor()
+    booking = services.create_booking(
+        visitor=visitor,
+        items=[
+            {"category_id": adult.id, "quantity": 1},
+            {"category_id": student.id, "quantity": 2},
+        ],
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+    )
+    booking.status = Booking.Status.PENDING
+    booking.save(update_fields=["status", "updated_at"])
+    student_item = booking.items.get(category=student)
+    adult_item = booking.items.get(category=adult)
+    cashier = _make_cashier()
+
+    # old total: 100 + (2 x 50) = 200.00
+    booking, delta = services.correct_booking_category(
+        booking=booking, item_id=student_item.id, quantity=3, actor=cashier
+    )
+
+    student_item.refresh_from_db()
+    adult_item.refresh_from_db()
+    assert student_item.quantity == 3
+    assert student_item.subtotal_etb == Decimal("150.00")
+    assert adult_item.quantity == 1  # untouched
+    assert adult_item.subtotal_etb == Decimal("100.00")  # untouched
+    assert booking.total_amount_etb == Decimal("250.00")  # 100 + 150
+    assert booking.booked_quantity == 4  # 1 + 3
+    assert delta == Decimal("50.00")  # 250 - 200
+
+
+def test_correct_quantity_requires_at_least_category_or_quantity():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(student)
+    item = booking.items.get()
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.correct_booking_category(booking=booking, item_id=item.id, actor=cashier)
+
+
+def test_correct_quantity_rejects_less_than_one():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(student, quantity=2)
+    item = booking.items.get()
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.correct_booking_category(
+            booking=booking, item_id=item.id, quantity=0, actor=cashier
+        )
+
+
+def test_correct_quantity_rejects_the_same_quantity_when_category_unchanged():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(student, quantity=2)
+    item = booking.items.get()
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.correct_booking_category(
+            booking=booking, item_id=item.id, quantity=2, actor=cashier
+        )
+
+
+def test_correct_quantity_rejected_once_no_longer_pending():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(student, quantity=2)
+    item = booking.items.get()
+    booking.status = Booking.Status.VISITED
+    booking.save(update_fields=["status", "updated_at"])
+    cashier = _make_cashier()
+
+    with pytest.raises(Conflict):
+        services.correct_booking_category(
+            booking=booking, item_id=item.id, quantity=3, actor=cashier
+        )
+
+
 def test_correct_category_rejects_an_inactive_category():
     student = _make_category(name_en="Student", price_etb="50.00")
     retired = _make_category(name_en="Retired Category", price_etb="10.00", active=False)
@@ -379,7 +570,9 @@ def test_correct_category_rejects_an_item_not_on_this_booking():
     student = _make_category(name_en="Student", price_etb="50.00")
     adult = _make_category(name_en="Adult", price_etb="100.00")
     booking = _make_correctable_booking(student)
-    other_booking = _make_correctable_booking(student)
+    other_booking = _make_correctable_booking(
+        student, visitor=_make_visitor(email="other-visitor@example.com")
+    )
     other_item = other_booking.items.get()
     cashier = _make_cashier()
 
