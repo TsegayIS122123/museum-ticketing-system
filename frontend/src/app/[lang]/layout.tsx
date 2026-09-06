@@ -5,7 +5,7 @@ import { AuthProvider } from '@/lib/auth/auth-context';
 import '../globals.css';
 
 export const metadata: Metadata = {
-  title: 'Science Museum - Ticketing & Booking',
+  title: 'The Zoological Natural History Museum - Ticketing & Booking',
   description: 'Book and manage your museum visit online.',
 };
 

@@ -231,6 +231,33 @@ html[lang="am"] {
   }
 }
 
+/* Homepage specimen gallery -- a continuous horizontal scroll through
+   preserved-specimen photos (see SpecimenGallery.tsx). The track holds
+   two identical passes of the roster back to back, so animating from
+   translateX(0) to translateX(-50%) loops without a visible seam. */
+@keyframes specimen-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.specimen-marquee-track {
+  animation: specimen-marquee 24s linear infinite;
+}
+
+.specimen-marquee:hover .specimen-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .specimen-marquee-track {
+    animation: none;
+  }
+}
+
 /* Utility classes */
 .tap-target {
   min-height: 44px;

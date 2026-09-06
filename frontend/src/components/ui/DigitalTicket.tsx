@@ -46,7 +46,7 @@ export function DigitalTicket({
       {/* Event half */}
       <div className="bg-brand-primary text-white px-6 py-5">
         <div className="text-xs font-semibold uppercase tracking-wider text-white/70">
-          {t('museum_name') || 'Science Museum'}
+          {t('museum_name') || 'Zoological Natural History Museum'}
         </div>
         <div className="mt-1 text-lg font-bold">
           {t('digital_ticket') || 'Digital Ticket'}

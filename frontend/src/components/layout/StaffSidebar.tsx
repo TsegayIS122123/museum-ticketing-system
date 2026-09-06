@@ -115,7 +115,7 @@ export function StaffSidebar() {
           />
           <div>
             <div className="text-white font-semibold text-sm leading-tight">
-              {t('museum_name') || 'Science Museum'}
+              {t('museum_name') || 'Zoological Natural History Museum'}
             </div>
             <div className="text-white/65 text-xs">{t('staff_portal') || 'Staff Portal'}</div>
           </div>
