@@ -39,41 +39,42 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    setLoadError(null);
 
-    const monthDates = buildMonthDates(viewYear, viewMonth);
-    const from = monthDates[0];
-    const to = monthDates[monthDates.length - 1];
+    void (async () => {
+      setIsLoading(true);
+      setLoadError(null);
 
-    // GET /availability is public (FR-BOOK-008) -- no auth needed for a
-    // visitor to see which dates the Museum Manager has closed.
-    getAvailability(from, to)
-      .then((records) => {
+      const monthDates = buildMonthDates(viewYear, viewMonth);
+      const from = monthDates[0];
+      const to = monthDates[monthDates.length - 1];
+
+      // GET /availability is public (FR-BOOK-008) -- no auth needed for a
+      // visitor to see which dates the Museum Manager has closed.
+      try {
+        const records = await getAvailability(from, to);
         if (cancelled) return;
         const closed = new Set(
           records.filter((r) => !r.isOpenForBooking).map((r) => r.date)
         );
         setClosedDates(closed);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setLoadError(t('failed_to_load_availability') || 'Could not load date availability.');
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsLoading(false);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
     // `t` intentionally excluded: useTranslation() returns a new
     // function reference every render, so including it here retriggers
-    // this fetch on every render (setIsLoading(true) -> re-render -> new
-    // t -> effect re-fires), leaving the calendar stuck in the loading
-    // state almost permanently -- which reads as every date being
-    // closed, not just the genuinely closed ones.
+    // this fetch on every render (setIsLoading(true) -> re-render ->
+    // new t -> effect re-fires), leaving the calendar stuck in the
+    // loading state almost permanently -- which reads as every date
+    // being closed, not just the genuinely closed ones.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewYear, viewMonth]);
 

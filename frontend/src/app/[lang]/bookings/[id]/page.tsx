@@ -87,8 +87,14 @@ export default function BookingDetailPage() {
     }
 
     if (bookingId) {
-      loadBooking();
+      void (async () => {
+        await loadBooking();
+      })();
     }
+    // `loadBooking` intentionally excluded: it's redefined every render
+    // (and calls setState itself), so including it here would refetch on
+    // every render instead of only when the booking to load changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId, isAuthenticated, authLoading, locale, router]);
 
   if (authLoading || isLoading) {

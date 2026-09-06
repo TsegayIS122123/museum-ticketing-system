@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Pin } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Modal } from '@/components/ui/Modal';
@@ -40,7 +40,16 @@ export function ProvisionStaffModal({
 
   const isEditing = !!initialData;
 
-  useEffect(() => {
+  // Reset the form fields whenever the modal is (re)opened or handed a
+  // different account to edit -- adjusted during render rather than in
+  // an effect, per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  const [prevInitialData, setPrevInitialData] = useState(initialData);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (initialData !== prevInitialData || isOpen !== prevIsOpen) {
+    setPrevInitialData(initialData);
+    setPrevIsOpen(isOpen);
+
     if (initialData) {
       setFormData({
         email: initialData.email,
@@ -65,7 +74,7 @@ export function ProvisionStaffModal({
       });
     }
     setErrors({});
-  }, [initialData, isOpen]);
+  }
 
   const handleChange = (field: keyof StaffCreateInput, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

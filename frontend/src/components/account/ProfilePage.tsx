@@ -25,12 +25,19 @@ export function ProfilePage() {
     if (!isLoading && !isAuthenticated) router.push(`/${locale}/`);
   }, [isAuthenticated, isLoading, locale, router]);
 
-  useEffect(() => {
-    if (!user) return;
-    setFullName(user.full_name);
-    setPhone(user.phone ?? '');
-    setLanguage(user.language_preference);
-  }, [user]);
+  // Reset the editable form fields whenever the source-of-truth `user`
+  // object changes identity (first load, or a fresh object after a save)
+  // -- adjusted during render rather than in an effect, per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  const [prevUser, setPrevUser] = useState<typeof user>(user);
+  if (user !== prevUser) {
+    setPrevUser(user);
+    if (user) {
+      setFullName(user.full_name);
+      setPhone(user.phone ?? '');
+      setLanguage(user.language_preference);
+    }
+  }
 
   if (isLoading || !isAuthenticated || !user) return null;
 

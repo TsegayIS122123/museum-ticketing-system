@@ -32,7 +32,9 @@ export default function SettlementTransfersPage() {
   };
 
   useEffect(() => {
-    loadTransfers();
+    void (async () => {
+      await loadTransfers();
+    })();
   }, []);
 
   const formatDateTime = (dateStr: string | null) => {

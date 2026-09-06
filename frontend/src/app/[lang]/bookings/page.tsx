@@ -44,7 +44,9 @@ export default function MyBookingsPage() {
       return;
     }
 
-    loadBookings();
+    void (async () => {
+      await loadBookings();
+    })();
   }, [isAuthenticated, authLoading, locale, router]);
 
   if (authLoading) {

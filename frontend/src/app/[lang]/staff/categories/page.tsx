@@ -49,7 +49,13 @@ export default function CategoriesPage() {
   };
 
   useEffect(() => {
-    loadCategories();
+    void (async () => {
+      await loadCategories();
+    })();
+    // `loadCategories` intentionally excluded: it's redefined every
+    // render (and calls setState itself), so including it here would
+    // refetch on every render instead of just once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCreate = () => {

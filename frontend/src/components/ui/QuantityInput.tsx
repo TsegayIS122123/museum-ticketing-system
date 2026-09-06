@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -25,10 +25,14 @@ export function QuantityInput({
 }: QuantityInputProps) {
   const [inputValue, setInputValue] = useState(String(value));
 
-  // Sync when external value changes
-  useEffect(() => {
+  // Sync the local editable buffer when the external `value` changes --
+  // adjusted during render rather than in an effect, per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     setInputValue(String(value));
-  }, [value]);
+  }
 
   const handleDecrement = useCallback(() => {
     const newValue = Math.max(min, value - 1);

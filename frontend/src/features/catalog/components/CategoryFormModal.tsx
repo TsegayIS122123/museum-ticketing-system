@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -39,7 +39,16 @@ export function CategoryFormModal({
 
   const isEditing = !!initialData;
 
-  useEffect(() => {
+  // Reset the form fields whenever the modal is (re)opened or handed a
+  // different category to edit -- adjusted during render rather than in
+  // an effect, per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  const [prevInitialData, setPrevInitialData] = useState(initialData);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (initialData !== prevInitialData || isOpen !== prevIsOpen) {
+    setPrevInitialData(initialData);
+    setPrevIsOpen(isOpen);
+
     if (initialData) {
       setFormData({
         name_en: initialData.name_en,
@@ -58,7 +67,7 @@ export function CategoryFormModal({
       });
     }
     setErrors({});
-  }, [initialData, isOpen]);
+  }
 
   const handleChange = (field: keyof CategoryFormInput, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

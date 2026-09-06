@@ -28,22 +28,25 @@ export function VerifyEmailStatus() {
     if (hasRun.current) return;
     hasRun.current = true;
 
-    if (!token) {
-      setStatus('error');
-      setError(t('verify_email_missing_token') || 'This verification link is missing its token.');
-      return;
-    }
+    void (async () => {
+      if (!token) {
+        setStatus('error');
+        setError(t('verify_email_missing_token') || 'This verification link is missing its token.');
+        return;
+      }
 
-    confirmEmailVerification(token)
-      .then(() => setStatus('success'))
-      .catch((err: unknown) => {
+      try {
+        await confirmEmailVerification(token);
+        setStatus('success');
+      } catch (err: unknown) {
         setStatus('error');
         setError(
           err instanceof ApiError
             ? err.message
             : t('verify_email_failed') || 'This link is invalid or has expired.'
         );
-      });
+      }
+    })();
   }, [token, t]);
 
   return (

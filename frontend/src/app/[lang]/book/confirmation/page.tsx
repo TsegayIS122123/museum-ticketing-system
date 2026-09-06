@@ -51,24 +51,26 @@ function ConfirmationPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) {
-      setError('No booking id provided');
-      setIsLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
-    getBooking(id)
-      .then((data) => {
+    (async () => {
+      if (!id) {
+        if (!cancelled) {
+          setError('No booking id provided');
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const data = await getBooking(id);
         if (!cancelled) setBooking(data);
-      })
-      .catch((err: any) => {
+      } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load booking');
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsLoading(false);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;

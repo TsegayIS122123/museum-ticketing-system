@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const pathname = usePathname();
+  const isPublicRoute = isPublicAuthRoute(pathname);
 
   useEffect(() => {
     // On every fresh mount (first load, or coming back from a full page
@@ -68,17 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // httpOnly refresh-token cookie the browser already carries, and
     // only a signed-out visitor (no valid cookie) actually falls through
     // to `isAuthenticated: false`.
-    //
-    // Exception: skip this entirely on public auth routes (login,
-    // forgot-password, reset-password) -- see isPublicAuthRoute above.
-    if (isPublicAuthRoute(pathname)) {
-      setIsLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
     async function bootstrap() {
+      // Exception: skip this entirely on public auth routes (login,
+      // forgot-password, reset-password) -- see isPublicAuthRoute above.
+      if (isPublicRoute) {
+        if (!cancelled) setIsLoading(false);
+        return;
+      }
+
       const newAccessToken = await refreshAccessToken();
       if (!newAccessToken) {
         if (!cancelled) setIsLoading(false);
@@ -100,10 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally
-    // re-runs only when navigating into/out of a public auth route, not on
-    // every pathname change; see isPublicAuthRoute check above.
-  }, [isPublicAuthRoute(pathname)]);
+    // Intentionally re-runs only when navigating into/out of a public
+    // auth route, not on every pathname change; see isPublicRoute above.
+  }, [isPublicRoute]);
 
   const login = (tokens: { access_token: string }, userData: User) => {
     // The refresh token isn't handled here at all -- the response that

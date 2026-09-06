@@ -70,6 +70,10 @@ export function CategoryCorrectionPanel({
     return () => {
       cancelled = true;
     };
+    // `t` intentionally excluded: useTranslation() returns a new function
+    // reference every render, so including it here would refire this
+    // fetch on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleItemChange = (itemId: string) => {

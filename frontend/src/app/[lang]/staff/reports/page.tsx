@@ -25,21 +25,22 @@ export default function ReportsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
 
-    Promise.all([getReportSummary(period), getDashboard()])
-      .then(([summaryRes, dashboardRes]) => {
+    void (async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const [summaryRes, dashboardRes] = await Promise.all([getReportSummary(period), getDashboard()]);
         if (cancelled) return;
         setSummary(summaryRes);
         setDashboard(dashboardRes);
-      })
-      .catch((err: any) => {
+      } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load reports');
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsLoading(false);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;

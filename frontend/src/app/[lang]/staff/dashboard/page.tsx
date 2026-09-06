@@ -33,29 +33,29 @@ export default function StaffDashboardPage() {
   useEffect(() => {
     if (!isManager && !isAdmin) return;
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
 
-    Promise.all([
-      getDashboard(),
-      getReportSummary('daily'),
-    ])
-      .then(([dashboardRes, summaryRes]) => {
+    void (async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const [dashboardRes, summaryRes] = await Promise.all([
+          getDashboard(),
+          getReportSummary('daily'),
+        ]);
         if (cancelled) return;
         setDashboard(dashboardRes);
         setTodaySummary(summaryRes);
-      })
-      .catch((err: any) => {
+      } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load dashboard data');
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsLoading(false);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isManager, isAdmin]);
 
   const revenueToday = todaySummary
