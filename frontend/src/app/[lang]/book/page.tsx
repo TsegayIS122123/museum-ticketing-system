@@ -9,6 +9,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StepIndicator } from '@/components/ui/StepIndicator';
+import { OrbitMotif } from '@/components/ui/OrbitMotif';
 import { DateCategoryPicker, type BookingItemInput } from '@/features/booking/components/DateCategoryPicker';
 import { AvailabilityDatePicker } from '@/features/booking/components/AvailabilityDatePicker';
 import { BookingSummary } from '@/features/booking/components/BookingSummary';
@@ -183,15 +184,22 @@ export default function BookPage() {
       <div className="flex flex-1">
         <VisitorSidebar />
         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <div className="mb-8">
-          <h1 className="text-3xl font-serif font-semibold text-stone-900">
-            {t('book_a_visit') || 'Book a Visit'}
-          </h1>
-          <StepIndicator
-            steps={steps}
-            current={stepIndex}
-            className="mt-4"
-          />
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-stone-900">
+              {t('book_a_visit') || 'Book a Visit'}
+            </h1>
+            <StepIndicator
+              steps={steps}
+              current={stepIndex}
+              className="mt-4"
+            />
+          </div>
+          {/* Compact echo of the landing-page hero motif, sized down so
+              it reads as chrome rather than competing with the wizard
+              for attention. Hidden on small screens where the step
+              indicator already needs the full width. */}
+          <OrbitMotif size="compact" className="hidden sm:block w-16 h-16 shrink-0 mt-1" />
         </div>
 
         {renderStep()}

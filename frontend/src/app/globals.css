@@ -192,6 +192,18 @@ html[lang="am"] {
   font-family: var(--font-mono);
 }
 
+/* Visitor surface — hero motif backdrop (task 3 of the redesign
+   sequence). A very low-opacity dot grid gives the hero section texture
+   without introducing a new color. The dashed/left-border "ticket" cues
+   used on the bookings list and summary total (plain Tailwind utilities
+   at their call sites) start that visual language deliberately lightly
+   here -- task 4 (the confirmation screen) is where it's fully
+   realized, and should stay the most visually distinct screen. */
+.visitor-dot-grid {
+  background-image: radial-gradient(var(--color-primary-200) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
 /* Utility classes */
 .tap-target {
   min-height: 44px;

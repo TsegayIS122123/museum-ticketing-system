@@ -17,11 +17,11 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
           <div className="flex flex-col items-center min-w-0">
             <div
               className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all flex-shrink-0",
+                "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all flex-shrink-0",
                 index < current
-                  ? "bg-slate-800 border-slate-800 text-white"
+                  ? "bg-brand-primary border-brand-primary text-white"
                   : index === current
-                  ? "bg-white border-slate-800 text-slate-800"
+                  ? "bg-white border-brand-primary text-brand-primary ring-4 ring-primary-100"
                   : "bg-white border-stone-300 text-stone-400"
               )}
             >
@@ -29,8 +29,8 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
             </div>
             <div
               className={cn(
-                "text-xs mt-1 font-medium text-center whitespace-nowrap",
-                index <= current ? "text-slate-800" : "text-stone-400"
+                "text-xs mt-1.5 font-medium text-center whitespace-nowrap",
+                index <= current ? "text-brand-primary" : "text-stone-400"
               )}
             >
               {step}
@@ -39,8 +39,8 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
           {index < steps.length - 1 && (
             <div
               className={cn(
-                "flex-1 h-0.5 mx-1 mb-4",
-                index < current ? "bg-slate-800" : "bg-stone-300"
+                "flex-1 h-0.5 mx-1 mb-5 transition-colors",
+                index < current ? "bg-brand-primary" : "bg-stone-300"
               )}
             />
           )}

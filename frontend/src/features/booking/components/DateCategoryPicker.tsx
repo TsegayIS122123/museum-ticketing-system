@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Ticket } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -118,7 +118,8 @@ export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategor
                 <div className="text-sm text-stone-500 mt-1">
                   {locale === 'en' ? category.name_am : category.name_en}
                 </div>
-                <div className="mt-2 text-lg font-bold text-primary-600">
+                <div className="mt-2 flex items-center gap-1.5 text-lg font-bold text-primary-600">
+                  <Ticket className="w-4 h-4 shrink-0" aria-hidden="true" />
                   {`ETB ${category.price_etb}`}
                 </div>
               </div>
