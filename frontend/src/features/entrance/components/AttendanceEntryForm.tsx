@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toast } from '@/components/ui/Toast';
-import { QRCodeSVG } from '@/components/ui/QRCodeSVG';
 import { TextField } from '@/components/ui/TextField';
 import { CategoryCorrectionPanel } from './CategoryCorrectionPanel';
 import {
@@ -304,39 +303,31 @@ export function AttendanceEntryForm({
 
       <Card>
         {/* Booking details */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="font-mono tabular-nums text-sm font-semibold text-stone-600">
-                #{booking.reference}
-              </span>
-              <StatusBadge status={booking.status} />
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="font-mono tabular-nums text-sm font-semibold text-stone-600">
+              #{booking.reference}
+            </span>
+            <StatusBadge status={booking.status} />
+          </div>
+          <h3 className="text-xl font-semibold text-stone-900 mt-2">
+            {displayName}
+          </h3>
+          {contactLine && (
+            <div className="text-sm text-stone-500 mt-1">
+              {contactLine}
             </div>
-            <h3 className="text-xl font-semibold text-stone-900 mt-2">
-              {displayName}
-            </h3>
-            {contactLine && (
-              <div className="text-sm text-stone-500 mt-1">
-                {contactLine}
-              </div>
-            )}
-            {/* The institutional payer's TIN -- alongside groupName/
-                groupContactPhone above, for the same IFMIS receipt
-                voucher reconciliation (e.g. "Received From: BS School
-                Group, Tin 0000900158"). Group bookings only; an
-                individual Visitor has no TIN on file. */}
-            {booking.bookingType === 'group' && booking.groupTin && (
-              <div className="text-sm text-stone-500 mt-0.5">
-                {(t('tin') || 'TIN')}: {booking.groupTin}
-              </div>
-            )}
-          </div>
-          <div className="bg-white p-2 rounded-xl shadow-inner border border-stone-200">
-            <QRCodeSVG
-              value={booking.reference}
-              size={80}
-            />
-          </div>
+          )}
+          {/* The institutional payer's TIN -- alongside groupName/
+              groupContactPhone above, for the same IFMIS receipt
+              voucher reconciliation (e.g. "Received From: BS School
+              Group, Tin 0000900158"). Group bookings only; an
+              individual Visitor has no TIN on file. */}
+          {booking.bookingType === 'group' && booking.groupTin && (
+            <div className="text-sm text-stone-500 mt-0.5">
+              {(t('tin') || 'TIN')}: {booking.groupTin}
+            </div>
+          )}
         </div>
 
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-stone-100 pt-4">

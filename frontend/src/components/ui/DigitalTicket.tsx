@@ -1,7 +1,6 @@
 'use client';
 
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { QRCodeSVG } from './QRCodeSVG';
 
 interface DigitalTicketProps {
   reference: string;
@@ -27,6 +26,10 @@ interface DigitalTicketProps {
  * this only works because the card's parent is always that background;
  * if this component is ever placed on a differently-colored surface,
  * update `--ticket-notch-bg` at the call site.
+ *
+ * No QR code here on purpose: gate staff don't currently have scanning
+ * equipment, so the stub just surfaces the reference code, which they
+ * look up manually. Re-add a QRCodeSVG in the stub half if that changes.
  */
 export function DigitalTicket({
   reference,
@@ -74,18 +77,13 @@ export function DigitalTicket({
         />
       </div>
 
-      {/* Stub half -- QR + reference, sized to actually be scannable */}
+      {/* Stub half -- reference code, shown to gate staff to look up manually */}
       <div className="bg-white px-6 py-6 text-center">
-        <div className="flex justify-center">
-          <div className="rounded-xl border border-stone-200 bg-white p-3 shadow-inner">
-            <QRCodeSVG value={reference} size={172} />
-          </div>
-        </div>
-        <div className="mt-4 font-mono text-lg font-bold tracking-[0.2em] text-stone-900">
+        <div className="font-mono text-lg font-bold tracking-[0.2em] text-stone-900">
           {reference}
         </div>
         <div className="mt-1 text-xs text-stone-500">
-          {t('show_at_gate') || 'Show this QR code at the museum entrance'}
+          {t('show_at_gate') || 'Show this reference code at the museum entrance'}
         </div>
       </div>
     </div>

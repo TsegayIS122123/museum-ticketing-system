@@ -14,10 +14,9 @@ export function SiteHeader() {
   const { user, isAuthenticated, logout } = useAuth();
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  // The logged-out primary nav (About/Solutions/Booking/Contact) plus the
-  // language toggle doesn't fit next to the logo below `md` -- it's
-  // collapsed into this toggle-able panel instead of wrapping onto the
-  // logo's line.
+  // The logged-out primary nav (Booking) plus the language toggle doesn't
+  // fit next to the logo below `md` -- it's collapsed into this
+  // toggle-able panel instead of wrapping onto the logo's line.
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleSignOut = () => {
@@ -28,10 +27,7 @@ export function SiteHeader() {
   const profilePath = `/${locale}/settings/account`;
 
   const navLinks = [
-    { href: `/${locale}#about`, label: t('about') || 'About' },
-    { href: `/${locale}#solutions`, label: t('solutions') || 'Solutions' },
     { href: `/${locale}/book`, label: t('booking') || 'Booking' },
-    { href: `/${locale}#contact`, label: t('contact') || 'Contact' },
   ];
 
   return (
