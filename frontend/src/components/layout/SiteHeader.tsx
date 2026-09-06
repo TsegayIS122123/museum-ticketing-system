@@ -38,7 +38,7 @@ export function SiteHeader() {
     <header className="border-b border-brand-primary/15 bg-white">
       <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:gap-6 sm:px-6 lg:px-8">
         <Link href={`/${locale}`} className="flex shrink-0 items-center gap-3">
-          <Image src="/aau-logo.png" alt="Addis Ababa University" width={40} height={40} priority />
+          <Image src="/aau-logo.png" alt={t('aau_logo_alt') || 'Addis Ababa University'} width={40} height={40} priority />
           <span className="font-serif text-lg font-bold text-brand-primary sm:text-xl">{t('museum_name')}</span>
         </Link>
 
@@ -72,7 +72,7 @@ export function SiteHeader() {
           </div>
         ) : (
           <div className="flex items-center gap-2 sm:gap-4">
-            <nav aria-label="Primary" className="hidden items-center gap-4 text-sm font-semibold text-brand-primary md:flex">
+            <nav aria-label={t('primary_navigation') || 'Primary'} className="hidden items-center gap-4 text-sm font-semibold text-brand-primary md:flex">
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href} className="hover:underline">
                   {link.label}
@@ -98,7 +98,7 @@ export function SiteHeader() {
 
       {!isAuthenticated && isMobileMenuOpen && (
         <div id="mobile-primary-nav" className="border-t border-brand-primary/15 px-4 py-3 md:hidden">
-          <nav aria-label="Primary" className="flex flex-col gap-1 text-sm font-semibold text-brand-primary">
+          <nav aria-label={t('primary_navigation') || 'Primary'} className="flex flex-col gap-1 text-sm font-semibold text-brand-primary">
             {navLinks.map((link) => (
               <Link
                 key={link.href}

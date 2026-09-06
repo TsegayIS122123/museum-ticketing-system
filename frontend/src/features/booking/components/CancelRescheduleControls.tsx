@@ -43,7 +43,7 @@ export function CancelRescheduleControls({
     try {
       await cancelBooking(bookingId);
       setToast({
-        message: t('booking_cancelled') || 'Booking cancelled successfully. Refund will be processed.',
+        message: t('booking_cancel_success') || 'Booking cancelled successfully. Refund will be processed.',
         type: 'success',
       });
       setIsCancelDialogOpen(false);
@@ -142,7 +142,7 @@ export function CancelRescheduleControls({
             onClick={() => setIsCancelDialogOpen(true)}
             disabled={isProcessing}
           >
-            <X className="w-4 h-4" /> {t('cancel') || 'Cancel Booking'}
+            <X className="w-4 h-4" /> {t('cancel_booking') || 'Cancel Booking'}
           </Button>
         )}
       </div>
@@ -154,7 +154,7 @@ export function CancelRescheduleControls({
         onConfirm={handleCancel}
         title={t('cancel_booking') || 'Cancel Booking'}
         message={t('cancel_confirmation') || 'Are you sure you want to cancel this booking? A full refund will be processed.'}
-        confirmLabel={t('cancel') || 'Cancel Booking'}
+        confirmLabel={t('cancel_booking') || 'Cancel Booking'}
         danger
       />
 

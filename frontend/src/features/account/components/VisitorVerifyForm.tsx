@@ -35,7 +35,7 @@ export function VisitorVerifyForm() {
     setError(null);
 
     if (!email || !phone) {
-      setError('Please enter both email and phone number.');
+      setError(t('email_phone_required') || 'Please enter both email and phone number.');
       return;
     }
 
@@ -50,7 +50,7 @@ export function VisitorVerifyForm() {
       setVerificationId(response.verification_id);
       setStep('otp');
     } catch (err: any) {
-      setError(err.message || 'Failed to send verification code. Please try again.');
+      setError(err.message || t('otp_send_failed') || 'Failed to send verification code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +61,7 @@ export function VisitorVerifyForm() {
     setError(null);
 
     if (!otpCode || otpCode.length !== 6) {
-      setError('Please enter a valid 6-digit verification code.');
+      setError(t('otp_invalid_length') || 'Please enter a valid 6-digit verification code.');
       return;
     }
 
@@ -71,7 +71,7 @@ export function VisitorVerifyForm() {
       login({ access_token: response.access_token }, response.user);
       router.push(`/${locale}/bookings`);
     } catch (err: any) {
-      setError(err.message || 'Invalid verification code. Please try again.');
+      setError(err.message || t('otp_invalid_code') || 'Invalid verification code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -154,7 +154,7 @@ export function VisitorVerifyForm() {
       <form onSubmit={handleStartVerification} className="space-y-4">
         <TextField
           id="fullName"
-          label="Full Name (Optional)"
+          label={t('full_name_optional') || 'Full Name (Optional)'}
           type="text"
           placeholder="e.g., Hana"
           value={fullName}

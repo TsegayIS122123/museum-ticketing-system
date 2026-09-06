@@ -1,13 +1,18 @@
+'use client';
+
 import { cn } from '@/lib/utils/cn';
 import { ReactNode } from 'react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface TableProps {
   headers: string[];
   rows: ReactNode[][];
   className?: string;
+  emptyMessage?: string;
 }
 
-export function Table({ headers, rows, className }: TableProps) {
+export function Table({ headers, rows, className, emptyMessage }: TableProps) {
+  const { t } = useTranslation();
   return (
     <div className={cn("overflow-x-auto", className)}>
       <table className="w-full text-sm">
@@ -30,7 +35,7 @@ export function Table({ headers, rows, className }: TableProps) {
                 colSpan={headers.length}
                 className="py-8 text-center text-stone-400 text-sm"
               >
-                No data available
+                {emptyMessage || t('no_data_available') || 'No data available'}
               </td>
             </tr>
           ) : (

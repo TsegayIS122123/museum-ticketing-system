@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface QuantityInputProps {
   value: number;
@@ -23,6 +24,7 @@ export function QuantityInput({
   className,
   disabled = false,
 }: QuantityInputProps) {
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = useState(String(value));
 
   // Sync the local editable buffer when the external `value` changes --
@@ -90,7 +92,7 @@ export function QuantityInput({
           onClick={handleDecrement}
           disabled={disabled || value <= min}
           className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          aria-label="Decrease quantity"
+          aria-label={t('decrease_quantity') || 'Decrease quantity'}
         >
           <Minus className="w-4 h-4" />
         </button>
@@ -103,19 +105,19 @@ export function QuantityInput({
           onBlur={handleBlur}
           disabled={disabled}
           className="w-16 h-10 text-center text-lg font-semibold border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent disabled:bg-stone-100 disabled:cursor-not-allowed"
-          aria-label="Quantity input"
+          aria-label={t('quantity_input') || 'Quantity input'}
         />
         <button
           type="button"
           onClick={handleIncrement}
           disabled={disabled || value >= max}
           className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          aria-label="Increase quantity"
+          aria-label={t('increase_quantity') || 'Increase quantity'}
         >
           <Plus className="w-4 h-4" />
         </button>
         <span className="text-sm text-stone-500 ml-1">
-          max {max}
+          {t('max_label') || 'max'} {max}
         </span>
       </div>
     </div>

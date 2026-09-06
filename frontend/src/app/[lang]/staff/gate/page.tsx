@@ -33,7 +33,7 @@ export default function GatePage() {
       setBooking(result);
       setState('found');
     } catch (err: any) {
-      setError(err.message || t('booking_not_found') || 'Booking not found. Please check the reference and try again.');
+      setError(err.message || t('booking_not_found_message') || 'Booking not found. Please check the reference and try again.');
       setState('not_found');
     }
   };
@@ -123,7 +123,7 @@ export default function GatePage() {
         <Card>
           <div className="text-center py-12">
             <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-stone-500 mt-4">{t('searching') || 'Searching for booking...'}</p>
+            <p className="text-stone-500 mt-4">{t('searching_for_booking') || 'Searching for booking...'}</p>
           </div>
         </Card>
       )}

@@ -56,7 +56,7 @@ function ConfirmationPageContent() {
     (async () => {
       if (!id) {
         if (!cancelled) {
-          setError('No booking id provided');
+          setError(t('no_booking_id') || 'No booking id provided');
           setIsLoading(false);
         }
         return;
@@ -75,6 +75,10 @@ function ConfirmationPageContent() {
     return () => {
       cancelled = true;
     };
+    // `t` intentionally excluded: useTranslation() returns a new function
+    // reference every render, so including it here would refire this
+    // fetch on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (isLoading) {
@@ -100,7 +104,7 @@ function ConfirmationPageContent() {
             <h2 className="text-xl font-bold text-stone-900 mb-2">
               {t('booking_failed') || 'Booking Failed'}
             </h2>
-            <p className="text-stone-500">{error || t('try_again') || 'Please try again'}</p>
+            <p className="text-stone-500">{error || t('please_try_again') || 'Please try again'}</p>
             <Button
               className="mt-4"
               onClick={() => router.push(`/${locale}/book`)}

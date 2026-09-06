@@ -35,7 +35,7 @@ export default function SettlementPage() {
       setState('idle');
     } catch (error: any) {
       setToast({
-        message: error.message || t('failed_to_load') || 'Failed to load your balance.',
+        message: error.message || t('failed_to_load_balance') || 'Failed to load your balance.',
         type: 'error',
       });
       setState('idle');
@@ -68,7 +68,7 @@ export default function SettlementPage() {
       });
     } catch (error: any) {
       setToast({
-        message: error.message || t('transfer_failed') || 'Failed to initiate reconciliation.',
+        message: error.message || t('transfer_failed_message') || 'Failed to initiate reconciliation.',
         type: 'error',
       });
       setState('idle');
@@ -124,7 +124,7 @@ export default function SettlementPage() {
         open={showConfirm}
         onClose={() => setShowConfirm(false)}
         onConfirm={handleInitiateTransfer}
-        title={t('initiate_transfer') || 'Initiate Settlement Reconciliation'}
+        title={t('initiate_transfer_title') || 'Initiate Settlement Reconciliation'}
         message={
           t('transfer_confirmation_message') ||
           `You are about to reconcile your full outstanding balance of ETB ${balance?.balanceEtb ?? '0.00'}. This action cannot be undone.`

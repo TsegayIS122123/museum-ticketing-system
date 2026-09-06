@@ -26,7 +26,8 @@ import { isStaff } from '@/lib/auth/roles';
 
 interface NavItem {
   view: string;
-  label: string;
+  labelKey: string;
+  labelFallback: string;
   icon: LucideIcon;
   path: string;
 }
@@ -34,29 +35,29 @@ interface NavItem {
 const navByRole: Record<UserRole, NavItem[]> = {
   visitor: [],
   cashier: [
-    { view: 'gate', label: 'Gate Check-In', icon: DoorOpen, path: '/staff/gate' },
-    { view: 'settlement', label: 'Settlement', icon: Landmark, path: '/staff/settlement' },
-    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
+    { view: 'gate', labelKey: 'nav_gate_check_in', labelFallback: 'Gate Check-In', icon: DoorOpen, path: '/staff/gate' },
+    { view: 'settlement', labelKey: 'settlement', labelFallback: 'Settlement', icon: Landmark, path: '/staff/settlement' },
+    { view: 'profile', labelKey: 'profile', labelFallback: 'Profile', icon: User, path: '/settings/account' },
   ],
   museum_manager: [
-    { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/staff/dashboard' },
-    { view: 'categories', label: 'Ticket Categories & Pricing', icon: Tag, path: '/staff/categories' },
-    { view: 'availability', label: 'Availability', icon: Calendar, path: '/staff/availability' },
-    { view: 'refunds', label: 'Refunds', icon: Wallet, path: '/staff/refunds' },
-    { view: 'reports', label: 'Reports', icon: TrendingUp, path: '/staff/reports' },
-    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
+    { view: 'dashboard', labelKey: 'dashboard', labelFallback: 'Dashboard', icon: LayoutDashboard, path: '/staff/dashboard' },
+    { view: 'categories', labelKey: 'nav_ticket_categories_pricing', labelFallback: 'Ticket Categories & Pricing', icon: Tag, path: '/staff/categories' },
+    { view: 'availability', labelKey: 'nav_availability', labelFallback: 'Availability', icon: Calendar, path: '/staff/availability' },
+    { view: 'refunds', labelKey: 'nav_refunds', labelFallback: 'Refunds', icon: Wallet, path: '/staff/refunds' },
+    { view: 'reports', labelKey: 'nav_reports', labelFallback: 'Reports', icon: TrendingUp, path: '/staff/reports' },
+    { view: 'profile', labelKey: 'profile', labelFallback: 'Profile', icon: User, path: '/settings/account' },
   ],
   platform_admin: [
-    { view: 'staff', label: 'Staff Accounts', icon: Users, path: '/staff/admin/staff' },
-    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
+    { view: 'staff', labelKey: 'nav_staff_accounts', labelFallback: 'Staff Accounts', icon: Users, path: '/staff/admin/staff' },
+    { view: 'profile', labelKey: 'profile', labelFallback: 'Profile', icon: User, path: '/settings/account' },
   ],
 };
 
-const roleInfo: Record<UserRole, { name: string; badge: string; initials: string; badgeColor: string }> = {
-  visitor: { name: 'Visitor', badge: 'Visitor', initials: 'V', badgeColor: 'bg-blue-500/20 text-blue-200' },
-  cashier: { name: 'Cashier', badge: 'Cashier', initials: 'C', badgeColor: 'bg-emerald-500/20 text-emerald-200' },
-  museum_manager: { name: 'Manager', badge: 'Museum Manager', initials: 'M', badgeColor: 'bg-primary-500/20 text-primary-200' },
-  platform_admin: { name: 'Admin', badge: 'Platform Admin', initials: 'A', badgeColor: 'bg-purple-500/20 text-purple-200' },
+const roleInfo: Record<UserRole, { nameKey: string; nameFallback: string; badgeKey: string; badgeFallback: string; initials: string; badgeColor: string }> = {
+  visitor: { nameKey: 'role_visitor', nameFallback: 'Visitor', badgeKey: 'role_visitor', badgeFallback: 'Visitor', initials: 'V', badgeColor: 'bg-blue-500/20 text-blue-200' },
+  cashier: { nameKey: 'role_cashier', nameFallback: 'Cashier', badgeKey: 'role_cashier', badgeFallback: 'Cashier', initials: 'C', badgeColor: 'bg-emerald-500/20 text-emerald-200' },
+  museum_manager: { nameKey: 'nav_manager_short', nameFallback: 'Manager', badgeKey: 'role_museum_manager', badgeFallback: 'Museum Manager', initials: 'M', badgeColor: 'bg-primary-500/20 text-primary-200' },
+  platform_admin: { nameKey: 'nav_admin_short', nameFallback: 'Admin', badgeKey: 'role_platform_admin', badgeFallback: 'Platform Admin', initials: 'A', badgeColor: 'bg-purple-500/20 text-purple-200' },
 };
 
 export function StaffSidebar() {
@@ -107,16 +108,16 @@ export function StaffSidebar() {
         <div className="flex items-center gap-3">
           <Image
             src="/aau-logo.png"
-            alt="Addis Ababa University"
+            alt={t('aau_logo_alt') || 'Addis Ababa University'}
             width={36}
             height={36}
             className="rounded-lg flex-shrink-0"
           />
           <div>
             <div className="text-white font-semibold text-sm leading-tight">
-              Science Museum
+              {t('museum_name') || 'Science Museum'}
             </div>
-            <div className="text-white/65 text-xs">Staff Portal</div>
+            <div className="text-white/65 text-xs">{t('staff_portal') || 'Staff Portal'}</div>
           </div>
         </div>
       </div>
@@ -124,7 +125,7 @@ export function StaffSidebar() {
       {/* Navigation */}
       <nav className="flex-1 py-3 overflow-y-auto">
         <div className="px-4 mb-2 text-xs font-semibold text-white/60 uppercase tracking-wider">
-          {info.badge}
+          {t(info.badgeKey) || info.badgeFallback}
         </div>
         {navItems.map((item) => {
           const active = isActive(item.path);
@@ -140,7 +141,7 @@ export function StaffSidebar() {
               )}
             >
               <item.icon className="w-4 h-4 flex-shrink-0" />
-              {item.label}
+              {t(item.labelKey) || item.labelFallback}
             </button>
           );
         })}
@@ -154,10 +155,10 @@ export function StaffSidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-white truncate">
-              {user.full_name || info.name}
+              {user.full_name || t(info.nameKey) || info.nameFallback}
             </div>
             <span className={cn('text-xs px-1.5 py-0.5 rounded font-medium', info.badgeColor)}>
-              {info.badge}
+              {t(info.badgeKey) || info.badgeFallback}
             </span>
           </div>
         </div>
@@ -165,7 +166,7 @@ export function StaffSidebar() {
           onClick={handleSignOut}
           className="w-full flex items-center gap-2 text-xs text-white/65 hover:text-white transition-colors py-1 text-left cursor-pointer"
         >
-          <LogOut className="w-3.5 h-3.5" /> Sign Out
+          <LogOut className="w-3.5 h-3.5" /> {t('logout') || 'Logout'}
         </button>
       </div>
     </>
@@ -179,7 +180,7 @@ export function StaffSidebar() {
       <button
         type="button"
         onClick={() => setIsMobileOpen(true)}
-        aria-label={t('open_menu') || 'Open navigation menu'}
+        aria-label={t('open_nav_menu') || 'Open navigation menu'}
         aria-expanded={isMobileOpen}
         className="fixed left-4 top-20 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-brand-primary text-white shadow-lg md:hidden"
       >
@@ -197,7 +198,7 @@ export function StaffSidebar() {
             <button
               type="button"
               onClick={() => setIsMobileOpen(false)}
-              aria-label={t('close_menu') || 'Close navigation menu'}
+              aria-label={t('close_nav_menu') || 'Close navigation menu'}
               className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />

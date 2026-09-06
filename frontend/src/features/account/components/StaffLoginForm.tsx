@@ -27,7 +27,7 @@ export function StaffLoginForm() {
     setError(null);
 
     if (!email || !password) {
-      setError('Please enter both email and password.');
+      setError(t('email_password_required') || 'Please enter both email and password.');
       return;
     }
 
@@ -49,7 +49,7 @@ export function StaffLoginForm() {
         router.push(`/${locale}/`);
       }
     } catch (err: any) {
-      setError('Invalid email or password.');
+      setError(t('invalid_credentials') || 'Invalid email or password.');
     } finally {
       setIsLoading(false);
     }
@@ -62,10 +62,10 @@ export function StaffLoginForm() {
           <span className="text-white font-bold text-xl">SM</span>
         </div>
         <h2 className="text-2xl font-serif font-bold text-stone-900">
-          Staff Login
+          {t('staff_login') || 'Staff Login'}
         </h2>
         <p className="text-sm text-stone-500 mt-1">
-          Sign in to access the staff dashboard
+          {t('staff_login_subtitle') || 'Sign in to access the staff dashboard'}
         </p>
       </div>
 
@@ -74,7 +74,7 @@ export function StaffLoginForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <TextField
           id="email"
-          label="Email"
+          label={t('email') || 'Email'}
           type="email"
           placeholder="staff@museum.et"
           value={email}
@@ -85,7 +85,7 @@ export function StaffLoginForm() {
 
         <PasswordField
           id="password"
-          label="Password"
+          label={t('password') || 'Password'}
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -95,7 +95,7 @@ export function StaffLoginForm() {
 
         <div className="text-right">
           <Link href={`/${locale}/staff/forgot-password`} className="text-sm text-brand-primary hover:underline">
-            Forgot password?
+            {t('forgot_password') || 'Forgot password?'}
           </Link>
         </div>
 
@@ -105,11 +105,11 @@ export function StaffLoginForm() {
           className="w-full bg-brand-primary hover:bg-primary-700"
           disabled={isLoading}
         >
-          {isLoading ? 'Loading...' : 'Sign In'}
+          {isLoading ? t('loading') || 'Loading...' : t('sign_in') || 'Sign In'}
         </Button>
 
         <div className="text-xs text-stone-400 text-center mt-2">
-          This page is for museum staff only. Visitors should use the verification flow.
+          {t('staff_only_notice') || 'This page is for museum staff only. Visitors should use the verification flow.'}
         </div>
       </form>
     </Card>

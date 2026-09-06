@@ -47,7 +47,7 @@ export default function StaffDashboardPage() {
         setDashboard(dashboardRes);
         setTodaySummary(summaryRes);
       } catch (err: any) {
-        if (!cancelled) setError(err.message || 'Failed to load dashboard data');
+        if (!cancelled) setError(err.message || t('failed_to_load_dashboard') || 'Failed to load dashboard data');
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -56,6 +56,10 @@ export default function StaffDashboardPage() {
     return () => {
       cancelled = true;
     };
+    // `t` intentionally excluded: useTranslation() returns a new function
+    // reference every render, so including it here would refire this
+    // fetch on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isManager, isAdmin]);
 
   const revenueToday = todaySummary
@@ -80,10 +84,10 @@ export default function StaffDashboardPage() {
     <PageContainer>
       <div className="mb-8">
         <div className="text-xs text-stone-400 uppercase tracking-wider mb-1">
-          Welcome back
+          {t('welcome_back') || 'Welcome back'}
         </div>
         <h1 className="font-serif text-4xl text-stone-900">
-          {user?.full_name || 'Staff'}
+          {user?.full_name || t('staff') || 'Staff'}
         </h1>
         <p className="text-stone-500 mt-1">
           {new Date().toLocaleDateString('en-US', {
@@ -104,21 +108,25 @@ export default function StaffDashboardPage() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <StatCard
-                label="Today's Revenue"
+                label={t('todays_revenue') || "Today's Revenue"}
                 value={`ETB ${revenueToday}`}
-                sub={`${transactionsToday} bookings today`}
+                sub={`${transactionsToday} ${t('bookings_today') || 'bookings today'}`}
                 color="green"
               />
               <StatCard
-                label="Visitors Today"
+                label={t('visitors_today') || 'Visitors Today'}
                 value={visitorsToday}
-                sub="Booked quantity today"
+                sub={t('booked_quantity_today') || 'Booked quantity today'}
                 color="primary"
               />
               <StatCard
-                label="Checked In"
+                label={t('checked_in') || 'Checked In'}
                 value={checkedIn}
-                sub={totalBookings > 0 ? `${checkedInPct}% of all bookings` : 'No bookings yet'}
+                sub={
+                  totalBookings > 0
+                    ? `${checkedInPct}% ${t('of_all_bookings') || 'of all bookings'}`
+                    : t('no_bookings_yet') || 'No bookings yet'
+                }
                 color="blue"
               />
             </div>
@@ -128,7 +136,7 @@ export default function StaffDashboardPage() {
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
-          <h3 className="text-lg font-semibold text-stone-900 mb-4">Quick Actions</h3>
+          <h3 className="text-lg font-semibold text-stone-900 mb-4">{t('quick_actions') || 'Quick Actions'}</h3>
           <div className="space-y-3">
             {isManager ? (
               <>
@@ -137,21 +145,21 @@ export default function StaffDashboardPage() {
                   variant="secondary"
                   onClick={() => router.push(`/${locale}/staff/categories`)}
                 >
-                  <Tag className="w-4 h-4" /> Manage Categories
+                  <Tag className="w-4 h-4" /> {t('manage_categories') || 'Manage Categories'}
                 </Button>
                 <Button
                   className="w-full justify-start"
                   variant="secondary"
                   onClick={() => router.push(`/${locale}/staff/availability`)}
                 >
-                  <Calendar className="w-4 h-4" /> Manage Availability
+                  <Calendar className="w-4 h-4" /> {t('manage_availability') || 'Manage Availability'}
                 </Button>
                 <Button
                   className="w-full justify-start"
                   variant="secondary"
                   onClick={() => router.push(`/${locale}/staff/reports`)}
                 >
-                  <BarChart3 className="w-4 h-4" /> View Reports
+                  <BarChart3 className="w-4 h-4" /> {t('view_reports') || 'View Reports'}
                 </Button>
               </>
             ) : (
@@ -160,14 +168,14 @@ export default function StaffDashboardPage() {
                   className="w-full justify-start bg-brand-primary hover:bg-primary-700"
                   onClick={() => router.push(`/${locale}/staff/gate`)}
                 >
-                  <DoorOpen className="w-4 h-4" /> Gate Check-in
+                  <DoorOpen className="w-4 h-4" /> {t('gate_check_in') || 'Gate Check-in'}
                 </Button>
                 <Button
                   className="w-full justify-start"
                   variant="secondary"
                   onClick={() => router.push(`/${locale}/staff/settlement`)}
                 >
-                  <Landmark className="w-4 h-4" /> Settlement
+                  <Landmark className="w-4 h-4" /> {t('settlement') || 'Settlement'}
                 </Button>
               </>
             )}
@@ -176,22 +184,22 @@ export default function StaffDashboardPage() {
 
         {(isManager || isAdmin) && !isLoading && !error && statusMix && (
           <Card>
-            <h3 className="text-lg font-semibold text-stone-900 mb-4">Booking Status (All Time)</h3>
+            <h3 className="text-lg font-semibold text-stone-900 mb-4">{t('booking_status_all_time') || 'Booking Status (All Time)'}</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between py-2 border-b border-stone-100">
-                <span className="text-stone-500">Pending</span>
+                <span className="text-stone-500">{t('pending')}</span>
                 <span className="font-medium">{statusMix.pending}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-stone-100">
-                <span className="text-stone-500">Visited</span>
+                <span className="text-stone-500">{t('visited')}</span>
                 <span className="font-medium">{statusMix.visited}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-stone-100">
-                <span className="text-stone-500">Cancelled</span>
+                <span className="text-stone-500">{t('cancelled')}</span>
                 <span className="font-medium text-red-500">{statusMix.cancelled}</span>
               </div>
               <div className="flex justify-between py-2 font-bold text-lg">
-                <span>Total Revenue</span>
+                <span>{t('total_revenue') || 'Total Revenue'}</span>
                 <span className="text-primary-600">ETB {dashboard?.revenueTotalEtb ?? 0}</span>
               </div>
             </div>

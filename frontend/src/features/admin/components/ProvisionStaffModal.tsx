@@ -225,7 +225,7 @@ export function ProvisionStaffModal({
           <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-3 text-xs text-secondary-700">
             <span className="font-semibold inline-flex items-center gap-1.5"><Pin className="w-3.5 h-3.5" /> {t('set_password_note') || 'Set-Password Link'}</span>
             <p className="mt-1">
-              {t('set_password_description') || 'The new account has no password yet. A link to set one will be sent to the staff email address; there is no temporary password to reset.'}
+              {t('set_password_note_description') || 'The new account has no password yet. A link to set one will be sent to the staff email address; there is no temporary password to reset.'}
             </p>
           </div>
         )}

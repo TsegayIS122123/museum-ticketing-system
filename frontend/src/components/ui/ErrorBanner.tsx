@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface ErrorBannerProps {
   message: string;
@@ -15,6 +16,7 @@ export function ErrorBanner({
   dismissible = true,
   className,
 }: ErrorBannerProps) {
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(true);
 
   if (!isVisible || !message) return null;
@@ -33,7 +35,7 @@ export function ErrorBanner({
         <button
           onClick={() => setIsVisible(false)}
           className="flex-shrink-0 text-red-600 hover:text-red-800 transition-colors"
-          aria-label="Dismiss error"
+          aria-label={t('dismiss_error') || 'Dismiss error'}
         >
           <X className="w-4 h-4" />
         </button>

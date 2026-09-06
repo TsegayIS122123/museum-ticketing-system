@@ -149,7 +149,7 @@ export function CategoryFormModal({
             onChange={(e) => handleChange('name_en', e.target.value)}
             error={errors.name_en}
             required
-            placeholder="e.g., Adult / Teacher"
+            placeholder={t('category_name_placeholder') || 'e.g., Adult / Teacher'}
           />
           <TextField
             id="name_am"
@@ -165,7 +165,7 @@ export function CategoryFormModal({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium text-stone-700">
-              {t('price') || 'Price (ETB)'}
+              {t('price_etb') || 'Price (ETB)'}
             </label>
             <div className="flex items-center gap-3 mt-1">
               <input

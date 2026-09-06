@@ -69,7 +69,7 @@ export default function AvailabilityPage() {
       })
       .catch(() => {
         if (!cancelled) {
-          setToast({ message: 'Failed to load availability.', type: 'error' });
+          setToast({ message: t('failed_to_load_availability_management') || 'Failed to load availability.', type: 'error' });
         }
       })
       .finally(() => {
@@ -79,6 +79,10 @@ export default function AvailabilityPage() {
     return () => {
       cancelled = true;
     };
+    // `t` intentionally excluded: useTranslation() returns a new function
+    // reference every render, so including it here would refire this
+    // fetch on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStatusChange = async (date: string, newStatus: AvailabilityStatus) => {

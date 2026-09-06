@@ -8,9 +8,9 @@ import { cn } from '@/lib/utils/cn';
 import { useAuth } from '@/lib/auth/auth-context';
 
 const items = [
-  { label: 'My Bookings', path: '/bookings' },
-  { label: 'Book a Visit', path: '/book' },
-  { label: 'Profile', path: '/settings/account' },
+  { labelKey: 'nav_my_bookings', labelFallback: 'My Bookings', path: '/bookings' },
+  { labelKey: 'nav_book_a_visit', labelFallback: 'Book a Visit', path: '/book' },
+  { labelKey: 'profile', labelFallback: 'Profile', path: '/settings/account' },
 ];
 
 export function VisitorSidebar() {
@@ -42,10 +42,10 @@ export function VisitorSidebar() {
   const sidebarBody = (
     <>
       <div className="border-b border-white/20 p-5">
-        <p className="text-sm font-semibold">Visitor Portal</p>
+        <p className="text-sm font-semibold">{t('visitor_portal') || 'Visitor Portal'}</p>
         <p className="mt-1 truncate text-xs text-white/70">{user.full_name || user.email}</p>
       </div>
-      <nav className="space-y-1 p-3" aria-label="Visitor navigation">
+      <nav className="space-y-1 p-3" aria-label={t('visitor_navigation') || 'Visitor navigation'}>
         {items.map((item) => (
           <button
             key={item.path}
@@ -56,7 +56,7 @@ export function VisitorSidebar() {
               pathname?.includes(item.path) ? 'bg-white/20 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'
             )}
           >
-            {item.label}
+            {t(item.labelKey) || item.labelFallback}
           </button>
         ))}
       </nav>
@@ -71,7 +71,7 @@ export function VisitorSidebar() {
       <button
         type="button"
         onClick={() => setIsMobileOpen(true)}
-        aria-label={t('open_menu') || 'Open navigation menu'}
+        aria-label={t('open_nav_menu') || 'Open navigation menu'}
         aria-expanded={isMobileOpen}
         className="fixed left-4 top-20 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-brand-primary text-white shadow-lg md:hidden"
       >
@@ -89,7 +89,7 @@ export function VisitorSidebar() {
             <button
               type="button"
               onClick={() => setIsMobileOpen(false)}
-              aria-label={t('close_menu') || 'Close navigation menu'}
+              aria-label={t('close_nav_menu') || 'Close navigation menu'}
               className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />

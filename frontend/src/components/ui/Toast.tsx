@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -33,6 +34,7 @@ export function Toast({
   onClose,
   duration = 5000,
 }: ToastProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     const timer = setTimeout(onClose, duration);
     return () => clearTimeout(timer);
@@ -54,7 +56,7 @@ export function Toast({
         <button
           onClick={onClose}
           className="ml-2 opacity-60 hover:opacity-100 transition-opacity"
-          aria-label="Dismiss notification"
+          aria-label={t('dismiss_notification') || 'Dismiss notification'}
         >
           <X className="w-4 h-4" />
         </button>

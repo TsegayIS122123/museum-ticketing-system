@@ -100,7 +100,7 @@ function ResetPasswordPageContent() {
         <Card className="max-w-md w-full">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-serif font-bold text-stone-900">
-              {t('set_password') || 'Set Your Password'}
+              {t('set_password_title') || 'Set Your Password'}
             </h2>
             <p className="text-sm text-stone-500 mt-1">
               {t('set_password_description') ||

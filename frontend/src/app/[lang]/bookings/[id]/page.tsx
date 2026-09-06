@@ -305,7 +305,7 @@ export default function BookingDetailPage() {
                 <span className="text-secondary-600"><AlertTriangle className="w-6 h-6" /></span>
                 <div className="flex-1">
                   <div className="font-semibold text-secondary-800">
-                    {t('partial_attendance') || 'Partial Attendance Recorded'}
+                    {t('partial_attendance_recorded') || 'Partial Attendance Recorded'}
                   </div>
                   <p className="text-sm text-secondary-700">
                     {booking.bookedQuantity - booking.attendedQuantity} of {booking.bookedQuantity} did not attend.

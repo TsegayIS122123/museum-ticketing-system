@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface ModalProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, className }: ModalProps) {
+  const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors"
-            aria-label="Close modal"
+            aria-label={t('close_modal') || 'Close modal'}
           >
             <X className="w-4 h-4" />
           </button>

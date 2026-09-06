@@ -418,7 +418,7 @@ export function AttendanceEntryForm({
                 type="button"
                 onClick={() => setAttendedQuantity(Math.max(0, attendedQuantity - 1))}
                 className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
-                aria-label="Decrease attended count"
+                aria-label={t('decrease_attended_count') || 'Decrease attended count'}
               >
                 <Minus className="w-4 h-4" />
               </button>
@@ -434,7 +434,7 @@ export function AttendanceEntryForm({
                 type="button"
                 onClick={() => setAttendedQuantity(Math.min(booking.bookedQuantity, attendedQuantity + 1))}
                 className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
-                aria-label="Increase attended count"
+                aria-label={t('increase_attended_count') || 'Increase attended count'}
               >
                 <Plus className="w-4 h-4" />
               </button>

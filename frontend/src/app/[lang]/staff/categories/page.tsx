@@ -40,7 +40,7 @@ export default function CategoriesPage() {
       setCategories(data);
     } catch (error: any) {
       setToast({
-        message: error.message || t('failed_to_load') || 'Failed to load categories.',
+        message: error.message || t('failed_to_load_categories') || 'Failed to load categories.',
         type: 'error',
       });
     } finally {

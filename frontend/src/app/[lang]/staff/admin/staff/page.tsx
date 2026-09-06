@@ -38,7 +38,7 @@ export default function StaffManagementPage() {
       setStaff(response.data);
     } catch (error: any) {
       setToast({
-        message: error.message || t('failed_to_load') || 'Failed to load staff accounts.',
+        message: error.message || t('failed_to_load_staff') || 'Failed to load staff accounts.',
         type: 'error',
       });
     } finally {

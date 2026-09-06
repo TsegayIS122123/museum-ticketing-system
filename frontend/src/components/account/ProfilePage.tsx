@@ -72,16 +72,16 @@ export function ProfilePage() {
         {user.role === 'visitor' ? (
           <TextField id="profile-phone" label={t('phone') || 'Phone'} value={phone} onChange={(event) => setPhone(event.target.value)} />
         ) : (
-          <div className="text-sm text-stone-700"><span className="font-medium">{t('role') || 'Role'}:</span> {getRoleDisplayName(user.role)}</div>
+          <div className="text-sm text-stone-700"><span className="font-medium">{t('role') || 'Role'}:</span> {getRoleDisplayName(user.role, t)}</div>
         )}
         <label className="block text-sm font-medium text-stone-700" htmlFor="profile-language">
           {t('language') || 'Language'}
           <select id="profile-language" value={language} onChange={(event) => setLanguage(event.target.value as 'en' | 'am')} className="mt-1 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-secondary-500">
-            <option value="en">English</option>
-            <option value="am">አማርኛ</option>
+            <option value="en">{t('english') || 'English'}</option>
+            <option value="am">{t('amharic') || 'አማርኛ'}</option>
           </select>
         </label>
-        <Button type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : t('save_changes') || 'Save changes'}</Button>
+        <Button type="submit" disabled={isSaving}>{isSaving ? t('saving') || 'Saving...' : t('save_changes') || 'Save changes'}</Button>
       </form>
     </PageContainer>
   );

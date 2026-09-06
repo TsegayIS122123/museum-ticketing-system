@@ -16,14 +16,20 @@ export function isPlatformAdmin(role: UserRole): boolean {
   return role === 'platform_admin';
 }
 
-export function getRoleDisplayName(role: UserRole): string {
+export function getRoleDisplayName(role: UserRole, t?: (key: string) => string): string {
   const names: Record<UserRole, string> = {
     visitor: 'Visitor',
     cashier: 'Cashier',
     museum_manager: 'Museum Manager',
     platform_admin: 'Platform Admin',
   };
-  return names[role];
+  const keys: Record<UserRole, string> = {
+    visitor: 'role_visitor',
+    cashier: 'role_cashier',
+    museum_manager: 'role_museum_manager',
+    platform_admin: 'role_platform_admin',
+  };
+  return (t && t(keys[role])) || names[role];
 }
 
 export function getStaffRoutes(role: UserRole): string[] {

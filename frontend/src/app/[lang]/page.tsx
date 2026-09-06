@@ -25,7 +25,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
   try {
     categories = await getCategories();
   } catch (err) {
-    error = 'Failed to load categories. Please try again later.';
+    error = t.categories_load_failed;
   }
 
   return (
@@ -61,7 +61,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
             <ErrorBanner message={error} />
           ) : categories.length === 0 ? (
             <div className="text-center py-12 text-stone-500">
-              No categories available.
+              {t.no_categories_available}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
@@ -103,13 +103,13 @@ export default async function LandingPage({ params }: LandingPageProps) {
           </Card>
           <Card>
             <div className="text-primary-600 mb-3"><MapPin className="w-6 h-6" /></div>
-            <h4 className="font-semibold text-stone-900 text-sm">Location</h4>
-            <p className="text-sm text-stone-600">AAU CNCS, 4 Killo</p>
-            <p className="text-xs text-stone-400">Addis Ababa, Ethiopia</p>
+            <h4 className="font-semibold text-stone-900 text-sm">{t.location}</h4>
+            <p className="text-sm text-stone-600">{t.location_address_line1}</p>
+            <p className="text-xs text-stone-400">{t.location_address_line2}</p>
           </Card>
           <Card>
             <div className="text-primary-600 mb-3"><Phone className="w-6 h-6" /></div>
-            <h4 className="font-semibold text-stone-900 text-sm">Enquiries</h4>
+            <h4 className="font-semibold text-stone-900 text-sm">{t.enquiries}</h4>
             <p className="text-sm text-stone-600">+251-900-000-000</p>
             <p className="text-xs text-stone-400">info@sciencemuseum.et</p>
           </Card>

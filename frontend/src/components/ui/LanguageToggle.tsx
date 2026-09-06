@@ -2,8 +2,10 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export function LanguageToggle() {
+  const { t } = useTranslation();
   const pathname = usePathname();
   const router = useRouter();
   const currentLang = pathname.split('/')[1] || 'en';
@@ -28,7 +30,7 @@ export function LanguageToggle() {
               ? 'bg-brand-primary text-white'
               : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50'
           )}
-          aria-label={lang === 'en' ? 'Switch to English' : 'Switch to Amharic'}
+          aria-label={lang === 'en' ? (t('switch_to_english') || 'Switch to English') : (t('switch_to_amharic') || 'Switch to Amharic')}
         >
           {lang === 'en' ? 'English' : 'አማርኛ'}
         </button>
