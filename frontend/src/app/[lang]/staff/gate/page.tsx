@@ -102,7 +102,7 @@ export default function GatePage() {
           />
           <Card className="bg-stone-50 border-dashed border-2 border-stone-200">
             <div className="text-center py-8">
-              <div className="text-5xl mb-3 flex justify-center text-stone-400">
+              <div className="mb-3 flex justify-center text-stone-400">
                 <DoorOpen className="w-12 h-12" />
               </div>
               <h3 className="font-semibold text-stone-700">
@@ -131,7 +131,7 @@ export default function GatePage() {
       {state === 'not_found' && (
         <Card className="bg-red-50 border-red-200">
           <div className="text-center py-8">
-            <div className="text-5xl mb-3 flex justify-center text-red-400">
+            <div className="mb-3 flex justify-center text-red-400">
               <SearchX className="w-12 h-12" />
             </div>
             <h3 className="font-semibold text-red-800">

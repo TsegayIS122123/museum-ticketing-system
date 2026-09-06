@@ -112,7 +112,7 @@ export default function BookingDetailPage() {
         <PublicHeader />
         <main className="flex-1 flex items-center justify-center px-4">
           <Card className="max-w-md w-full text-center">
-            <div className="text-4xl mb-4 flex justify-center text-stone-400">
+            <div className="mb-4 flex justify-center text-stone-400">
               <SearchX className="w-10 h-10" />
             </div>
             <h2 className="text-xl font-bold text-stone-900 mb-2">
@@ -270,7 +270,7 @@ export default function BookingDetailPage() {
         {/* QR Code */}
         {booking.status === 'pending' && (
           <Card className="mb-6 text-center">
-            <div className="font-semibold text-stone-900 mb-4">
+            <div className="text-lg font-semibold text-stone-900 mb-4">
               {t('digital_ticket') || 'Digital Ticket'}
             </div>
             <div className="flex justify-center">

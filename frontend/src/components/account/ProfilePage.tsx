@@ -59,7 +59,7 @@ export function ProfilePage() {
         <h1 className="font-serif text-3xl text-stone-900">{t('profile') || 'Profile'}</h1>
         <p className="mt-1 text-stone-500">{t('profile_description') || 'Manage your account details and language.'}</p>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-5 rounded-lg bg-white p-6 shadow-sm">
+      <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border border-stone-200 bg-white p-4 sm:p-6 shadow-sm">
         <TextField id="profile-name" label={t('full_name') || 'Full name'} value={fullName} onChange={(event) => setFullName(event.target.value)} required />
         <TextField id="profile-email" label={t('email') || 'Email'} value={user.email} disabled />
         {user.role === 'visitor' ? (
@@ -69,7 +69,7 @@ export function ProfilePage() {
         )}
         <label className="block text-sm font-medium text-stone-700" htmlFor="profile-language">
           {t('language') || 'Language'}
-          <select id="profile-language" value={language} onChange={(event) => setLanguage(event.target.value as 'en' | 'am')} className="mt-1 block w-full rounded border border-stone-300 bg-white px-3 py-2">
+          <select id="profile-language" value={language} onChange={(event) => setLanguage(event.target.value as 'en' | 'am')} className="mt-1 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-secondary-500">
             <option value="en">English</option>
             <option value="am">አማርኛ</option>
           </select>

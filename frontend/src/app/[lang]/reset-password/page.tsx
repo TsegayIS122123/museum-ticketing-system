@@ -112,7 +112,7 @@ function ResetPasswordPageContent() {
 
           {isDone ? (
             <div className="text-center py-4">
-              <div className="text-4xl mb-4 flex justify-center text-green-600">
+              <div className="mb-4 flex justify-center text-green-600">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <p className="text-stone-700">

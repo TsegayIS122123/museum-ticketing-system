@@ -98,7 +98,7 @@ export function QuantityInput({
           onChange={handleInputChange}
           onBlur={handleBlur}
           disabled={disabled}
-          className="w-16 h-10 text-center text-lg font-semibold border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-800 focus:border-transparent disabled:bg-stone-100 disabled:cursor-not-allowed"
+          className="w-16 h-10 text-center text-lg font-semibold border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent disabled:bg-stone-100 disabled:cursor-not-allowed"
           aria-label="Quantity input"
         />
         <button

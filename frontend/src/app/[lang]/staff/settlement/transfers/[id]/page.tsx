@@ -67,7 +67,7 @@ export default function TransferDetailPage() {
     return (
       <PageContainer>
         <Card className="text-center py-12">
-          <div className="text-4xl mb-4 flex justify-center text-stone-400">
+          <div className="mb-4 flex justify-center text-stone-400">
             <SearchX className="w-10 h-10" />
           </div>
           <h2 className="font-serif text-2xl text-stone-900">
@@ -112,7 +112,7 @@ export default function TransferDetailPage() {
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
-          <h3 className="font-semibold text-stone-900 mb-4">
+          <h3 className="text-lg font-semibold text-stone-900 mb-4">
             {t('transfer_summary') || 'Reconciliation Summary'}
           </h3>
           <div className="space-y-3 text-sm">
@@ -140,7 +140,7 @@ export default function TransferDetailPage() {
         </Card>
 
         <Card>
-          <h3 className="font-semibold text-stone-900 mb-4">
+          <h3 className="text-lg font-semibold text-stone-900 mb-4">
             {t('actions') || 'Actions'}
           </h3>
           <div className="space-y-3">

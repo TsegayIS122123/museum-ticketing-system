@@ -169,7 +169,7 @@ export default function AvailabilityPage() {
         {/* Calendar */}
         <div className="md:col-span-2">
           <Card>
-            <div className="font-semibold text-stone-900 mb-4">{currentMonth}</div>
+            <div className="text-lg font-semibold text-stone-900 mb-4">{currentMonth}</div>
             <div className="grid grid-cols-7 gap-1 text-center mb-1">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                 <div key={d} className="text-xs font-semibold text-stone-400 py-1">
@@ -259,7 +259,7 @@ export default function AvailabilityPage() {
             </Card>
           ) : (
             <Card className="bg-stone-50 border-stone-200 text-center">
-              <div className="text-3xl mb-3 flex justify-center text-stone-400">
+              <div className="mb-3 flex justify-center text-stone-400">
                 <Calendar className="w-7 h-7" />
               </div>
               <div className="font-semibold text-stone-700">

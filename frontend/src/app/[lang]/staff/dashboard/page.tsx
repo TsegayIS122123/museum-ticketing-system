@@ -128,7 +128,7 @@ export default function StaffDashboardPage() {
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
-          <h3 className="font-semibold text-stone-900 mb-4">Quick Actions</h3>
+          <h3 className="text-lg font-semibold text-stone-900 mb-4">Quick Actions</h3>
           <div className="space-y-3">
             {isManager ? (
               <>
@@ -176,7 +176,7 @@ export default function StaffDashboardPage() {
 
         {(isManager || isAdmin) && !isLoading && !error && statusMix && (
           <Card>
-            <h3 className="font-semibold text-stone-900 mb-4">Booking Status (All Time)</h3>
+            <h3 className="text-lg font-semibold text-stone-900 mb-4">Booking Status (All Time)</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between py-2 border-b border-stone-100">
                 <span className="text-stone-500">Pending</span>

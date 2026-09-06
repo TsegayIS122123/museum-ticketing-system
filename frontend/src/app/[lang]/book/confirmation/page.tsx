@@ -92,7 +92,7 @@ function ConfirmationPageContent() {
         <PublicHeader />
         <main className="flex-1 flex items-center justify-center px-4">
           <Card className="max-w-md w-full text-center">
-            <div className="text-4xl mb-4 flex justify-center text-red-500">
+            <div className="mb-4 flex justify-center text-red-500">
               <AlertTriangle className="w-10 h-10" />
             </div>
             <h2 className="text-xl font-bold text-stone-900 mb-2">

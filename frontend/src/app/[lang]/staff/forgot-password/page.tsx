@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
 
         {isSubmitted ? (
           <div className="text-center py-4">
-            <div className="text-4xl mb-4 flex justify-center text-primary-600">
+            <div className="mb-4 flex justify-center text-primary-600">
               <Mail className="w-10 h-10" />
             </div>
             <p className="text-stone-700">

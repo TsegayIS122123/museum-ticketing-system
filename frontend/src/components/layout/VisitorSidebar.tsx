@@ -52,7 +52,7 @@ export function VisitorSidebar() {
             type="button"
             onClick={() => handleNavigate(item.path)}
             className={cn(
-              'min-h-11 w-full px-3 py-2 text-left text-sm font-medium',
+              'min-h-11 w-full px-4 py-2.5 text-left text-sm font-medium transition-colors',
               pathname?.includes(item.path) ? 'bg-white/20 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'
             )}
           >

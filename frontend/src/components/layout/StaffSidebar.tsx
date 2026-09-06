@@ -133,9 +133,9 @@ export function StaffSidebar() {
               key={item.view}
               onClick={() => handleNavigate(item.path)}
               className={cn(
-                'w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all text-left cursor-pointer rounded-none',
+                'w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors text-left cursor-pointer',
                 active
-                  ? 'bg-brand-primary text-white'
+                  ? 'bg-white/20 text-white'
                   : 'text-white/75 hover:bg-white/10 hover:text-white'
               )}
             >

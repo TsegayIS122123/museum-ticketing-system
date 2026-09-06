@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, AlertTriangle, Check } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Check, Minus, Plus } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -404,7 +404,7 @@ export function AttendanceEntryForm({
 
       {/* Attendance Entry */}
       <Card>
-        <h4 className="font-semibold text-stone-900 mb-4">
+        <h4 className="text-lg font-semibold text-stone-900 mb-4">
           {t('record_attendance') || 'Record Attendance'}
         </h4>
 
@@ -417,10 +417,10 @@ export function AttendanceEntryForm({
               <button
                 type="button"
                 onClick={() => setAttendedQuantity(Math.max(0, attendedQuantity - 1))}
-                className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50"
+                className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
                 aria-label="Decrease attended count"
               >
-                −
+                <Minus className="w-4 h-4" />
               </button>
               <input
                 type="number"
@@ -433,10 +433,10 @@ export function AttendanceEntryForm({
               <button
                 type="button"
                 onClick={() => setAttendedQuantity(Math.min(booking.bookedQuantity, attendedQuantity + 1))}
-                className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50"
+                className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
                 aria-label="Increase attended count"
               >
-                +
+                <Plus className="w-4 h-4" />
               </button>
               <span className="text-sm text-stone-500">
                 / {booking.bookedQuantity} {t('max') || 'max'}

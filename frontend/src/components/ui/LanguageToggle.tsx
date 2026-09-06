@@ -16,14 +16,14 @@ export function LanguageToggle() {
   };
 
   return (
-    <div className="inline-flex rounded-md shadow-sm border border-stone-200 bg-white p-0.5">
+    <div className="inline-flex rounded-lg shadow-sm border border-stone-200 bg-white p-0.5">
       {(['en', 'am'] as const).map((lang) => (
         <button
           key={lang}
           type="button"
           onClick={() => switchLanguage(lang)}
           className={cn(
-            'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+            'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
             currentLang === lang
               ? 'bg-brand-primary text-white'
               : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50'
