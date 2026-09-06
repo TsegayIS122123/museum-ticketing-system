@@ -204,6 +204,33 @@ html[lang="am"] {
   background-size: 24px 24px;
 }
 
+/* The digital ticket's one-time entrance -- see DigitalTicket.tsx's own
+   comment for why this is the only animation in the visitor product
+   beyond ordinary hover/transition-colors. A small rise-and-settle
+   rather than anything bouncier, since this plays every time the card
+   mounts (including on a plain revisit to an existing booking), not
+   just the first time. */
+@keyframes ticket-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ticket-reveal {
+  animation: ticket-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-reveal {
+    animation: none;
+  }
+}
+
 /* Utility classes */
 .tap-target {
   min-height: 44px;

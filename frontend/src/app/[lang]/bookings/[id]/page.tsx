@@ -9,12 +9,12 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
+import { DigitalTicket } from '@/components/ui/DigitalTicket';
 import { CancelRescheduleControls } from '@/features/booking/components/CancelRescheduleControls';
 import { getBooking, type BookingResponse } from '@/features/booking/api';
 import { requestPartialRefund } from '@/features/refunds/api';
 import { ApiError } from '@/lib/api/errors';
 import { Toast } from '@/components/ui/Toast';
-import { QRCodeSVG } from '@/components/ui/QRCodeSVG';
 
 export default function BookingDetailPage() {
   const { t, locale } = useTranslation();
@@ -273,27 +273,20 @@ export default function BookingDetailPage() {
           </Card>
         )}
 
-        {/* QR Code */}
+        {/* Digital Ticket -- the one deliberately theatrical moment on
+            this page; see DigitalTicket.tsx's own comment for why. */}
         {booking.status === 'pending' && (
-          <Card className="mb-6 text-center">
-            <div className="text-lg font-semibold text-stone-900 mb-4">
-              {t('digital_ticket') || 'Digital Ticket'}
-            </div>
-            <div className="flex justify-center">
-              <div className="bg-white p-4 rounded-xl shadow-inner border border-stone-200">
-                <QRCodeSVG
-                  value={booking.reference}
-                  size={180}
-                />
-              </div>
-            </div>
-            <div className="mt-3 font-mono text-xs text-stone-400">
-              {booking.reference}
-            </div>
-            <div className="mt-2 text-xs text-stone-500">
-              {t('show_at_gate') || 'Show this QR code at the museum entrance'}
-            </div>
-          </Card>
+          <div className="mb-6">
+            <DigitalTicket
+              reference={booking.reference}
+              visitDateLabel={formatDate(booking.visitDate)}
+              categorySummary={booking.items
+                .map((item) =>
+                  `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`
+                )
+                .join(', ')}
+            />
+          </div>
         )}
 
         {/* Shortfall Notice */}
