@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertTriangle, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface ErrorBannerProps {
@@ -26,7 +27,7 @@ export function ErrorBanner({
       )}
       role="alert"
     >
-      <span className="flex-shrink-0 text-lg">⚠️</span>
+      <AlertTriangle className="flex-shrink-0 w-5 h-5" />
       <span className="flex-1">{message}</span>
       {dismissible && (
         <button
@@ -34,7 +35,7 @@ export function ErrorBanner({
           className="flex-shrink-0 text-red-600 hover:text-red-800 transition-colors"
           aria-label="Dismiss error"
         >
-          ✕
+          <X className="w-4 h-4" />
         </button>
       )}
     </div>

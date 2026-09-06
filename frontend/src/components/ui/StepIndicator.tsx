@@ -1,5 +1,6 @@
 'use client';
 
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface StepIndicatorProps {
@@ -24,7 +25,7 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
                   : "bg-white border-stone-300 text-stone-400"
               )}
             >
-              {index < current ? '✓' : index + 1}
+              {index < current ? <Check className="w-4 h-4" /> : index + 1}
             </div>
             <div
               className={cn(

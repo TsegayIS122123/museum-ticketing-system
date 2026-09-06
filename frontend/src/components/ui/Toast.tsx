@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -19,11 +20,11 @@ const styles: Record<ToastType, string> = {
   info: 'bg-blue-50 border-blue-200 text-blue-800',
 };
 
-const icons: Record<ToastType, string> = {
-  success: '✅',
-  error: '❌',
-  warning: '⚠️',
-  info: 'ℹ️',
+const icons: Record<ToastType, typeof CheckCircle2> = {
+  success: CheckCircle2,
+  error: XCircle,
+  warning: AlertTriangle,
+  info: Info,
 };
 
 export function Toast({
@@ -37,6 +38,8 @@ export function Toast({
     return () => clearTimeout(timer);
   }, [duration, onClose]);
 
+  const Icon = icons[type];
+
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-sm animate-in slide-in-from-bottom-5 sm:bottom-6 sm:left-auto sm:right-6 sm:mx-0">
       <div
@@ -46,14 +49,14 @@ export function Toast({
         )}
         role="alert"
       >
-        <span className="text-lg">{icons[type]}</span>
+        <Icon className="w-5 h-5 flex-shrink-0" />
         <span className="text-sm font-medium">{message}</span>
         <button
           onClick={onClose}
           className="ml-2 opacity-60 hover:opacity-100 transition-opacity"
           aria-label="Dismiss notification"
         >
-          ✕
+          <X className="w-4 h-4" />
         </button>
       </div>
     </div>

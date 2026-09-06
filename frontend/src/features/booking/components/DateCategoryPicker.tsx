@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -156,7 +157,7 @@ export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategor
           disabled={items.length === 0}
           onClick={onNext}
         >
-          {t('continue')} →
+          {t('continue')} <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
     </div>

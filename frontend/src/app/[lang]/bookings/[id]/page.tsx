@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { SearchX, ArrowLeft, FileDown, CreditCard, AlertTriangle, Check } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -111,7 +112,9 @@ export default function BookingDetailPage() {
         <PublicHeader />
         <main className="flex-1 flex items-center justify-center px-4">
           <Card className="max-w-md w-full text-center">
-            <div className="text-4xl mb-4">🔍</div>
+            <div className="text-4xl mb-4 flex justify-center text-stone-400">
+              <SearchX className="w-10 h-10" />
+            </div>
             <h2 className="text-xl font-bold text-stone-900 mb-2">
               {t('booking_not_found') || 'Booking Not Found'}
             </h2>
@@ -161,7 +164,7 @@ export default function BookingDetailPage() {
           className="mb-4"
           onClick={() => router.push(`/${locale}/bookings`)}
         >
-          ← {t('back_to_bookings') || 'Back to Bookings'}
+          <ArrowLeft className="w-4 h-4" /> {t('back_to_bookings') || 'Back to Bookings'}
         </Button>
 
         {/* Header */}
@@ -223,7 +226,7 @@ export default function BookingDetailPage() {
                 size="sm"
                 onClick={() => window.open(booking.receiptUrl!, '_blank')}
               >
-                📄 {t('download_receipt')}
+                <FileDown className="w-4 h-4" /> {t('download_receipt')}
               </Button>
             </div>
           )}
@@ -233,7 +236,7 @@ export default function BookingDetailPage() {
         {booking.status === 'awaiting_payment' && (
           <Card className="mb-6 bg-primary-50 border-primary-200">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">💳</span>
+              <span className="text-primary-600"><CreditCard className="w-6 h-6" /></span>
               <div className="flex-1">
                 <div className="font-semibold text-stone-900">
                   {t('payment_required') || 'Payment Required'}
@@ -293,7 +296,7 @@ export default function BookingDetailPage() {
           booking.attendedQuantity < booking.bookedQuantity && (
             <Card className="mb-6 bg-secondary-50 border-secondary-200">
               <div className="flex items-start gap-3">
-                <span className="text-2xl">⚠️</span>
+                <span className="text-secondary-600"><AlertTriangle className="w-6 h-6" /></span>
                 <div className="flex-1">
                   <div className="font-semibold text-secondary-800">
                     {t('partial_attendance') || 'Partial Attendance Recorded'}
@@ -309,8 +312,8 @@ export default function BookingDetailPage() {
                   {booking.status === 'visited' && (
                     <div className="mt-3">
                       {refundRequested ? (
-                        <div className="text-sm font-medium text-secondary-800">
-                          ✓ {t('refund_requested') || 'Refund requested. It will be processed shortly.'}
+                        <div className="text-sm font-medium text-secondary-800 flex items-center gap-1.5">
+                          <Check className="w-4 h-4" /> {t('refund_requested') || 'Refund requested. It will be processed shortly.'}
                         </div>
                       ) : (
                         <Button

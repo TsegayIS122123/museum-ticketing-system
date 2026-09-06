@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowRight, Pin } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
@@ -303,7 +304,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
           )}
 
           <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-3 text-sm text-secondary-700">
-            <span className="font-semibold">📌 {t('group_booking_note') || 'Important Information'}</span>
+            <span className="font-semibold inline-flex items-center gap-1.5"><Pin className="w-3.5 h-3.5" /> {t('group_booking_note') || 'Important Information'}</span>
             <ul className="mt-1 list-disc list-inside space-y-0.5 text-xs">
               <li>{t('group_booking_note_1') || 'You will pay for the whole group in one transaction.'}</li>
               <li>{t('group_booking_note_2') || 'Bring your booking reference to the gate for the group.'}</li>
@@ -329,7 +330,13 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
           className="flex-1 bg-brand-primary hover:bg-primary-700"
           disabled={isSubmitting}
         >
-          {isSubmitting ? t('submitting') || 'Submitting...' : t('submit_request') || 'Submit Request →'}
+          {isSubmitting ? (
+            t('submitting') || 'Submitting...'
+          ) : (
+            <>
+              {t('submit_request') || 'Submit Request'} <ArrowRight className="w-4 h-4" />
+            </>
+          )}
         </Button>
       </div>
     </form>

@@ -3,7 +3,21 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Menu, X } from 'lucide-react';
+import {
+  Menu,
+  X,
+  DoorOpen,
+  Landmark,
+  User,
+  LayoutDashboard,
+  Tag,
+  Calendar,
+  Wallet,
+  TrendingUp,
+  Users,
+  LogOut,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
@@ -13,28 +27,28 @@ import { isStaff } from '@/lib/auth/roles';
 interface NavItem {
   view: string;
   label: string;
-  icon: string;
+  icon: LucideIcon;
   path: string;
 }
 
 const navByRole: Record<UserRole, NavItem[]> = {
   visitor: [],
   cashier: [
-    { view: 'gate', label: 'Gate Check-In', icon: '🚪', path: '/staff/gate' },
-    { view: 'settlement', label: 'Settlement', icon: '🏦', path: '/staff/settlement' },
-    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
+    { view: 'gate', label: 'Gate Check-In', icon: DoorOpen, path: '/staff/gate' },
+    { view: 'settlement', label: 'Settlement', icon: Landmark, path: '/staff/settlement' },
+    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
   ],
   museum_manager: [
-    { view: 'dashboard', label: 'Dashboard', icon: '📊', path: '/staff/dashboard' },
-    { view: 'categories', label: 'Ticket Categories & Pricing', icon: '💲', path: '/staff/categories' },
-    { view: 'availability', label: 'Availability', icon: '📅', path: '/staff/availability' },
-    { view: 'refunds', label: 'Refunds', icon: '💰', path: '/staff/refunds' },
-    { view: 'reports', label: 'Reports', icon: '📈', path: '/staff/reports' },
-    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
+    { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/staff/dashboard' },
+    { view: 'categories', label: 'Ticket Categories & Pricing', icon: Tag, path: '/staff/categories' },
+    { view: 'availability', label: 'Availability', icon: Calendar, path: '/staff/availability' },
+    { view: 'refunds', label: 'Refunds', icon: Wallet, path: '/staff/refunds' },
+    { view: 'reports', label: 'Reports', icon: TrendingUp, path: '/staff/reports' },
+    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
   ],
   platform_admin: [
-    { view: 'staff', label: 'Staff Accounts', icon: '👤', path: '/staff/admin/staff' },
-    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
+    { view: 'staff', label: 'Staff Accounts', icon: Users, path: '/staff/admin/staff' },
+    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
   ],
 };
 
@@ -125,7 +139,7 @@ export function StaffSidebar() {
                   : 'text-white/75 hover:bg-white/10 hover:text-white'
               )}
             >
-              <span className="text-base w-5 text-center">{item.icon}</span>
+              <item.icon className="w-4 h-4 flex-shrink-0" />
               {item.label}
             </button>
           );
@@ -149,9 +163,9 @@ export function StaffSidebar() {
         </div>
         <button
           onClick={handleSignOut}
-          className="w-full text-xs text-white/65 hover:text-white transition-colors py-1 text-left cursor-pointer"
+          className="w-full flex items-center gap-2 text-xs text-white/65 hover:text-white transition-colors py-1 text-left cursor-pointer"
         >
-          ← Sign Out
+          <LogOut className="w-3.5 h-3.5" /> Sign Out
         </button>
       </div>
     </>

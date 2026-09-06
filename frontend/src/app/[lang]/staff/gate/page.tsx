@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { SearchX, DoorOpen, Lightbulb } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -101,15 +102,17 @@ export default function GatePage() {
           />
           <Card className="bg-stone-50 border-dashed border-2 border-stone-200">
             <div className="text-center py-8">
-              <div className="text-5xl mb-3">🚪</div>
+              <div className="text-5xl mb-3 flex justify-center text-stone-400">
+                <DoorOpen className="w-12 h-12" />
+              </div>
               <h3 className="font-semibold text-stone-700">
                 {t('ready_to_check_in') || 'Ready to Check In Visitors'}
               </h3>
               <p className="text-sm text-stone-400 max-w-sm mx-auto mt-1">
                 {t('ready_to_check_in_description') || 'Type or scan a booking reference to start the check-in process.'}
               </p>
-              <div className="mt-4 text-xs text-stone-400">
-                💡 {t('keyboard_wedge_hint') || 'Keyboard wedge QR scanners work in the reference field'}
+              <div className="mt-4 text-xs text-stone-400 flex items-center justify-center gap-1.5">
+                <Lightbulb className="w-3.5 h-3.5" /> {t('keyboard_wedge_hint') || 'Keyboard wedge QR scanners work in the reference field'}
               </div>
             </div>
           </Card>
@@ -128,7 +131,9 @@ export default function GatePage() {
       {state === 'not_found' && (
         <Card className="bg-red-50 border-red-200">
           <div className="text-center py-8">
-            <div className="text-5xl mb-3">🔍</div>
+            <div className="text-5xl mb-3 flex justify-center text-red-400">
+              <SearchX className="w-12 h-12" />
+            </div>
             <h3 className="font-semibold text-red-800">
               {t('booking_not_found') || 'Booking Not Found'}
             </h3>

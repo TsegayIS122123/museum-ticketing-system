@@ -1,5 +1,6 @@
 'use client';
 
+import { RefreshCw, Landmark, ArrowRight } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -59,7 +60,7 @@ export function PendingSettlementTable({
               onClick={onRefresh}
               disabled={isTransferring}
             >
-              🔄 {t('refresh') || 'Refresh'}
+              <RefreshCw className="w-4 h-4" /> {t('refresh') || 'Refresh'}
             </Button>
           )}
           {onTransfer && (
@@ -75,7 +76,9 @@ export function PendingSettlementTable({
                   {t('processing') || 'Processing...'}
                 </>
               ) : (
-                `🏦 ${t('initiate_transfer') || 'Reconcile Now'} →`
+                <>
+                  <Landmark className="w-4 h-4" /> {t('initiate_transfer') || 'Reconcile Now'} <ArrowRight className="w-4 h-4" />
+                </>
               )}
             </Button>
           )}

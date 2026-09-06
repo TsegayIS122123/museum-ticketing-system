@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CheckCircle2, AlertTriangle, Check } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -139,7 +140,9 @@ export function AttendanceEntryForm({
       <Card className="bg-green-50 border-green-200">
         <div className="py-2">
           <div className="text-center mb-4">
-            <div className="text-3xl mb-2">✅</div>
+            <div className="text-3xl mb-2 flex justify-center text-green-600">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
             <div className="font-semibold text-green-800">
               {t('check_in_success') || 'Check-in successful!'}
             </div>
@@ -177,8 +180,8 @@ export function AttendanceEntryForm({
           </div>
 
           {voucherSaved ? (
-            <div className="mt-4 text-center text-sm font-medium text-green-800">
-              ✓ {t('voucher_saved') || 'IFMIS voucher reference saved.'}
+            <div className="mt-4 text-center text-sm font-medium text-green-800 flex items-center justify-center gap-1.5">
+              <Check className="w-4 h-4" /> {t('voucher_saved') || 'IFMIS voucher reference saved.'}
             </div>
           ) : (
             <div className="mt-4 space-y-3">
@@ -223,7 +226,9 @@ export function AttendanceEntryForm({
     return (
       <Card className="bg-green-50 border-green-200">
         <div className="text-center py-4">
-          <div className="text-3xl mb-2">✅</div>
+          <div className="text-3xl mb-2 flex justify-center text-green-600">
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
           <div className="font-semibold text-green-800">
             {t('already_checked_in') || 'Already Checked In'}
           </div>
@@ -249,7 +254,9 @@ export function AttendanceEntryForm({
     return (
       <Card className="bg-yellow-50 border-yellow-200">
         <div className="text-center py-4">
-          <div className="text-3xl mb-2">⚠️</div>
+          <div className="text-3xl mb-2 flex justify-center text-yellow-600">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
           <div className="font-semibold text-yellow-800">
             {t('cannot_check_in') || 'Cannot Check In'}
           </div>
@@ -440,7 +447,7 @@ export function AttendanceEntryForm({
           {shortfall > 0 && (
             <div className="p-3 bg-secondary-50 border border-secondary-200 rounded-lg">
               <div className="flex items-start gap-2">
-                <span className="text-secondary-600">⚠️</span>
+                <span className="text-secondary-600"><AlertTriangle className="w-4 h-4" /></span>
                 <div>
                   <div className="text-sm font-medium text-secondary-800">
                     {t('partial_attendance') || 'Partial Attendance'}

@@ -1,3 +1,4 @@
+import { Clock, MapPin, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
@@ -95,19 +96,19 @@ export default async function LandingPage({ params }: LandingPageProps) {
         {/* Museum Info */}
         <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
-            <div className="text-2xl mb-3">🕐</div>
+            <div className="text-primary-600 mb-3"><Clock className="w-6 h-6" /></div>
             <h4 className="font-semibold text-stone-900 text-sm">{t.opening_hours}</h4>
             <p className="text-sm text-stone-600">{t.opening_hours_time}</p>
             <p className="text-xs text-stone-400">{t.opening_hours_closed}</p>
           </Card>
           <Card>
-            <div className="text-2xl mb-3">📍</div>
+            <div className="text-primary-600 mb-3"><MapPin className="w-6 h-6" /></div>
             <h4 className="font-semibold text-stone-900 text-sm">Location</h4>
             <p className="text-sm text-stone-600">AAU CNCS, 4 Killo</p>
             <p className="text-xs text-stone-400">Addis Ababa, Ethiopia</p>
           </Card>
           <Card>
-            <div className="text-2xl mb-3">📞</div>
+            <div className="text-primary-600 mb-3"><Phone className="w-6 h-6" /></div>
             <h4 className="font-semibold text-stone-900 text-sm">Enquiries</h4>
             <p className="text-sm text-stone-600">+251-900-000-000</p>
             <p className="text-xs text-stone-400">info@sciencemuseum.et</p>

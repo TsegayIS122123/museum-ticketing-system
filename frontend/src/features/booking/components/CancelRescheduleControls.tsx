@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Calendar, X } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -130,7 +131,7 @@ export function CancelRescheduleControls({
             onClick={() => setIsRescheduleModalOpen(true)}
             disabled={isProcessing}
           >
-            📅 {t('reschedule') || 'Reschedule'}
+            <Calendar className="w-4 h-4" /> {t('reschedule') || 'Reschedule'}
             {rescheduledCount >= 1 && ' (max 1)'}
           </Button>
         )}
@@ -141,7 +142,7 @@ export function CancelRescheduleControls({
             onClick={() => setIsCancelDialogOpen(true)}
             disabled={isProcessing}
           >
-            ✕ {t('cancel') || 'Cancel Booking'}
+            <X className="w-4 h-4" /> {t('cancel') || 'Cancel Booking'}
           </Button>
         )}
       </div>

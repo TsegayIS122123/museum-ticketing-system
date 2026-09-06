@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { CheckCircle2 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -111,7 +112,9 @@ function ResetPasswordPageContent() {
 
           {isDone ? (
             <div className="text-center py-4">
-              <div className="text-4xl mb-4">✅</div>
+              <div className="text-4xl mb-4 flex justify-center text-green-600">
+                <CheckCircle2 className="w-10 h-10" />
+              </div>
               <p className="text-stone-700">
                 {t('password_set') || 'Your password has been set. You can now sign in.'}
               </p>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ScrollText, Landmark } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -69,7 +70,7 @@ export default function SettlementTransfersPage() {
           </p>
         </div>
         <EmptyState
-          icon="📜"
+          icon={<ScrollText className="w-12 h-12" />}
           title={t('no_transfers') || 'No Reconciliations Yet'}
           description={t('no_transfers_description') || 'Settlement reconciliations will appear here once initiated.'}
           action={
@@ -132,7 +133,7 @@ export default function SettlementTransfersPage() {
           className="bg-brand-primary hover:bg-primary-700"
           onClick={() => router.push(`/${locale}/staff/settlement`)}
         >
-          🏦 {t('new_transfer') || 'New Reconciliation'}
+          <Landmark className="w-4 h-4" /> {t('new_transfer') || 'New Reconciliation'}
         </Button>
       </div>
 

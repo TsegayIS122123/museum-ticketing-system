@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { getAvailability } from '@/features/availability/api';
 
@@ -111,7 +112,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
           className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           aria-label={t('previous_month') || 'Previous month'}
         >
-          ←
+          <ChevronLeft className="w-4 h-4" />
         </button>
         <div className="font-semibold text-stone-900">{monthLabel}</div>
         <button
@@ -120,7 +121,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
           className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 cursor-pointer"
           aria-label={t('next_month') || 'Next month'}
         >
-          →
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 

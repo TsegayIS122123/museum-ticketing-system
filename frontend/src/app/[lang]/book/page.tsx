@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -132,14 +133,14 @@ export default function BookPage() {
             </Card>
             <div className="flex justify-between">
               <Button variant="secondary" onClick={() => setCurrentStep('category')}>
-                ← {t('back') || 'Back'}
+                <ArrowLeft className="w-4 h-4" /> {t('back') || 'Back'}
               </Button>
               <Button
                 className="bg-brand-primary hover:bg-primary-700"
                 disabled={!visitDate}
                 onClick={handleDateTimeNext}
               >
-                {t('continue')} →
+                {t('continue')} <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
           </div>

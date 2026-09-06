@@ -1,5 +1,6 @@
 'use client';
 
+import { Users, Pencil, RefreshCw } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Table } from '@/components/ui/Table';
@@ -63,7 +64,7 @@ export function StaffAccountTable({
   if (staff.length === 0) {
     return (
       <EmptyState
-        icon="👤"
+        icon={<Users className="w-12 h-12" />}
         title={t('no_staff') || 'No Staff Accounts'}
         description={t('no_staff_description') || 'Create your first staff account to get started.'}
       />
@@ -99,7 +100,7 @@ export function StaffAccountTable({
         variant="secondary"
         onClick={() => onEdit(account)}
       >
-        ✏️ {t('edit') || 'Edit'}
+        <Pencil className="w-3.5 h-3.5" /> {t('edit') || 'Edit'}
       </Button>
       {account.active ? (
         <Button
@@ -126,7 +127,7 @@ export function StaffAccountTable({
       {onRefresh && (
         <div className="flex justify-end">
           <Button variant="secondary" size="sm" onClick={onRefresh}>
-            🔄 {t('refresh') || 'Refresh'}
+            <RefreshCw className="w-4 h-4" /> {t('refresh') || 'Refresh'}
           </Button>
         </div>
       )}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Mail, ArrowLeft } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -62,7 +63,9 @@ export default function ForgotPasswordPage() {
 
         {isSubmitted ? (
           <div className="text-center py-4">
-            <div className="text-4xl mb-4">📧</div>
+            <div className="text-4xl mb-4 flex justify-center text-primary-600">
+              <Mail className="w-10 h-10" />
+            </div>
             <p className="text-stone-700">
               {t('check_email') || 'Check your email for the reset link.'}
             </p>
@@ -107,7 +110,7 @@ export default function ForgotPasswordPage() {
               className="w-full text-stone-500"
               onClick={() => router.push(`/${locale}/staff/login`)}
             >
-              ← {t('back_to_login') || 'Back to Login'}
+              <ArrowLeft className="w-4 h-4" /> {t('back_to_login') || 'Back to Login'}
             </Button>
           </form>
         )}

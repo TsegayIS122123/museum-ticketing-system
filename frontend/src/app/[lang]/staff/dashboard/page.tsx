@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Tag, Calendar, BarChart3, DoorOpen, Landmark } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
@@ -136,21 +137,21 @@ export default function StaffDashboardPage() {
                   variant="secondary"
                   onClick={() => router.push(`/${locale}/staff/categories`)}
                 >
-                  💲 Manage Categories
+                  <Tag className="w-4 h-4" /> Manage Categories
                 </Button>
                 <Button
                   className="w-full justify-start"
                   variant="secondary"
                   onClick={() => router.push(`/${locale}/staff/availability`)}
                 >
-                  📅 Manage Availability
+                  <Calendar className="w-4 h-4" /> Manage Availability
                 </Button>
                 <Button
                   className="w-full justify-start"
                   variant="secondary"
                   onClick={() => router.push(`/${locale}/staff/reports`)}
                 >
-                  📊 View Reports
+                  <BarChart3 className="w-4 h-4" /> View Reports
                 </Button>
               </>
             ) : (
@@ -159,14 +160,14 @@ export default function StaffDashboardPage() {
                   className="w-full justify-start bg-brand-primary hover:bg-primary-700"
                   onClick={() => router.push(`/${locale}/staff/gate`)}
                 >
-                  🚪 Gate Check-in
+                  <DoorOpen className="w-4 h-4" /> Gate Check-in
                 </Button>
                 <Button
                   className="w-full justify-start"
                   variant="secondary"
                   onClick={() => router.push(`/${locale}/staff/settlement`)}
                 >
-                  🏦 Settlement
+                  <Landmark className="w-4 h-4" /> Settlement
                 </Button>
               </>
             )}

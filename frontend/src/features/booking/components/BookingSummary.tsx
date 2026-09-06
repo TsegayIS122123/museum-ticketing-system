@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -144,7 +145,7 @@ export function BookingSummary({
           onClick={onBack}
           disabled={isProcessing}
         >
-          ← {t('back') || 'Back'}
+          <ArrowLeft className="w-4 h-4" /> {t('back') || 'Back'}
         </Button>
         <Button
           size="lg"
@@ -152,7 +153,13 @@ export function BookingSummary({
           onClick={onConfirm}
           disabled={isProcessing}
         >
-          {isProcessing ? t('processing') || 'Processing...' : `${t('confirm') || 'Confirm'} →`}
+          {isProcessing ? (
+            t('processing') || 'Processing...'
+          ) : (
+            <>
+              {t('confirm') || 'Confirm'} <ArrowRight className="w-4 h-4" />
+            </>
+          )}
         </Button>
       </div>
     </div>

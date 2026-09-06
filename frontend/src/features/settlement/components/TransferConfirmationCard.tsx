@@ -1,5 +1,6 @@
 'use client';
 
+import { CheckCircle2, AlertTriangle, Clock, FileDown } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -46,8 +47,19 @@ export function TransferConfirmationCard({
       }
     >
       <div className="text-center mb-6">
-        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 text-3xl">
-          {isCompleted ? '✅' : isFailed ? '⚠️' : '⏳'}
+        <div
+          className={
+            'w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 ' +
+            (isCompleted ? 'text-green-600' : isFailed ? 'text-red-600' : 'text-secondary-600')
+          }
+        >
+          {isCompleted ? (
+            <CheckCircle2 className="w-8 h-8" />
+          ) : isFailed ? (
+            <AlertTriangle className="w-8 h-8" />
+          ) : (
+            <Clock className="w-8 h-8" />
+          )}
         </div>
         <h2 className="font-serif text-2xl text-stone-900">
           {isCompleted
@@ -99,7 +111,7 @@ export function TransferConfirmationCard({
             className="flex-1"
           >
             <Button className="w-full bg-brand-primary hover:bg-primary-700">
-              📄 {t('download_receipt') || 'Download Transfer Receipt'}
+              <FileDown className="w-4 h-4" /> {t('download_receipt') || 'Download Transfer Receipt'}
             </Button>
           </a>
         )}

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { Card } from '@/components/ui/Card';
@@ -91,7 +92,9 @@ function ConfirmationPageContent() {
         <PublicHeader />
         <main className="flex-1 flex items-center justify-center px-4">
           <Card className="max-w-md w-full text-center">
-            <div className="text-4xl mb-4">⚠️</div>
+            <div className="text-4xl mb-4 flex justify-center text-red-500">
+              <AlertTriangle className="w-10 h-10" />
+            </div>
             <h2 className="text-xl font-bold text-stone-900 mb-2">
               {t('booking_failed') || 'Booking Failed'}
             </h2>
@@ -124,8 +127,8 @@ function ConfirmationPageContent() {
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <Card className="max-w-lg w-full">
           <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-              ✅
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
+              <CheckCircle2 className="w-8 h-8" />
             </div>
             <h1 className="text-2xl font-serif font-bold text-stone-900">
               {t('booking_confirmed') || 'Booking Confirmed!'}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { SearchX, ArrowLeft, FileDown, Landmark } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -66,7 +67,9 @@ export default function TransferDetailPage() {
     return (
       <PageContainer>
         <Card className="text-center py-12">
-          <div className="text-4xl mb-4">🔍</div>
+          <div className="text-4xl mb-4 flex justify-center text-stone-400">
+            <SearchX className="w-10 h-10" />
+          </div>
           <h2 className="font-serif text-2xl text-stone-900">
             {t('transfer_not_found') || 'Transfer Not Found'}
           </h2>
@@ -92,7 +95,7 @@ export default function TransferDetailPage() {
         className="mb-4"
         onClick={() => router.push(`/${locale}/staff/settlement/transfers`)}
       >
-        ← {t('back_to_history') || 'Back to History'}
+        <ArrowLeft className="w-4 h-4" /> {t('back_to_history') || 'Back to History'}
       </Button>
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -144,7 +147,7 @@ export default function TransferDetailPage() {
             {transfer.transferReceiptUrl && (
               <a href={transfer.transferReceiptUrl} target="_blank" rel="noreferrer">
                 <Button className="w-full bg-brand-primary hover:bg-primary-700">
-                  📄 {t('download_transfer_receipt') || 'Download Transfer Receipt'}
+                  <FileDown className="w-4 h-4" /> {t('download_transfer_receipt') || 'Download Transfer Receipt'}
                 </Button>
               </a>
             )}
@@ -153,7 +156,7 @@ export default function TransferDetailPage() {
               className="w-full"
               onClick={() => router.push(`/${locale}/staff/settlement`)}
             >
-              🏦 {t('go_to_settlement') || 'Go to Settlement'}
+              <Landmark className="w-4 h-4" /> {t('go_to_settlement') || 'Go to Settlement'}
             </Button>
           </div>
         </Card>

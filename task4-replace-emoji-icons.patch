@@ -1,0 +1,1190 @@
+diff --git a/frontend/src/app/[lang]/book/confirmation/page.tsx b/frontend/src/app/[lang]/book/confirmation/page.tsx
+index d24469f..4c40d86 100644
+--- a/frontend/src/app/[lang]/book/confirmation/page.tsx
++++ b/frontend/src/app/[lang]/book/confirmation/page.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { Suspense, useEffect, useState } from 'react';
+ import { useRouter, useSearchParams } from 'next/navigation';
++import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { PublicHeader } from '@/components/layout/PublicHeader';
+ import { Card } from '@/components/ui/Card';
+@@ -91,7 +92,9 @@ function ConfirmationPageContent() {
+         <PublicHeader />
+         <main className="flex-1 flex items-center justify-center px-4">
+           <Card className="max-w-md w-full text-center">
+-            <div className="text-4xl mb-4">⚠️</div>
++            <div className="text-4xl mb-4 flex justify-center text-red-500">
++              <AlertTriangle className="w-10 h-10" />
++            </div>
+             <h2 className="text-xl font-bold text-stone-900 mb-2">
+               {t('booking_failed') || 'Booking Failed'}
+             </h2>
+@@ -124,8 +127,8 @@ function ConfirmationPageContent() {
+       <main className="flex-1 flex items-center justify-center px-4 py-8">
+         <Card className="max-w-lg w-full">
+           <div className="text-center">
+-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+-              ✅
++            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
++              <CheckCircle2 className="w-8 h-8" />
+             </div>
+             <h1 className="text-2xl font-serif font-bold text-stone-900">
+               {t('booking_confirmed') || 'Booking Confirmed!'}
+diff --git a/frontend/src/app/[lang]/book/page.tsx b/frontend/src/app/[lang]/book/page.tsx
+index 41d06f5..dd0356c 100644
+--- a/frontend/src/app/[lang]/book/page.tsx
++++ b/frontend/src/app/[lang]/book/page.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useEffect, useState } from 'react';
+ import { useRouter } from 'next/navigation';
++import { ArrowLeft, ArrowRight } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { useAuth } from '@/lib/auth/auth-context';
+ import { PublicHeader } from '@/components/layout/PublicHeader';
+@@ -132,14 +133,14 @@ export default function BookPage() {
+             </Card>
+             <div className="flex justify-between">
+               <Button variant="secondary" onClick={() => setCurrentStep('category')}>
+-                ← {t('back') || 'Back'}
++                <ArrowLeft className="w-4 h-4" /> {t('back') || 'Back'}
+               </Button>
+               <Button
+                 className="bg-brand-primary hover:bg-primary-700"
+                 disabled={!visitDate}
+                 onClick={handleDateTimeNext}
+               >
+-                {t('continue')} →
++                {t('continue')} <ArrowRight className="w-4 h-4" />
+               </Button>
+             </div>
+           </div>
+diff --git a/frontend/src/app/[lang]/bookings/[id]/page.tsx b/frontend/src/app/[lang]/bookings/[id]/page.tsx
+index 18b78c3..7eb5c83 100644
+--- a/frontend/src/app/[lang]/bookings/[id]/page.tsx
++++ b/frontend/src/app/[lang]/bookings/[id]/page.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useEffect, useState } from 'react';
+ import { useParams, useRouter } from 'next/navigation';
++import { SearchX, ArrowLeft, FileDown, CreditCard, AlertTriangle, Check } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { useAuth } from '@/lib/auth/auth-context';
+ import { PublicHeader } from '@/components/layout/PublicHeader';
+@@ -111,7 +112,9 @@ export default function BookingDetailPage() {
+         <PublicHeader />
+         <main className="flex-1 flex items-center justify-center px-4">
+           <Card className="max-w-md w-full text-center">
+-            <div className="text-4xl mb-4">🔍</div>
++            <div className="text-4xl mb-4 flex justify-center text-stone-400">
++              <SearchX className="w-10 h-10" />
++            </div>
+             <h2 className="text-xl font-bold text-stone-900 mb-2">
+               {t('booking_not_found') || 'Booking Not Found'}
+             </h2>
+@@ -161,7 +164,7 @@ export default function BookingDetailPage() {
+           className="mb-4"
+           onClick={() => router.push(`/${locale}/bookings`)}
+         >
+-          ← {t('back_to_bookings') || 'Back to Bookings'}
++          <ArrowLeft className="w-4 h-4" /> {t('back_to_bookings') || 'Back to Bookings'}
+         </Button>
+ 
+         {/* Header */}
+@@ -223,7 +226,7 @@ export default function BookingDetailPage() {
+                 size="sm"
+                 onClick={() => window.open(booking.receiptUrl!, '_blank')}
+               >
+-                📄 {t('download_receipt')}
++                <FileDown className="w-4 h-4" /> {t('download_receipt')}
+               </Button>
+             </div>
+           )}
+@@ -233,7 +236,7 @@ export default function BookingDetailPage() {
+         {booking.status === 'awaiting_payment' && (
+           <Card className="mb-6 bg-primary-50 border-primary-200">
+             <div className="flex items-start gap-3">
+-              <span className="text-2xl">💳</span>
++              <span className="text-primary-600"><CreditCard className="w-6 h-6" /></span>
+               <div className="flex-1">
+                 <div className="font-semibold text-stone-900">
+                   {t('payment_required') || 'Payment Required'}
+@@ -293,7 +296,7 @@ export default function BookingDetailPage() {
+           booking.attendedQuantity < booking.bookedQuantity && (
+             <Card className="mb-6 bg-secondary-50 border-secondary-200">
+               <div className="flex items-start gap-3">
+-                <span className="text-2xl">⚠️</span>
++                <span className="text-secondary-600"><AlertTriangle className="w-6 h-6" /></span>
+                 <div className="flex-1">
+                   <div className="font-semibold text-secondary-800">
+                     {t('partial_attendance') || 'Partial Attendance Recorded'}
+@@ -309,8 +312,8 @@ export default function BookingDetailPage() {
+                   {booking.status === 'visited' && (
+                     <div className="mt-3">
+                       {refundRequested ? (
+-                        <div className="text-sm font-medium text-secondary-800">
+-                          ✓ {t('refund_requested') || 'Refund requested. It will be processed shortly.'}
++                        <div className="text-sm font-medium text-secondary-800 flex items-center gap-1.5">
++                          <Check className="w-4 h-4" /> {t('refund_requested') || 'Refund requested. It will be processed shortly.'}
+                         </div>
+                       ) : (
+                         <Button
+diff --git a/frontend/src/app/[lang]/page.tsx b/frontend/src/app/[lang]/page.tsx
+index 06bf8ee..a95aa82 100644
+--- a/frontend/src/app/[lang]/page.tsx
++++ b/frontend/src/app/[lang]/page.tsx
+@@ -1,3 +1,4 @@
++import { Clock, MapPin, Phone } from 'lucide-react';
+ import { Button } from '@/components/ui/Button';
+ import { Card } from '@/components/ui/Card';
+ import { ErrorBanner } from '@/components/ui/ErrorBanner';
+@@ -95,19 +96,19 @@ export default async function LandingPage({ params }: LandingPageProps) {
+         {/* Museum Info */}
+         <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
+           <Card>
+-            <div className="text-2xl mb-3">🕐</div>
++            <div className="text-primary-600 mb-3"><Clock className="w-6 h-6" /></div>
+             <h4 className="font-semibold text-stone-900 text-sm">{t.opening_hours}</h4>
+             <p className="text-sm text-stone-600">{t.opening_hours_time}</p>
+             <p className="text-xs text-stone-400">{t.opening_hours_closed}</p>
+           </Card>
+           <Card>
+-            <div className="text-2xl mb-3">📍</div>
++            <div className="text-primary-600 mb-3"><MapPin className="w-6 h-6" /></div>
+             <h4 className="font-semibold text-stone-900 text-sm">Location</h4>
+             <p className="text-sm text-stone-600">AAU CNCS, 4 Killo</p>
+             <p className="text-xs text-stone-400">Addis Ababa, Ethiopia</p>
+           </Card>
+           <Card>
+-            <div className="text-2xl mb-3">📞</div>
++            <div className="text-primary-600 mb-3"><Phone className="w-6 h-6" /></div>
+             <h4 className="font-semibold text-stone-900 text-sm">Enquiries</h4>
+             <p className="text-sm text-stone-600">+251-900-000-000</p>
+             <p className="text-xs text-stone-400">info@sciencemuseum.et</p>
+diff --git a/frontend/src/app/[lang]/reset-password/page.tsx b/frontend/src/app/[lang]/reset-password/page.tsx
+index 5ac5b02..7380c73 100644
+--- a/frontend/src/app/[lang]/reset-password/page.tsx
++++ b/frontend/src/app/[lang]/reset-password/page.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { Suspense, useState } from 'react';
+ import { useRouter, useSearchParams } from 'next/navigation';
++import { CheckCircle2 } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+@@ -111,7 +112,9 @@ function ResetPasswordPageContent() {
+ 
+           {isDone ? (
+             <div className="text-center py-4">
+-              <div className="text-4xl mb-4">✅</div>
++              <div className="text-4xl mb-4 flex justify-center text-green-600">
++                <CheckCircle2 className="w-10 h-10" />
++              </div>
+               <p className="text-stone-700">
+                 {t('password_set') || 'Your password has been set. You can now sign in.'}
+               </p>
+diff --git a/frontend/src/app/[lang]/staff/availability/page.tsx b/frontend/src/app/[lang]/staff/availability/page.tsx
+index d8e6f75..d96caa9 100644
+--- a/frontend/src/app/[lang]/staff/availability/page.tsx
++++ b/frontend/src/app/[lang]/staff/availability/page.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useEffect, useState } from 'react';
++import { Check, X, Calendar } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { PageContainer } from '@/components/layout/PageContainer';
+ import { Card } from '@/components/ui/Card';
+@@ -242,7 +243,7 @@ export default function AvailabilityPage() {
+                     setConfirmDialog({ open: true, date: selectedDate, status: 'available' })
+                   }
+                 >
+-                  ✓ {t('open_available') || 'Open / Available'}
++                  <Check className="w-4 h-4" /> {t('open_available') || 'Open / Available'}
+                 </Button>
+                 <Button
+                   size="sm"
+@@ -252,13 +253,15 @@ export default function AvailabilityPage() {
+                     setConfirmDialog({ open: true, date: selectedDate, status: 'closed' })
+                   }
+                 >
+-                  ✕ {t('close_date') || 'Close Date'}
++                  <X className="w-4 h-4" /> {t('close_date') || 'Close Date'}
+                 </Button>
+               </div>
+             </Card>
+           ) : (
+             <Card className="bg-stone-50 border-stone-200 text-center">
+-              <div className="text-3xl mb-3">📅</div>
++              <div className="text-3xl mb-3 flex justify-center text-stone-400">
++                <Calendar className="w-7 h-7" />
++              </div>
+               <div className="font-semibold text-stone-700">
+                 {t('select_a_date') || 'Select a date'}
+               </div>
+diff --git a/frontend/src/app/[lang]/staff/dashboard/page.tsx b/frontend/src/app/[lang]/staff/dashboard/page.tsx
+index 6690204..3d951e8 100644
+--- a/frontend/src/app/[lang]/staff/dashboard/page.tsx
++++ b/frontend/src/app/[lang]/staff/dashboard/page.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useEffect, useState } from 'react';
++import { Tag, Calendar, BarChart3, DoorOpen, Landmark } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { useAuth } from '@/lib/auth/auth-context';
+ import { Card } from '@/components/ui/Card';
+@@ -136,21 +137,21 @@ export default function StaffDashboardPage() {
+                   variant="secondary"
+                   onClick={() => router.push(`/${locale}/staff/categories`)}
+                 >
+-                  💲 Manage Categories
++                  <Tag className="w-4 h-4" /> Manage Categories
+                 </Button>
+                 <Button
+                   className="w-full justify-start"
+                   variant="secondary"
+                   onClick={() => router.push(`/${locale}/staff/availability`)}
+                 >
+-                  📅 Manage Availability
++                  <Calendar className="w-4 h-4" /> Manage Availability
+                 </Button>
+                 <Button
+                   className="w-full justify-start"
+                   variant="secondary"
+                   onClick={() => router.push(`/${locale}/staff/reports`)}
+                 >
+-                  📊 View Reports
++                  <BarChart3 className="w-4 h-4" /> View Reports
+                 </Button>
+               </>
+             ) : (
+@@ -159,14 +160,14 @@ export default function StaffDashboardPage() {
+                   className="w-full justify-start bg-brand-primary hover:bg-primary-700"
+                   onClick={() => router.push(`/${locale}/staff/gate`)}
+                 >
+-                  🚪 Gate Check-in
++                  <DoorOpen className="w-4 h-4" /> Gate Check-in
+                 </Button>
+                 <Button
+                   className="w-full justify-start"
+                   variant="secondary"
+                   onClick={() => router.push(`/${locale}/staff/settlement`)}
+                 >
+-                  🏦 Settlement
++                  <Landmark className="w-4 h-4" /> Settlement
+                 </Button>
+               </>
+             )}
+diff --git a/frontend/src/app/[lang]/staff/forgot-password/page.tsx b/frontend/src/app/[lang]/staff/forgot-password/page.tsx
+index 4c08175..01059dd 100644
+--- a/frontend/src/app/[lang]/staff/forgot-password/page.tsx
++++ b/frontend/src/app/[lang]/staff/forgot-password/page.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useState } from 'react';
+ import { useRouter } from 'next/navigation';
++import { Mail, ArrowLeft } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+@@ -62,7 +63,9 @@ export default function ForgotPasswordPage() {
+ 
+         {isSubmitted ? (
+           <div className="text-center py-4">
+-            <div className="text-4xl mb-4">📧</div>
++            <div className="text-4xl mb-4 flex justify-center text-primary-600">
++              <Mail className="w-10 h-10" />
++            </div>
+             <p className="text-stone-700">
+               {t('check_email') || 'Check your email for the reset link.'}
+             </p>
+@@ -107,7 +110,7 @@ export default function ForgotPasswordPage() {
+               className="w-full text-stone-500"
+               onClick={() => router.push(`/${locale}/staff/login`)}
+             >
+-              ← {t('back_to_login') || 'Back to Login'}
++              <ArrowLeft className="w-4 h-4" /> {t('back_to_login') || 'Back to Login'}
+             </Button>
+           </form>
+         )}
+diff --git a/frontend/src/app/[lang]/staff/gate/page.tsx b/frontend/src/app/[lang]/staff/gate/page.tsx
+index cbce114..924f6b1 100644
+--- a/frontend/src/app/[lang]/staff/gate/page.tsx
++++ b/frontend/src/app/[lang]/staff/gate/page.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useState } from 'react';
++import { SearchX, DoorOpen, Lightbulb } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { useAuth } from '@/lib/auth/auth-context';
+ import { PageContainer } from '@/components/layout/PageContainer';
+@@ -101,15 +102,17 @@ export default function GatePage() {
+           />
+           <Card className="bg-stone-50 border-dashed border-2 border-stone-200">
+             <div className="text-center py-8">
+-              <div className="text-5xl mb-3">🚪</div>
++              <div className="text-5xl mb-3 flex justify-center text-stone-400">
++                <DoorOpen className="w-12 h-12" />
++              </div>
+               <h3 className="font-semibold text-stone-700">
+                 {t('ready_to_check_in') || 'Ready to Check In Visitors'}
+               </h3>
+               <p className="text-sm text-stone-400 max-w-sm mx-auto mt-1">
+                 {t('ready_to_check_in_description') || 'Type or scan a booking reference to start the check-in process.'}
+               </p>
+-              <div className="mt-4 text-xs text-stone-400">
+-                💡 {t('keyboard_wedge_hint') || 'Keyboard wedge QR scanners work in the reference field'}
++              <div className="mt-4 text-xs text-stone-400 flex items-center justify-center gap-1.5">
++                <Lightbulb className="w-3.5 h-3.5" /> {t('keyboard_wedge_hint') || 'Keyboard wedge QR scanners work in the reference field'}
+               </div>
+             </div>
+           </Card>
+@@ -128,7 +131,9 @@ export default function GatePage() {
+       {state === 'not_found' && (
+         <Card className="bg-red-50 border-red-200">
+           <div className="text-center py-8">
+-            <div className="text-5xl mb-3">🔍</div>
++            <div className="text-5xl mb-3 flex justify-center text-red-400">
++              <SearchX className="w-12 h-12" />
++            </div>
+             <h3 className="font-semibold text-red-800">
+               {t('booking_not_found') || 'Booking Not Found'}
+             </h3>
+diff --git a/frontend/src/app/[lang]/staff/refunds/page.tsx b/frontend/src/app/[lang]/staff/refunds/page.tsx
+index ca513d8..d8e5aeb 100644
+--- a/frontend/src/app/[lang]/staff/refunds/page.tsx
++++ b/frontend/src/app/[lang]/staff/refunds/page.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useEffect, useState } from 'react';
++import { Download } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { PageContainer } from '@/components/layout/PageContainer';
+ import { Card } from '@/components/ui/Card';
+@@ -140,7 +141,7 @@ export default function RefundsPage() {
+             {t('refund_requests') || 'Refund Requests'}
+           </div>
+           <Button variant="secondary" size="sm">
+-            ⬇ {t('export') || 'Export'}
++            <Download className="w-4 h-4" /> {t('export') || 'Export'}
+           </Button>
+         </div>
+         {isLoading ? (
+diff --git a/frontend/src/app/[lang]/staff/reports/page.tsx b/frontend/src/app/[lang]/staff/reports/page.tsx
+index df2842a..f23403f 100644
+--- a/frontend/src/app/[lang]/staff/reports/page.tsx
++++ b/frontend/src/app/[lang]/staff/reports/page.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useEffect, useState } from 'react';
++import { Download } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { PageContainer } from '@/components/layout/PageContainer';
+ import { Card } from '@/components/ui/Card';
+@@ -90,7 +91,7 @@ export default function ReportsPage() {
+             </button>
+           ))}
+           <Button variant="secondary" size="sm">
+-            ⬇ {t('export') || 'Export'}
++            <Download className="w-4 h-4" /> {t('export') || 'Export'}
+           </Button>
+         </div>
+       </div>
+diff --git a/frontend/src/app/[lang]/staff/settlement/transfers/[id]/page.tsx b/frontend/src/app/[lang]/staff/settlement/transfers/[id]/page.tsx
+index 01c1db7..043a560 100644
+--- a/frontend/src/app/[lang]/staff/settlement/transfers/[id]/page.tsx
++++ b/frontend/src/app/[lang]/staff/settlement/transfers/[id]/page.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useState, useEffect } from 'react';
+ import { useParams, useRouter } from 'next/navigation';
++import { SearchX, ArrowLeft, FileDown, Landmark } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { PageContainer } from '@/components/layout/PageContainer';
+ import { Card } from '@/components/ui/Card';
+@@ -66,7 +67,9 @@ export default function TransferDetailPage() {
+     return (
+       <PageContainer>
+         <Card className="text-center py-12">
+-          <div className="text-4xl mb-4">🔍</div>
++          <div className="text-4xl mb-4 flex justify-center text-stone-400">
++            <SearchX className="w-10 h-10" />
++          </div>
+           <h2 className="font-serif text-2xl text-stone-900">
+             {t('transfer_not_found') || 'Transfer Not Found'}
+           </h2>
+@@ -92,7 +95,7 @@ export default function TransferDetailPage() {
+         className="mb-4"
+         onClick={() => router.push(`/${locale}/staff/settlement/transfers`)}
+       >
+-        ← {t('back_to_history') || 'Back to History'}
++        <ArrowLeft className="w-4 h-4" /> {t('back_to_history') || 'Back to History'}
+       </Button>
+ 
+       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+@@ -144,7 +147,7 @@ export default function TransferDetailPage() {
+             {transfer.transferReceiptUrl && (
+               <a href={transfer.transferReceiptUrl} target="_blank" rel="noreferrer">
+                 <Button className="w-full bg-brand-primary hover:bg-primary-700">
+-                  📄 {t('download_transfer_receipt') || 'Download Transfer Receipt'}
++                  <FileDown className="w-4 h-4" /> {t('download_transfer_receipt') || 'Download Transfer Receipt'}
+                 </Button>
+               </a>
+             )}
+@@ -153,7 +156,7 @@ export default function TransferDetailPage() {
+               className="w-full"
+               onClick={() => router.push(`/${locale}/staff/settlement`)}
+             >
+-              🏦 {t('go_to_settlement') || 'Go to Settlement'}
++              <Landmark className="w-4 h-4" /> {t('go_to_settlement') || 'Go to Settlement'}
+             </Button>
+           </div>
+         </Card>
+diff --git a/frontend/src/app/[lang]/staff/settlement/transfers/page.tsx b/frontend/src/app/[lang]/staff/settlement/transfers/page.tsx
+index 8ee8d5b..5e98b1e 100644
+--- a/frontend/src/app/[lang]/staff/settlement/transfers/page.tsx
++++ b/frontend/src/app/[lang]/staff/settlement/transfers/page.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useState, useEffect } from 'react';
+ import { useRouter } from 'next/navigation';
++import { ScrollText, Landmark } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { PageContainer } from '@/components/layout/PageContainer';
+ import { Card } from '@/components/ui/Card';
+@@ -69,7 +70,7 @@ export default function SettlementTransfersPage() {
+           </p>
+         </div>
+         <EmptyState
+-          icon="📜"
++          icon={<ScrollText className="w-12 h-12" />}
+           title={t('no_transfers') || 'No Reconciliations Yet'}
+           description={t('no_transfers_description') || 'Settlement reconciliations will appear here once initiated.'}
+           action={
+@@ -132,7 +133,7 @@ export default function SettlementTransfersPage() {
+           className="bg-brand-primary hover:bg-primary-700"
+           onClick={() => router.push(`/${locale}/staff/settlement`)}
+         >
+-          🏦 {t('new_transfer') || 'New Reconciliation'}
++          <Landmark className="w-4 h-4" /> {t('new_transfer') || 'New Reconciliation'}
+         </Button>
+       </div>
+ 
+diff --git a/frontend/src/components/layout/StaffSidebar.tsx b/frontend/src/components/layout/StaffSidebar.tsx
+index 82713c1..6bbe0a3 100644
+--- a/frontend/src/components/layout/StaffSidebar.tsx
++++ b/frontend/src/components/layout/StaffSidebar.tsx
+@@ -3,7 +3,21 @@
+ import { useEffect, useState } from 'react';
+ import { usePathname, useRouter } from 'next/navigation';
+ import Image from 'next/image';
+-import { Menu, X } from 'lucide-react';
++import {
++  Menu,
++  X,
++  DoorOpen,
++  Landmark,
++  User,
++  LayoutDashboard,
++  Tag,
++  Calendar,
++  Wallet,
++  TrendingUp,
++  Users,
++  LogOut,
++  type LucideIcon,
++} from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { useAuth } from '@/lib/auth/auth-context';
+ import { cn } from '@/lib/utils/cn';
+@@ -13,28 +27,28 @@ import { isStaff } from '@/lib/auth/roles';
+ interface NavItem {
+   view: string;
+   label: string;
+-  icon: string;
++  icon: LucideIcon;
+   path: string;
+ }
+ 
+ const navByRole: Record<UserRole, NavItem[]> = {
+   visitor: [],
+   cashier: [
+-    { view: 'gate', label: 'Gate Check-In', icon: '🚪', path: '/staff/gate' },
+-    { view: 'settlement', label: 'Settlement', icon: '🏦', path: '/staff/settlement' },
+-    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
++    { view: 'gate', label: 'Gate Check-In', icon: DoorOpen, path: '/staff/gate' },
++    { view: 'settlement', label: 'Settlement', icon: Landmark, path: '/staff/settlement' },
++    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
+   ],
+   museum_manager: [
+-    { view: 'dashboard', label: 'Dashboard', icon: '📊', path: '/staff/dashboard' },
+-    { view: 'categories', label: 'Ticket Categories & Pricing', icon: '💲', path: '/staff/categories' },
+-    { view: 'availability', label: 'Availability', icon: '📅', path: '/staff/availability' },
+-    { view: 'refunds', label: 'Refunds', icon: '💰', path: '/staff/refunds' },
+-    { view: 'reports', label: 'Reports', icon: '📈', path: '/staff/reports' },
+-    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
++    { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/staff/dashboard' },
++    { view: 'categories', label: 'Ticket Categories & Pricing', icon: Tag, path: '/staff/categories' },
++    { view: 'availability', label: 'Availability', icon: Calendar, path: '/staff/availability' },
++    { view: 'refunds', label: 'Refunds', icon: Wallet, path: '/staff/refunds' },
++    { view: 'reports', label: 'Reports', icon: TrendingUp, path: '/staff/reports' },
++    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
+   ],
+   platform_admin: [
+-    { view: 'staff', label: 'Staff Accounts', icon: '👤', path: '/staff/admin/staff' },
+-    { view: 'profile', label: 'Profile', icon: '👤', path: '/settings/account' },
++    { view: 'staff', label: 'Staff Accounts', icon: Users, path: '/staff/admin/staff' },
++    { view: 'profile', label: 'Profile', icon: User, path: '/settings/account' },
+   ],
+ };
+ 
+@@ -125,7 +139,7 @@ export function StaffSidebar() {
+                   : 'text-white/75 hover:bg-white/10 hover:text-white'
+               )}
+             >
+-              <span className="text-base w-5 text-center">{item.icon}</span>
++              <item.icon className="w-4 h-4 flex-shrink-0" />
+               {item.label}
+             </button>
+           );
+@@ -149,9 +163,9 @@ export function StaffSidebar() {
+         </div>
+         <button
+           onClick={handleSignOut}
+-          className="w-full text-xs text-white/65 hover:text-white transition-colors py-1 text-left cursor-pointer"
++          className="w-full flex items-center gap-2 text-xs text-white/65 hover:text-white transition-colors py-1 text-left cursor-pointer"
+         >
+-          ← Sign Out
++          <LogOut className="w-3.5 h-3.5" /> Sign Out
+         </button>
+       </div>
+     </>
+diff --git a/frontend/src/components/ui/EmptyState.tsx b/frontend/src/components/ui/EmptyState.tsx
+index 99fd570..9a46235 100644
+--- a/frontend/src/components/ui/EmptyState.tsx
++++ b/frontend/src/components/ui/EmptyState.tsx
+@@ -1,19 +1,21 @@
++import { Inbox } from 'lucide-react';
++
+ interface EmptyStateProps {
+-  icon?: string;
++  icon?: React.ReactNode;
+   title: string;
+   description?: string;
+   action?: React.ReactNode;
+ }
+ 
+ export function EmptyState({
+-  icon = '📭',
++  icon = <Inbox className="w-12 h-12" />,
+   title,
+   description,
+   action,
+ }: EmptyStateProps) {
+   return (
+     <div className="flex flex-col items-center justify-center py-16 text-center">
+-      <div className="text-5xl mb-4">{icon}</div>
++      <div className="mb-4 text-stone-400">{icon}</div>
+       <h3 className="font-semibold text-stone-700 text-lg mb-2">{title}</h3>
+       {description && (
+         <p className="text-stone-500 text-sm max-w-xs">{description}</p>
+diff --git a/frontend/src/components/ui/ErrorBanner.tsx b/frontend/src/components/ui/ErrorBanner.tsx
+index 14afc1e..2a46a67 100644
+--- a/frontend/src/components/ui/ErrorBanner.tsx
++++ b/frontend/src/components/ui/ErrorBanner.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useState } from 'react';
++import { AlertTriangle, X } from 'lucide-react';
+ import { cn } from '@/lib/utils/cn';
+ 
+ interface ErrorBannerProps {
+@@ -26,7 +27,7 @@ export function ErrorBanner({
+       )}
+       role="alert"
+     >
+-      <span className="flex-shrink-0 text-lg">⚠️</span>
++      <AlertTriangle className="flex-shrink-0 w-5 h-5" />
+       <span className="flex-1">{message}</span>
+       {dismissible && (
+         <button
+@@ -34,7 +35,7 @@ export function ErrorBanner({
+           className="flex-shrink-0 text-red-600 hover:text-red-800 transition-colors"
+           aria-label="Dismiss error"
+         >
+-          ✕
++          <X className="w-4 h-4" />
+         </button>
+       )}
+     </div>
+diff --git a/frontend/src/components/ui/Modal.tsx b/frontend/src/components/ui/Modal.tsx
+index b0ee941..869c658 100644
+--- a/frontend/src/components/ui/Modal.tsx
++++ b/frontend/src/components/ui/Modal.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useEffect, useRef } from 'react';
++import { X } from 'lucide-react';
+ import { cn } from '@/lib/utils/cn';
+ 
+ interface ModalProps {
+@@ -62,7 +63,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
+             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors"
+             aria-label="Close modal"
+           >
+-            ✕
++            <X className="w-4 h-4" />
+           </button>
+         </div>
+         <div className="p-6">{children}</div>
+diff --git a/frontend/src/components/ui/StepIndicator.tsx b/frontend/src/components/ui/StepIndicator.tsx
+index 473cab3..3399ffc 100644
+--- a/frontend/src/components/ui/StepIndicator.tsx
++++ b/frontend/src/components/ui/StepIndicator.tsx
+@@ -1,5 +1,6 @@
+ 'use client';
+ 
++import { Check } from 'lucide-react';
+ import { cn } from '@/lib/utils/cn';
+ 
+ interface StepIndicatorProps {
+@@ -24,7 +25,7 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
+                   : "bg-white border-stone-300 text-stone-400"
+               )}
+             >
+-              {index < current ? '✓' : index + 1}
++              {index < current ? <Check className="w-4 h-4" /> : index + 1}
+             </div>
+             <div
+               className={cn(
+diff --git a/frontend/src/components/ui/Toast.tsx b/frontend/src/components/ui/Toast.tsx
+index d4a5795..74312a7 100644
+--- a/frontend/src/components/ui/Toast.tsx
++++ b/frontend/src/components/ui/Toast.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useEffect } from 'react';
++import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
+ import { cn } from '@/lib/utils/cn';
+ 
+ type ToastType = 'success' | 'error' | 'warning' | 'info';
+@@ -19,11 +20,11 @@ const styles: Record<ToastType, string> = {
+   info: 'bg-blue-50 border-blue-200 text-blue-800',
+ };
+ 
+-const icons: Record<ToastType, string> = {
+-  success: '✅',
+-  error: '❌',
+-  warning: '⚠️',
+-  info: 'ℹ️',
++const icons: Record<ToastType, typeof CheckCircle2> = {
++  success: CheckCircle2,
++  error: XCircle,
++  warning: AlertTriangle,
++  info: Info,
+ };
+ 
+ export function Toast({
+@@ -37,6 +38,8 @@ export function Toast({
+     return () => clearTimeout(timer);
+   }, [duration, onClose]);
+ 
++  const Icon = icons[type];
++
+   return (
+     <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-sm animate-in slide-in-from-bottom-5 sm:bottom-6 sm:left-auto sm:right-6 sm:mx-0">
+       <div
+@@ -46,14 +49,14 @@ export function Toast({
+         )}
+         role="alert"
+       >
+-        <span className="text-lg">{icons[type]}</span>
++        <Icon className="w-5 h-5 flex-shrink-0" />
+         <span className="text-sm font-medium">{message}</span>
+         <button
+           onClick={onClose}
+           className="ml-2 opacity-60 hover:opacity-100 transition-opacity"
+           aria-label="Dismiss notification"
+         >
+-          ✕
++          <X className="w-4 h-4" />
+         </button>
+       </div>
+     </div>
+diff --git a/frontend/src/features/account/components/VisitorVerifyForm.tsx b/frontend/src/features/account/components/VisitorVerifyForm.tsx
+index 70c1df2..ef7eb81 100644
+--- a/frontend/src/features/account/components/VisitorVerifyForm.tsx
++++ b/frontend/src/features/account/components/VisitorVerifyForm.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useState } from 'react';
+ import { useRouter } from 'next/navigation';
++import { ArrowLeft } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { useAuth } from '@/lib/auth/auth-context';
+ import { Button } from '@/components/ui/Button';
+@@ -127,7 +128,7 @@ export function VisitorVerifyForm() {
+               setError(null);
+             }}
+           >
+-            ← {t('back') || 'Back'}
++            <ArrowLeft className="w-4 h-4" /> {t('back') || 'Back'}
+           </Button>
+         </form>
+       </Card>
+diff --git a/frontend/src/features/admin/components/ProvisionStaffModal.tsx b/frontend/src/features/admin/components/ProvisionStaffModal.tsx
+index b32f0eb..0f576cf 100644
+--- a/frontend/src/features/admin/components/ProvisionStaffModal.tsx
++++ b/frontend/src/features/admin/components/ProvisionStaffModal.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useState, useEffect } from 'react';
++import { Pin } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Modal } from '@/components/ui/Modal';
+ import { Button } from '@/components/ui/Button';
+@@ -213,7 +214,7 @@ export function ProvisionStaffModal({
+ 
+         {!isEditing && (
+           <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-3 text-xs text-secondary-700">
+-            <span className="font-semibold">📌 {t('set_password_note') || 'Set-Password Link'}</span>
++            <span className="font-semibold inline-flex items-center gap-1.5"><Pin className="w-3.5 h-3.5" /> {t('set_password_note') || 'Set-Password Link'}</span>
+             <p className="mt-1">
+               {t('set_password_description') || 'The new account has no password yet. A link to set one will be sent to the staff email address; there is no temporary password to reset.'}
+             </p>
+diff --git a/frontend/src/features/admin/components/StaffAccountTable.tsx b/frontend/src/features/admin/components/StaffAccountTable.tsx
+index df3c7ad..d26e61b 100644
+--- a/frontend/src/features/admin/components/StaffAccountTable.tsx
++++ b/frontend/src/features/admin/components/StaffAccountTable.tsx
+@@ -1,5 +1,6 @@
+ 'use client';
+ 
++import { Users, Pencil, RefreshCw } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Table } from '@/components/ui/Table';
+@@ -63,7 +64,7 @@ export function StaffAccountTable({
+   if (staff.length === 0) {
+     return (
+       <EmptyState
+-        icon="👤"
++        icon={<Users className="w-12 h-12" />}
+         title={t('no_staff') || 'No Staff Accounts'}
+         description={t('no_staff_description') || 'Create your first staff account to get started.'}
+       />
+@@ -99,7 +100,7 @@ export function StaffAccountTable({
+         variant="secondary"
+         onClick={() => onEdit(account)}
+       >
+-        ✏️ {t('edit') || 'Edit'}
++        <Pencil className="w-3.5 h-3.5" /> {t('edit') || 'Edit'}
+       </Button>
+       {account.active ? (
+         <Button
+@@ -126,7 +127,7 @@ export function StaffAccountTable({
+       {onRefresh && (
+         <div className="flex justify-end">
+           <Button variant="secondary" size="sm" onClick={onRefresh}>
+-            🔄 {t('refresh') || 'Refresh'}
++            <RefreshCw className="w-4 h-4" /> {t('refresh') || 'Refresh'}
+           </Button>
+         </div>
+       )}
+diff --git a/frontend/src/features/booking/components/AvailabilityDatePicker.tsx b/frontend/src/features/booking/components/AvailabilityDatePicker.tsx
+index ade9ebc..ab187fd 100644
+--- a/frontend/src/features/booking/components/AvailabilityDatePicker.tsx
++++ b/frontend/src/features/booking/components/AvailabilityDatePicker.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useEffect, useState } from 'react';
++import { ChevronLeft, ChevronRight } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { getAvailability } from '@/features/availability/api';
+ 
+@@ -111,7 +112,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
+           className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+           aria-label={t('previous_month') || 'Previous month'}
+         >
+-          ←
++          <ChevronLeft className="w-4 h-4" />
+         </button>
+         <div className="font-semibold text-stone-900">{monthLabel}</div>
+         <button
+@@ -120,7 +121,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
+           className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 cursor-pointer"
+           aria-label={t('next_month') || 'Next month'}
+         >
+-          →
++          <ChevronRight className="w-4 h-4" />
+         </button>
+       </div>
+ 
+diff --git a/frontend/src/features/booking/components/BookingDetailCard.tsx b/frontend/src/features/booking/components/BookingDetailCard.tsx
+index 1cd4be8..e89b0ad 100644
+--- a/frontend/src/features/booking/components/BookingDetailCard.tsx
++++ b/frontend/src/features/booking/components/BookingDetailCard.tsx
+@@ -1,5 +1,6 @@
+ 'use client';
+ 
++import { FileDown } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
+@@ -146,7 +147,7 @@ export function BookingDetailCard({
+             size="sm"
+             onClick={onViewReceipt}
+           >
+-            📄 {t('download_receipt')}
++            <FileDown className="w-4 h-4" /> {t('download_receipt')}
+           </Button>
+         )}
+       </div>
+diff --git a/frontend/src/features/booking/components/BookingList.tsx b/frontend/src/features/booking/components/BookingList.tsx
+index 0684603..78554e1 100644
+--- a/frontend/src/features/booking/components/BookingList.tsx
++++ b/frontend/src/features/booking/components/BookingList.tsx
+@@ -1,5 +1,6 @@
+ 'use client';
+ 
++import { Ticket, RefreshCw, ArrowRight } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
+@@ -54,7 +55,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
+   if (bookings.length === 0) {
+     return (
+       <EmptyState
+-        icon="🎫"
++        icon={<Ticket className="w-12 h-12" />}
+         title={t('no_bookings') || 'No bookings yet'}
+         description={t('no_bookings_description') || 'Book your first museum visit today!'}
+         action={
+@@ -73,7 +74,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
+       {onRefresh && (
+         <div className="flex justify-end">
+           <Button variant="secondary" size="sm" onClick={onRefresh}>
+-            🔄 {t('refresh') || 'Refresh'}
++            <RefreshCw className="w-4 h-4" /> {t('refresh') || 'Refresh'}
+           </Button>
+         </div>
+       )}
+@@ -109,7 +110,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
+                 </div>
+               </div>
+               <Button variant="ghost" size="sm" className="flex-shrink-0">
+-                {t('view_details') || 'View Details'} →
++                {t('view_details') || 'View Details'} <ArrowRight className="w-4 h-4" />
+               </Button>
+             </div>
+           </Card>
+diff --git a/frontend/src/features/booking/components/BookingSummary.tsx b/frontend/src/features/booking/components/BookingSummary.tsx
+index d6de640..8525e8f 100644
+--- a/frontend/src/features/booking/components/BookingSummary.tsx
++++ b/frontend/src/features/booking/components/BookingSummary.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useEffect, useState } from 'react';
++import { ArrowLeft, ArrowRight } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+@@ -144,7 +145,7 @@ export function BookingSummary({
+           onClick={onBack}
+           disabled={isProcessing}
+         >
+-          ← {t('back') || 'Back'}
++          <ArrowLeft className="w-4 h-4" /> {t('back') || 'Back'}
+         </Button>
+         <Button
+           size="lg"
+@@ -152,7 +153,13 @@ export function BookingSummary({
+           onClick={onConfirm}
+           disabled={isProcessing}
+         >
+-          {isProcessing ? t('processing') || 'Processing...' : `${t('confirm') || 'Confirm'} →`}
++          {isProcessing ? (
++            t('processing') || 'Processing...'
++          ) : (
++            <>
++              {t('confirm') || 'Confirm'} <ArrowRight className="w-4 h-4" />
++            </>
++          )}
+         </Button>
+       </div>
+     </div>
+diff --git a/frontend/src/features/booking/components/CancelRescheduleControls.tsx b/frontend/src/features/booking/components/CancelRescheduleControls.tsx
+index a57d7aa..550ae43 100644
+--- a/frontend/src/features/booking/components/CancelRescheduleControls.tsx
++++ b/frontend/src/features/booking/components/CancelRescheduleControls.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useState } from 'react';
+ import { useRouter } from 'next/navigation';
++import { Calendar, X } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Button } from '@/components/ui/Button';
+ import { Modal } from '@/components/ui/Modal';
+@@ -130,7 +131,7 @@ export function CancelRescheduleControls({
+             onClick={() => setIsRescheduleModalOpen(true)}
+             disabled={isProcessing}
+           >
+-            📅 {t('reschedule') || 'Reschedule'}
++            <Calendar className="w-4 h-4" /> {t('reschedule') || 'Reschedule'}
+             {rescheduledCount >= 1 && ' (max 1)'}
+           </Button>
+         )}
+@@ -141,7 +142,7 @@ export function CancelRescheduleControls({
+             onClick={() => setIsCancelDialogOpen(true)}
+             disabled={isProcessing}
+           >
+-            ✕ {t('cancel') || 'Cancel Booking'}
++            <X className="w-4 h-4" /> {t('cancel') || 'Cancel Booking'}
+           </Button>
+         )}
+       </div>
+diff --git a/frontend/src/features/booking/components/DateCategoryPicker.tsx b/frontend/src/features/booking/components/DateCategoryPicker.tsx
+index 4531c42..8bddb40 100644
+--- a/frontend/src/features/booking/components/DateCategoryPicker.tsx
++++ b/frontend/src/features/booking/components/DateCategoryPicker.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useState, useEffect } from 'react';
++import { ArrowRight } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+@@ -156,7 +157,7 @@ export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategor
+           disabled={items.length === 0}
+           onClick={onNext}
+         >
+-          {t('continue')} →
++          {t('continue')} <ArrowRight className="w-4 h-4" />
+         </Button>
+       </div>
+     </div>
+diff --git a/frontend/src/features/catalog/components/CategoryTable.tsx b/frontend/src/features/catalog/components/CategoryTable.tsx
+index f5a7f97..32530ff 100644
+--- a/frontend/src/features/catalog/components/CategoryTable.tsx
++++ b/frontend/src/features/catalog/components/CategoryTable.tsx
+@@ -1,5 +1,6 @@
+ 'use client';
+ 
++import { Tag, Pencil, RefreshCw } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Table } from '@/components/ui/Table';
+@@ -39,7 +40,7 @@ export function CategoryTable({
+   if (categories.length === 0) {
+     return (
+       <EmptyState
+-        icon="💲"
++        icon={<Tag className="w-12 h-12" />}
+         title={t('no_categories') || 'No Categories'}
+         description={t('no_categories_description') || 'Create your first ticket category to get started.'}
+       />
+@@ -74,7 +75,7 @@ export function CategoryTable({
+         variant="secondary"
+         onClick={() => onEdit(category)}
+       >
+-        ✏️ {t('edit') || 'Edit'}
++        <Pencil className="w-3.5 h-3.5" /> {t('edit') || 'Edit'}
+       </Button>
+       {category.active ? (
+         <Button
+@@ -101,7 +102,7 @@ export function CategoryTable({
+       {onRefresh && (
+         <div className="flex justify-end">
+           <Button variant="secondary" size="sm" onClick={onRefresh}>
+-            🔄 {t('refresh') || 'Refresh'}
++            <RefreshCw className="w-4 h-4" /> {t('refresh') || 'Refresh'}
+           </Button>
+         </div>
+       )}
+diff --git a/frontend/src/features/entrance/components/AttendanceEntryForm.tsx b/frontend/src/features/entrance/components/AttendanceEntryForm.tsx
+index df0d964..cc6f06c 100644
+--- a/frontend/src/features/entrance/components/AttendanceEntryForm.tsx
++++ b/frontend/src/features/entrance/components/AttendanceEntryForm.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useState } from 'react';
++import { CheckCircle2, AlertTriangle, Check } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+@@ -139,7 +140,9 @@ export function AttendanceEntryForm({
+       <Card className="bg-green-50 border-green-200">
+         <div className="py-2">
+           <div className="text-center mb-4">
+-            <div className="text-3xl mb-2">✅</div>
++            <div className="text-3xl mb-2 flex justify-center text-green-600">
++              <CheckCircle2 className="w-8 h-8" />
++            </div>
+             <div className="font-semibold text-green-800">
+               {t('check_in_success') || 'Check-in successful!'}
+             </div>
+@@ -177,8 +180,8 @@ export function AttendanceEntryForm({
+           </div>
+ 
+           {voucherSaved ? (
+-            <div className="mt-4 text-center text-sm font-medium text-green-800">
+-              ✓ {t('voucher_saved') || 'IFMIS voucher reference saved.'}
++            <div className="mt-4 text-center text-sm font-medium text-green-800 flex items-center justify-center gap-1.5">
++              <Check className="w-4 h-4" /> {t('voucher_saved') || 'IFMIS voucher reference saved.'}
+             </div>
+           ) : (
+             <div className="mt-4 space-y-3">
+@@ -223,7 +226,9 @@ export function AttendanceEntryForm({
+     return (
+       <Card className="bg-green-50 border-green-200">
+         <div className="text-center py-4">
+-          <div className="text-3xl mb-2">✅</div>
++          <div className="text-3xl mb-2 flex justify-center text-green-600">
++            <CheckCircle2 className="w-8 h-8" />
++          </div>
+           <div className="font-semibold text-green-800">
+             {t('already_checked_in') || 'Already Checked In'}
+           </div>
+@@ -249,7 +254,9 @@ export function AttendanceEntryForm({
+     return (
+       <Card className="bg-yellow-50 border-yellow-200">
+         <div className="text-center py-4">
+-          <div className="text-3xl mb-2">⚠️</div>
++          <div className="text-3xl mb-2 flex justify-center text-yellow-600">
++            <AlertTriangle className="w-8 h-8" />
++          </div>
+           <div className="font-semibold text-yellow-800">
+             {t('cannot_check_in') || 'Cannot Check In'}
+           </div>
+@@ -440,7 +447,7 @@ export function AttendanceEntryForm({
+           {shortfall > 0 && (
+             <div className="p-3 bg-secondary-50 border border-secondary-200 rounded-lg">
+               <div className="flex items-start gap-2">
+-                <span className="text-secondary-600">⚠️</span>
++                <span className="text-secondary-600"><AlertTriangle className="w-4 h-4" /></span>
+                 <div>
+                   <div className="text-sm font-medium text-secondary-800">
+                     {t('partial_attendance') || 'Partial Attendance'}
+diff --git a/frontend/src/features/group-bookings/components/GroupVisitRequestForm.tsx b/frontend/src/features/group-bookings/components/GroupVisitRequestForm.tsx
+index 1ca0bd0..bb1ca37 100644
+--- a/frontend/src/features/group-bookings/components/GroupVisitRequestForm.tsx
++++ b/frontend/src/features/group-bookings/components/GroupVisitRequestForm.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useState, useEffect } from 'react';
+ import { useRouter } from 'next/navigation';
++import { ArrowRight, Pin } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { useAuth } from '@/lib/auth/auth-context';
+ import { Card } from '@/components/ui/Card';
+@@ -303,7 +304,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
+           )}
+ 
+           <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-3 text-sm text-secondary-700">
+-            <span className="font-semibold">📌 {t('group_booking_note') || 'Important Information'}</span>
++            <span className="font-semibold inline-flex items-center gap-1.5"><Pin className="w-3.5 h-3.5" /> {t('group_booking_note') || 'Important Information'}</span>
+             <ul className="mt-1 list-disc list-inside space-y-0.5 text-xs">
+               <li>{t('group_booking_note_1') || 'You will pay for the whole group in one transaction.'}</li>
+               <li>{t('group_booking_note_2') || 'Bring your booking reference to the gate for the group.'}</li>
+@@ -329,7 +330,13 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
+           className="flex-1 bg-brand-primary hover:bg-primary-700"
+           disabled={isSubmitting}
+         >
+-          {isSubmitting ? t('submitting') || 'Submitting...' : t('submit_request') || 'Submit Request →'}
++          {isSubmitting ? (
++            t('submitting') || 'Submitting...'
++          ) : (
++            <>
++              {t('submit_request') || 'Submit Request'} <ArrowRight className="w-4 h-4" />
++            </>
++          )}
+         </Button>
+       </div>
+     </form>
+diff --git a/frontend/src/features/settlement/components/PendingSettlementTable.tsx b/frontend/src/features/settlement/components/PendingSettlementTable.tsx
+index bef4aab..5b8bca0 100644
+--- a/frontend/src/features/settlement/components/PendingSettlementTable.tsx
++++ b/frontend/src/features/settlement/components/PendingSettlementTable.tsx
+@@ -1,5 +1,6 @@
+ 'use client';
+ 
++import { RefreshCw, Landmark, ArrowRight } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+@@ -59,7 +60,7 @@ export function PendingSettlementTable({
+               onClick={onRefresh}
+               disabled={isTransferring}
+             >
+-              🔄 {t('refresh') || 'Refresh'}
++              <RefreshCw className="w-4 h-4" /> {t('refresh') || 'Refresh'}
+             </Button>
+           )}
+           {onTransfer && (
+@@ -75,7 +76,9 @@ export function PendingSettlementTable({
+                   {t('processing') || 'Processing...'}
+                 </>
+               ) : (
+-                `🏦 ${t('initiate_transfer') || 'Reconcile Now'} →`
++                <>
++                  <Landmark className="w-4 h-4" /> {t('initiate_transfer') || 'Reconcile Now'} <ArrowRight className="w-4 h-4" />
++                </>
+               )}
+             </Button>
+           )}
+diff --git a/frontend/src/features/settlement/components/TransferConfirmationCard.tsx b/frontend/src/features/settlement/components/TransferConfirmationCard.tsx
+index f8fab53..c14563d 100644
+--- a/frontend/src/features/settlement/components/TransferConfirmationCard.tsx
++++ b/frontend/src/features/settlement/components/TransferConfirmationCard.tsx
+@@ -1,5 +1,6 @@
+ 'use client';
+ 
++import { CheckCircle2, AlertTriangle, Clock, FileDown } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { Card } from '@/components/ui/Card';
+ import { Button } from '@/components/ui/Button';
+@@ -46,8 +47,19 @@ export function TransferConfirmationCard({
+       }
+     >
+       <div className="text-center mb-6">
+-        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 text-3xl">
+-          {isCompleted ? '✅' : isFailed ? '⚠️' : '⏳'}
++        <div
++          className={
++            'w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 ' +
++            (isCompleted ? 'text-green-600' : isFailed ? 'text-red-600' : 'text-secondary-600')
++          }
++        >
++          {isCompleted ? (
++            <CheckCircle2 className="w-8 h-8" />
++          ) : isFailed ? (
++            <AlertTriangle className="w-8 h-8" />
++          ) : (
++            <Clock className="w-8 h-8" />
++          )}
+         </div>
+         <h2 className="font-serif text-2xl text-stone-900">
+           {isCompleted
+@@ -99,7 +111,7 @@ export function TransferConfirmationCard({
+             className="flex-1"
+           >
+             <Button className="w-full bg-brand-primary hover:bg-primary-700">
+-              📄 {t('download_receipt') || 'Download Transfer Receipt'}
++              <FileDown className="w-4 h-4" /> {t('download_receipt') || 'Download Transfer Receipt'}
+             </Button>
+           </a>
+         )}

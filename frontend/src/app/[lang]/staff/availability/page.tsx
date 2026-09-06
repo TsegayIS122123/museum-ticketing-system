@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Check, X, Calendar } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -242,7 +243,7 @@ export default function AvailabilityPage() {
                     setConfirmDialog({ open: true, date: selectedDate, status: 'available' })
                   }
                 >
-                  ✓ {t('open_available') || 'Open / Available'}
+                  <Check className="w-4 h-4" /> {t('open_available') || 'Open / Available'}
                 </Button>
                 <Button
                   size="sm"
@@ -252,13 +253,15 @@ export default function AvailabilityPage() {
                     setConfirmDialog({ open: true, date: selectedDate, status: 'closed' })
                   }
                 >
-                  ✕ {t('close_date') || 'Close Date'}
+                  <X className="w-4 h-4" /> {t('close_date') || 'Close Date'}
                 </Button>
               </div>
             </Card>
           ) : (
             <Card className="bg-stone-50 border-stone-200 text-center">
-              <div className="text-3xl mb-3">📅</div>
+              <div className="text-3xl mb-3 flex justify-center text-stone-400">
+                <Calendar className="w-7 h-7" />
+              </div>
               <div className="font-semibold text-stone-700">
                 {t('select_a_date') || 'Select a date'}
               </div>

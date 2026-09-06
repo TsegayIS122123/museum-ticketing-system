@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Button } from '@/components/ui/Button';
@@ -127,7 +128,7 @@ export function VisitorVerifyForm() {
               setError(null);
             }}
           >
-            ← {t('back') || 'Back'}
+            <ArrowLeft className="w-4 h-4" /> {t('back') || 'Back'}
           </Button>
         </form>
       </Card>

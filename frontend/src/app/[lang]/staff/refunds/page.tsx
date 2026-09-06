@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Download } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -140,7 +141,7 @@ export default function RefundsPage() {
             {t('refund_requests') || 'Refund Requests'}
           </div>
           <Button variant="secondary" size="sm">
-            ⬇ {t('export') || 'Export'}
+            <Download className="w-4 h-4" /> {t('export') || 'Export'}
           </Button>
         </div>
         {isLoading ? (

@@ -1,5 +1,6 @@
 'use client';
 
+import { Tag, Pencil, RefreshCw } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Table } from '@/components/ui/Table';
@@ -39,7 +40,7 @@ export function CategoryTable({
   if (categories.length === 0) {
     return (
       <EmptyState
-        icon="💲"
+        icon={<Tag className="w-12 h-12" />}
         title={t('no_categories') || 'No Categories'}
         description={t('no_categories_description') || 'Create your first ticket category to get started.'}
       />
@@ -74,7 +75,7 @@ export function CategoryTable({
         variant="secondary"
         onClick={() => onEdit(category)}
       >
-        ✏️ {t('edit') || 'Edit'}
+        <Pencil className="w-3.5 h-3.5" /> {t('edit') || 'Edit'}
       </Button>
       {category.active ? (
         <Button
@@ -101,7 +102,7 @@ export function CategoryTable({
       {onRefresh && (
         <div className="flex justify-end">
           <Button variant="secondary" size="sm" onClick={onRefresh}>
-            🔄 {t('refresh') || 'Refresh'}
+            <RefreshCw className="w-4 h-4" /> {t('refresh') || 'Refresh'}
           </Button>
         </div>
       )}

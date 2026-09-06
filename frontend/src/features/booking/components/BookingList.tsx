@@ -1,5 +1,6 @@
 'use client';
 
+import { Ticket, RefreshCw, ArrowRight } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
@@ -54,7 +55,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
   if (bookings.length === 0) {
     return (
       <EmptyState
-        icon="🎫"
+        icon={<Ticket className="w-12 h-12" />}
         title={t('no_bookings') || 'No bookings yet'}
         description={t('no_bookings_description') || 'Book your first museum visit today!'}
         action={
@@ -73,7 +74,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
       {onRefresh && (
         <div className="flex justify-end">
           <Button variant="secondary" size="sm" onClick={onRefresh}>
-            🔄 {t('refresh') || 'Refresh'}
+            <RefreshCw className="w-4 h-4" /> {t('refresh') || 'Refresh'}
           </Button>
         </div>
       )}
@@ -109,7 +110,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
                 </div>
               </div>
               <Button variant="ghost" size="sm" className="flex-shrink-0">
-                {t('view_details') || 'View Details'} →
+                {t('view_details') || 'View Details'} <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
           </Card>

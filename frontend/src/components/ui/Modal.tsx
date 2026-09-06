@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface ModalProps {
@@ -62,7 +63,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors"
             aria-label="Close modal"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-6">{children}</div>

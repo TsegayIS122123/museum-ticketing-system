@@ -1,5 +1,6 @@
 'use client';
 
+import { FileDown } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
@@ -146,7 +147,7 @@ export function BookingDetailCard({
             size="sm"
             onClick={onViewReceipt}
           >
-            📄 {t('download_receipt')}
+            <FileDown className="w-4 h-4" /> {t('download_receipt')}
           </Button>
         )}
       </div>
