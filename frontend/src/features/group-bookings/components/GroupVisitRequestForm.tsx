@@ -134,10 +134,11 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
         groupTin: validated.groupTin,
         groupContactPhone: validated.groupContactPhone || null,
       });
+      // Same interpolation gap as book/page.tsx's handleConfirmBooking:
+      // the reference must be appended explicitly, not folded into the
+      // `||` fallback.
       setToast({
-        message:
-          t('booking_created') ||
-          'Booking created successfully! Reference: ' + booking.reference,
+        message: `${t('booking_created') || 'Booking created successfully! Reference:'} ${booking.reference}`,
         type: 'success',
       });
 

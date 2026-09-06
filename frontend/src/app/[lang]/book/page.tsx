@@ -78,9 +78,13 @@ export default function BookPage() {
         bookingType: 'individual',
       });
 
-      // Show success message
+      // Show success message. Note: `t('booking_created')` resolves to a
+      // translated string ending in "Reference:" with no interpolation
+      // support in `t()` -- the reference must be appended explicitly
+      // here, not folded into the `||` fallback (which never runs once
+      // the translation key exists, silently dropping the reference).
       setToast({
-        message: t('booking_created') || 'Booking created successfully! Reference: ' + booking.reference,
+        message: `${t('booking_created') || 'Booking created successfully! Reference:'} ${booking.reference}`,
         type: 'success',
       });
 

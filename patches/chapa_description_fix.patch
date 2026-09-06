@@ -1,0 +1,200 @@
+diff --git a/backend/apps/payments/services.py b/backend/apps/payments/services.py
+index 75966a4..5f9c22b 100644
+--- a/backend/apps/payments/services.py
++++ b/backend/apps/payments/services.py
+@@ -26,6 +26,7 @@ Two entry points, matching Document 03 Sec 4.2's sequence diagram:
+ import hashlib
+ import hmac
+ import logging
++import re
+ import uuid
+ 
+ import requests
+@@ -85,6 +86,28 @@ def _split_name(full_name):
+     return parts[0], parts[1]
+ 
+ 
++# Chapa's `customization.description` field rejects anything outside this
++# charset (letters, numbers, hyphens, underscores, spaces, and dots) -- a
++# booking's line-item description is built from category names we don't
++# fully control, so it must be sanitized before being sent, not just
++# joined with a comma (which Chapa's own error message shows is rejected).
++_CHAPA_DESCRIPTION_ALLOWED = re.compile(r"[^A-Za-z0-9\-_. ]")
++
++
++def _build_chapa_description(booking):
++    """Itemized across every category on this booking (e.g. "Adult x1 -
++    Student x2") -- a booking is no longer guaranteed to hold just one
++    category, so a single `category_name_en x booked_quantity` line would
++    misdescribe a mixed-category checkout. Joined with " - " (not a comma)
++    and stripped of anything outside Chapa's allowed charset, since
++    category names are free text we don't fully control."""
++    items_desc = " - ".join(
++        f"{item.category_name_en} x{item.quantity}" for item in booking.items.all()
++    )
++    cleaned = _CHAPA_DESCRIPTION_ALLOWED.sub("", items_desc).strip()
++    return cleaned or "Museum Ticket"
++
++
+ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
+     """The one function that actually talks to Chapa -- isolated so
+     services-level tests can monkeypatch this instead of the network
+@@ -115,14 +138,7 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
+         "return_url": f"{settings.PUBLIC_WEB_BASE_URL.rstrip('/')}/bookings/{booking.id}",
+         "customization": {
+             "title": "Museum Ticket",
+-            # Itemized across every category on this booking (e.g. "Adult
+-            # x1, Student x2") -- a booking is no longer guaranteed to
+-            # hold just one category, so a single `category_name_en x
+-            # booked_quantity` line would misdescribe a mixed-category
+-            # checkout.
+-            "description": ", ".join(
+-                f"{item.category_name_en} x{item.quantity}" for item in booking.items.all()
+-            ),
++            "description": _build_chapa_description(booking),
+         },
+     }
+     try:
+@@ -132,11 +148,6 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
+             headers={"Authorization": f"Bearer {settings.CHAPA_SECRET_KEY}"},
+             timeout=CHAPA_TIMEOUT_SECONDS,
+         )
+-        if not response.ok:
+-            logger.error(
+-                "Chapa rejected checkout init for booking %s: status=%s body=%s",
+-                booking.id, response.status_code, response.text,
+-            )
+         response.raise_for_status()
+         data = response.json()
+     except (requests.RequestException, ValueError) as exc:
+diff --git a/backend/apps/payments/tests/test_services.py b/backend/apps/payments/tests/test_services.py
+index 2c4c340..93b5458 100644
+--- a/backend/apps/payments/tests/test_services.py
++++ b/backend/apps/payments/tests/test_services.py
+@@ -11,6 +11,7 @@ that actually talks to Chapa -- rather than the network, mirroring how
+ from datetime import date, timedelta
+ from decimal import Decimal
+ from unittest import mock
++import re
+ 
+ import pytest
+ from django.utils import timezone
+@@ -146,6 +147,118 @@ def test_create_checkout_session_defaults_amount_to_booking_total(mock_init):
+     )
+ 
+ 
++# --------------------------------------------------------------------------
++# _build_chapa_description -- Chapa's `customization.description` field
++# only accepts letters, numbers, hyphens, underscores, spaces, and dots
++# (see the 400 Chapa returns otherwise); a booking's line items are
++# joined into this field and must never smuggle a rejected character
++# through, regardless of how many categories or what punctuation their
++# names contain.
++# --------------------------------------------------------------------------
++
++
++def test_build_chapa_description_joins_multiple_categories_without_comma():
++    visitor = _make_visitor()
++    booking = Booking.objects.create(
++        visitor=visitor,
++        visit_date=TOMORROW,
++        booking_type=Booking.BookingType.INDIVIDUAL,
++        booked_quantity=3,
++        total_amount_etb=Decimal("300.00"),
++        status=Booking.Status.AWAITING_PAYMENT,
++    )
++    adult = Category.objects.create(
++        name_en="Adult", name_am="Adult", price_etb=Decimal("100.00")
++    )
++    student = Category.objects.create(
++        name_en="Student", name_am="Student", price_etb=Decimal("100.00")
++    )
++    BookingItem.objects.create(
++        booking=booking, category=adult, category_name_en=adult.name_en,
++        category_name_am=adult.name_am, unit_price_etb=adult.price_etb,
++        quantity=1, subtotal_etb=Decimal("100.00"),
++    )
++    BookingItem.objects.create(
++        booking=booking, category=student, category_name_en=student.name_en,
++        category_name_am=student.name_am, unit_price_etb=student.price_etb,
++        quantity=2, subtotal_etb=Decimal("200.00"),
++    )
++
++    description = services._build_chapa_description(booking)
++
++    assert "," not in description
++    assert "Adult x1" in description
++    assert "Student x2" in description
++
++
++def test_build_chapa_description_strips_disallowed_characters():
++    booking = _make_booking(quantity=1)
++    item = booking.items.first()
++    item.category_name_en = "VIP (Members)!"
++    item.save(update_fields=["category_name_en"])
++
++    description = services._build_chapa_description(booking)
++
++    assert re.fullmatch(r"[A-Za-z0-9\-_. ]*", description)
++
++
++def test_build_chapa_description_falls_back_when_fully_stripped():
++    booking = _make_booking(quantity=1)
++    item = booking.items.first()
++    item.category_name_en = "!!!"
++    item.save(update_fields=["category_name_en"])
++    # Force a description that strips to nothing.
++    with mock.patch.object(
++        services, "_CHAPA_DESCRIPTION_ALLOWED", re.compile(r".*")
++    ):
++        description = services._build_chapa_description(booking)
++
++    assert description == "Museum Ticket"
++
++
++@mock.patch("apps.payments.services.requests.post")
++def test_initialize_chapa_checkout_sends_sanitized_description(mock_post, settings):
++    settings.PUBLIC_API_BASE_URL = "https://api.example.com"
++    settings.PUBLIC_WEB_BASE_URL = "https://web.example.com"
++    settings.CHAPA_SECRET_KEY = "test-secret"
++    mock_post.return_value = mock.Mock(
++        ok=True,
++        json=lambda: {"status": "success", "data": {"checkout_url": FAKE_CHECKOUT_URL}},
++    )
++    visitor = _make_visitor()
++    booking = Booking.objects.create(
++        visitor=visitor,
++        visit_date=TOMORROW,
++        booking_type=Booking.BookingType.INDIVIDUAL,
++        booked_quantity=3,
++        total_amount_etb=Decimal("300.00"),
++        status=Booking.Status.AWAITING_PAYMENT,
++    )
++    adult = Category.objects.create(
++        name_en="Adult", name_am="Adult", price_etb=Decimal("100.00")
++    )
++    student = Category.objects.create(
++        name_en="Student", name_am="Student", price_etb=Decimal("100.00")
++    )
++    BookingItem.objects.create(
++        booking=booking, category=adult, category_name_en=adult.name_en,
++        category_name_am=adult.name_am, unit_price_etb=adult.price_etb,
++        quantity=1, subtotal_etb=Decimal("100.00"),
++    )
++    BookingItem.objects.create(
++        booking=booking, category=student, category_name_en=student.name_en,
++        category_name_am=student.name_am, unit_price_etb=student.price_etb,
++        quantity=2, subtotal_etb=Decimal("200.00"),
++    )
++
++    services._initialize_chapa_checkout(
++        tx_ref="museum-test-ref", booking=booking, amount=Decimal("300.00")
++    )
++
++    sent_description = mock_post.call_args.kwargs["json"]["customization"]["description"]
++    assert "," not in sent_description
++
++
+ # --------------------------------------------------------------------------
+ # verify_webhook_signature (NFR-SEC-001)
+ # --------------------------------------------------------------------------

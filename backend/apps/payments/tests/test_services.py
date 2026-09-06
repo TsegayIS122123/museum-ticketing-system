@@ -11,6 +11,7 @@ that actually talks to Chapa -- rather than the network, mirroring how
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest import mock
+import re
 
 import pytest
 from django.utils import timezone
@@ -144,6 +145,118 @@ def test_create_checkout_session_defaults_amount_to_booking_total(mock_init):
     mock_init.assert_called_once_with(
         tx_ref=mock.ANY, booking=booking, amount=booking.total_amount_etb
     )
+
+
+# --------------------------------------------------------------------------
+# _build_chapa_description -- Chapa's `customization.description` field
+# only accepts letters, numbers, hyphens, underscores, spaces, and dots
+# (see the 400 Chapa returns otherwise); a booking's line items are
+# joined into this field and must never smuggle a rejected character
+# through, regardless of how many categories or what punctuation their
+# names contain.
+# --------------------------------------------------------------------------
+
+
+def test_build_chapa_description_joins_multiple_categories_without_comma():
+    visitor = _make_visitor()
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+        booked_quantity=3,
+        total_amount_etb=Decimal("300.00"),
+        status=Booking.Status.AWAITING_PAYMENT,
+    )
+    adult = Category.objects.create(
+        name_en="Adult", name_am="Adult", price_etb=Decimal("100.00")
+    )
+    student = Category.objects.create(
+        name_en="Student", name_am="Student", price_etb=Decimal("100.00")
+    )
+    BookingItem.objects.create(
+        booking=booking, category=adult, category_name_en=adult.name_en,
+        category_name_am=adult.name_am, unit_price_etb=adult.price_etb,
+        quantity=1, subtotal_etb=Decimal("100.00"),
+    )
+    BookingItem.objects.create(
+        booking=booking, category=student, category_name_en=student.name_en,
+        category_name_am=student.name_am, unit_price_etb=student.price_etb,
+        quantity=2, subtotal_etb=Decimal("200.00"),
+    )
+
+    description = services._build_chapa_description(booking)
+
+    assert "," not in description
+    assert "Adult x1" in description
+    assert "Student x2" in description
+
+
+def test_build_chapa_description_strips_disallowed_characters():
+    booking = _make_booking(quantity=1)
+    item = booking.items.first()
+    item.category_name_en = "VIP (Members)!"
+    item.save(update_fields=["category_name_en"])
+
+    description = services._build_chapa_description(booking)
+
+    assert re.fullmatch(r"[A-Za-z0-9\-_. ]*", description)
+
+
+def test_build_chapa_description_falls_back_when_fully_stripped():
+    booking = _make_booking(quantity=1)
+    item = booking.items.first()
+    item.category_name_en = "!!!"
+    item.save(update_fields=["category_name_en"])
+    # Force a description that strips to nothing.
+    with mock.patch.object(
+        services, "_CHAPA_DESCRIPTION_ALLOWED", re.compile(r".*")
+    ):
+        description = services._build_chapa_description(booking)
+
+    assert description == "Museum Ticket"
+
+
+@mock.patch("apps.payments.services.requests.post")
+def test_initialize_chapa_checkout_sends_sanitized_description(mock_post, settings):
+    settings.PUBLIC_API_BASE_URL = "https://api.example.com"
+    settings.PUBLIC_WEB_BASE_URL = "https://web.example.com"
+    settings.CHAPA_SECRET_KEY = "test-secret"
+    mock_post.return_value = mock.Mock(
+        ok=True,
+        json=lambda: {"status": "success", "data": {"checkout_url": FAKE_CHECKOUT_URL}},
+    )
+    visitor = _make_visitor()
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+        booked_quantity=3,
+        total_amount_etb=Decimal("300.00"),
+        status=Booking.Status.AWAITING_PAYMENT,
+    )
+    adult = Category.objects.create(
+        name_en="Adult", name_am="Adult", price_etb=Decimal("100.00")
+    )
+    student = Category.objects.create(
+        name_en="Student", name_am="Student", price_etb=Decimal("100.00")
+    )
+    BookingItem.objects.create(
+        booking=booking, category=adult, category_name_en=adult.name_en,
+        category_name_am=adult.name_am, unit_price_etb=adult.price_etb,
+        quantity=1, subtotal_etb=Decimal("100.00"),
+    )
+    BookingItem.objects.create(
+        booking=booking, category=student, category_name_en=student.name_en,
+        category_name_am=student.name_am, unit_price_etb=student.price_etb,
+        quantity=2, subtotal_etb=Decimal("200.00"),
+    )
+
+    services._initialize_chapa_checkout(
+        tx_ref="museum-test-ref", booking=booking, amount=Decimal("300.00")
+    )
+
+    sent_description = mock_post.call_args.kwargs["json"]["customization"]["description"]
+    assert "," not in sent_description
 
 
 # --------------------------------------------------------------------------

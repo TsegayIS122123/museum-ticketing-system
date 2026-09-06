@@ -26,6 +26,7 @@ Two entry points, matching Document 03 Sec 4.2's sequence diagram:
 import hashlib
 import hmac
 import logging
+import re
 import uuid
 
 import requests
@@ -85,6 +86,28 @@ def _split_name(full_name):
     return parts[0], parts[1]
 
 
+# Chapa's `customization.description` field rejects anything outside this
+# charset (letters, numbers, hyphens, underscores, spaces, and dots) -- a
+# booking's line-item description is built from category names we don't
+# fully control, so it must be sanitized before being sent, not just
+# joined with a comma (which Chapa's own error message shows is rejected).
+_CHAPA_DESCRIPTION_ALLOWED = re.compile(r"[^A-Za-z0-9\-_. ]")
+
+
+def _build_chapa_description(booking):
+    """Itemized across every category on this booking (e.g. "Adult x1 -
+    Student x2") -- a booking is no longer guaranteed to hold just one
+    category, so a single `category_name_en x booked_quantity` line would
+    misdescribe a mixed-category checkout. Joined with " - " (not a comma)
+    and stripped of anything outside Chapa's allowed charset, since
+    category names are free text we don't fully control."""
+    items_desc = " - ".join(
+        f"{item.category_name_en} x{item.quantity}" for item in booking.items.all()
+    )
+    cleaned = _CHAPA_DESCRIPTION_ALLOWED.sub("", items_desc).strip()
+    return cleaned or "Museum Ticket"
+
+
 def _initialize_chapa_checkout(*, tx_ref, booking, amount):
     """The one function that actually talks to Chapa -- isolated so
     services-level tests can monkeypatch this instead of the network
@@ -115,17 +138,9 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
         "return_url": f"{settings.PUBLIC_WEB_BASE_URL.rstrip('/')}/bookings/{booking.id}",
         "customization": {
             "title": "Museum Ticket",
-            # Itemized across every category on this booking (e.g. "Adult
-            # x1, Student x2") -- a booking is no longer guaranteed to
-            # hold just one category, so a single `category_name_en x
-            # booked_quantity` line would misdescribe a mixed-category
-            # checkout.
-            "description": ", ".join(
-                f"{item.category_name_en} x{item.quantity}" for item in booking.items.all()
-            ),
+            "description": _build_chapa_description(booking),
         },
     }
-
     try:
         response = requests.post(
             f"{CHAPA_BASE_URL}/transaction/initialize",
