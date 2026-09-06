@@ -36,7 +36,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Hero Section */}
         <section className="text-center py-12">
-          <h2 className="text-4xl font-extrabold text-stone-900 sm:text-5xl font-serif">
+          <h2 className="text-4xl text-stone-900 sm:text-5xl font-serif font-semibold">
             {t.landing_title}
           </h2>
           <p className="mt-4 text-lg text-stone-600 max-w-2xl mx-auto">
@@ -53,7 +53,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
 
         {/* Categories Section */}
         <section className="mt-12">
-          <h3 className="text-2xl font-bold text-stone-900 mb-6 font-serif">
+          <h3 className="text-2xl text-stone-900 mb-6 font-serif font-semibold">
             {t.browse_tickets}
           </h3>
           
@@ -77,7 +77,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
                       </p>
                     </div>
                     <div className="mt-4 pt-4 border-t border-stone-100">
-                      <p className="text-2xl font-bold text-amber-600 font-serif">
+                      <p className="text-2xl text-amber-600 font-serif font-semibold">
                         {`ETB ${category.price_etb}`}
                       </p>
                       <Link href={`/${lang}/book`}>

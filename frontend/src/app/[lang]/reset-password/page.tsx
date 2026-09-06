@@ -99,7 +99,7 @@ function ResetPasswordPageContent() {
       <main className="flex-1 flex items-center justify-center px-4 py-12">
         <Card className="max-w-md w-full">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-serif font-bold text-stone-900">
+            <h2 className="text-2xl font-serif font-semibold text-stone-900">
               {t('set_password_title') || 'Set Your Password'}
             </h2>
             <p className="text-sm text-stone-500 mt-1">

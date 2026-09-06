@@ -130,7 +130,7 @@ export function BookingSummary({
           {/* Total */}
           <div className="pt-4 flex justify-between items-center border-t-2 border-stone-200">
             <span className="text-lg font-semibold text-stone-900">{t('total')}</span>
-            <span className="text-2xl font-bold text-primary-600 font-serif">
+            <span className="text-2xl text-primary-600 font-serif font-semibold">
               ETB {totalAmount}
             </span>
           </div>

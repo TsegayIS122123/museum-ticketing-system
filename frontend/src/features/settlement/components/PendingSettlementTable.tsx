@@ -48,7 +48,7 @@ export function PendingSettlementTable({
           <div className="text-xs text-secondary-700 uppercase tracking-wider">
             {t('outstanding_balance') || 'Your Outstanding Balance'}
           </div>
-          <div className="font-bold text-3xl text-secondary-800 font-serif">
+          <div className="text-3xl text-secondary-800 font-serif font-semibold">
             ETB {balance?.balanceEtb ?? '0.00'}
           </div>
         </div>

@@ -70,7 +70,7 @@ export default function ReportsPage() {
     <PageContainer>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl text-stone-900">
+          <h1 className="font-serif font-semibold text-3xl text-stone-900">
             {t('reports') || 'Reports'}
           </h1>
           <p className="text-stone-500 mt-1">

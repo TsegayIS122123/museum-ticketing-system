@@ -64,7 +64,7 @@ export default function SettlementTransfersPage() {
     return (
       <PageContainer>
         <div className="mb-6">
-          <h1 className="font-serif text-3xl text-stone-900">
+          <h1 className="font-serif font-semibold text-3xl text-stone-900">
             {t('settlement_history') || 'Settlement History'}
           </h1>
           <p className="text-stone-500 mt-1">
@@ -124,7 +124,7 @@ export default function SettlementTransfersPage() {
     <PageContainer>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl text-stone-900">
+          <h1 className="font-serif font-semibold text-3xl text-stone-900">
             {t('settlement_history') || 'Settlement History'}
           </h1>
           <p className="text-stone-500 mt-1">

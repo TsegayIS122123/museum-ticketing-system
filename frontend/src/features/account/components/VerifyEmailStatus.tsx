@@ -57,7 +57,7 @@ export function VerifyEmailStatus() {
 
       {status === 'verifying' && (
         <>
-          <h2 className="text-2xl font-serif font-bold text-stone-900">
+          <h2 className="text-2xl font-serif font-semibold text-stone-900">
             {t('verify_email_verifying') || 'Verifying your email…'}
           </h2>
           <p className="text-sm text-stone-500 mt-1">{t('loading')}</p>
@@ -66,7 +66,7 @@ export function VerifyEmailStatus() {
 
       {status === 'success' && (
         <>
-          <h2 className="text-2xl font-serif font-bold text-stone-900">
+          <h2 className="text-2xl font-serif font-semibold text-stone-900">
             {t('verify_email_success') || 'Email verified'}
           </h2>
           <p className="text-sm text-stone-500 mt-1 mb-6">
@@ -83,7 +83,7 @@ export function VerifyEmailStatus() {
 
       {status === 'error' && (
         <>
-          <h2 className="text-2xl font-serif font-bold text-stone-900 mb-4">
+          <h2 className="text-2xl font-serif font-semibold text-stone-900 mb-4">
             {t('verify_email_error_title') || 'Verification failed'}
           </h2>
           {error && <ErrorBanner message={error} dismissible={false} className="mb-4 text-left" />}

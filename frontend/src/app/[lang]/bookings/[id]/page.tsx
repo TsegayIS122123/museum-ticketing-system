@@ -176,7 +176,7 @@ export default function BookingDetailPage() {
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-serif font-bold text-stone-900">
+            <h1 className="text-3xl font-serif font-semibold text-stone-900">
               {t('booking_details') || 'Booking Details'}
             </h1>
             <p className="font-mono text-sm text-stone-400 mt-1">
@@ -209,7 +209,7 @@ export default function BookingDetailPage() {
             </div>
             <div>
               <div className="text-stone-500">{t('total')}</div>
-              <div className="font-bold text-lg text-primary-600 font-serif">
+              <div className="text-lg text-primary-600 font-serif font-semibold">
                 ETB {booking.totalAmountEtb}
               </div>
             </div>

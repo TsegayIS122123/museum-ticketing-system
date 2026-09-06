@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center px-4" data-surface="visitor">
       <Card className="max-w-md w-full">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-serif font-bold text-stone-900">
+          <h2 className="text-2xl font-serif font-semibold text-stone-900">
             {t('reset_password') || 'Reset Password'}
           </h2>
           <p className="text-sm text-stone-500 mt-1">

@@ -39,7 +39,7 @@ export function SiteHeader() {
       <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:gap-6 sm:px-6 lg:px-8">
         <Link href={`/${locale}`} className="flex shrink-0 items-center gap-3">
           <Image src="/aau-logo.png" alt={t('aau_logo_alt') || 'Addis Ababa University'} width={40} height={40} priority />
-          <span className="font-serif text-lg font-bold text-brand-primary sm:text-xl">{t('museum_name')}</span>
+          <span className="font-serif font-semibold text-lg text-brand-primary sm:text-xl">{t('museum_name')}</span>
         </Link>
 
         {isAuthenticated && user ? (

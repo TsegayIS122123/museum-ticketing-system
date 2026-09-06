@@ -73,7 +73,7 @@ export default function GatePage() {
       )}
 
       <div className="mb-6">
-        <h1 className="font-serif text-3xl text-stone-900">
+        <h1 className="font-serif font-semibold text-3xl text-stone-900">
           {t('gate_check_in') || 'Gate Check-in'}
         </h1>
         <p className="text-stone-500 mt-1">

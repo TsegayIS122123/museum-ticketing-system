@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./fonts.css";
 
 @theme {
   --color-brand-footer: #01324E;
@@ -81,9 +82,22 @@
      blue here means focus states are a single, consistent blue. */
   --color-focus: var(--color-primary-600);
 
-  /* Typography - Figma fonts */
-  --font-serif: 'DM Serif Display', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Typography — self-hosted, bilingual (see fonts.css for @font-face
+     rules and the html[lang="am"] override below for the Amharic pair).
+     `--font-serif` drives headings/display type; `--font-sans` drives
+     body/UI text. Both are variable fonts loaded from /public/fonts.
+     `--font-serif` is intentionally mapped to the sans-serif stack (not
+     an actual serif face): a serif display font was hard to read at the
+     sizes headings render at here, so `font-serif` gives headings the
+     same sans face as body text. */
+  --font-serif: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Mono is unchanged for this pass — it's only ever used for reference
+     codes and numerals (Latin/digits), never for translated text, so it
+     isn't part of the Amharic type-parity fix. It's still effectively a
+     phantom font (declared but never shipped or loaded) the same way the
+     others were; self-hosting it is a fast-follow when the staff surface's
+     tabular-figures work touches it directly. */
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 }
 
@@ -96,9 +110,31 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Amharic font fallback */
-html[lang="am"] body {
-  font-family: 'Noto Sans Ethiopic', var(--font-sans);
+/* Amharic type system. Overriding the tokens themselves (rather than a
+   one-off body rule) means every component using font-serif/font-sans —
+   headings, buttons, the staff surface, everything — automatically picks
+   up the matched Ethiopic pair on `am` pages, carrying the same visual
+   weight and personality as the English pair instead of a plain fallback.
+   This only takes effect now that `<html lang>` is actually set per
+   locale (see app/[lang]/layout.tsx); previously it was hardcoded to
+   "en" and this selector never matched. */
+html[lang="am"] {
+  --font-serif: 'Noto Sans Ethiopic Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-sans: 'Noto Sans Ethiopic Variable', 'Inter Variable', system-ui, sans-serif;
+}
+
+/* Heading line rhythm. Ge'ez glyphs sit taller in the em box than Latin
+   glyphs (no ascender/descender split), so Tailwind's default tight
+   display line-heights (text-3xl/4xl default to ~1.1) clip/crowd
+   Ethiopic headings even though the same value reads fine in English. A
+   single shared value tuned for the Ethiopic case still looks correct —
+   if slightly airier than strictly necessary — on the English case,
+   which is a safer mismatch than the reverse. No letter-spacing
+   adjustment is needed now that headings use the sans face — the
+   negative tracking that used to live here was a serif-display holdover
+   and doesn't apply to a sans-serif face. */
+.font-serif {
+  line-height: 1.3;
 }
 
 /* Focus states for accessibility */

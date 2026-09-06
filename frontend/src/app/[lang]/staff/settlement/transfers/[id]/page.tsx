@@ -70,7 +70,7 @@ export default function TransferDetailPage() {
           <div className="mb-4 flex justify-center text-stone-400">
             <SearchX className="w-10 h-10" />
           </div>
-          <h2 className="font-serif text-2xl text-stone-900">
+          <h2 className="font-serif font-semibold text-2xl text-stone-900">
             {t('transfer_not_found') || 'Transfer Not Found'}
           </h2>
           <p className="text-stone-500 mt-1">
@@ -100,7 +100,7 @@ export default function TransferDetailPage() {
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl text-stone-900">
+          <h1 className="font-serif font-semibold text-3xl text-stone-900">
             {t('transfer_details') || 'Reconciliation Details'}
           </h1>
           <p className="font-mono text-sm text-stone-400 mt-1">
@@ -118,7 +118,7 @@ export default function TransferDetailPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b border-stone-100">
               <span className="text-stone-500">{t('amount') || 'Amount'}</span>
-              <span className="font-bold text-xl text-primary-600 font-serif">
+              <span className="text-xl text-primary-600 font-serif font-semibold">
                 ETB {transfer.amountEtb}
               </span>
             </div>

@@ -30,7 +30,7 @@ export function StatCard({
       <div className="text-xs text-stone-500 font-medium uppercase tracking-wider mb-1">
         {label}
       </div>
-      <div className={cn('text-2xl font-bold font-serif', colors[color])}>
+      <div className={cn('text-2xl font-serif font-semibold', colors[color])}>
         {value}
       </div>
       {sub && (

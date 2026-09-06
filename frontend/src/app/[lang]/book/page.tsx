@@ -184,7 +184,7 @@ export default function BookPage() {
         <VisitorSidebar />
         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="mb-8">
-          <h1 className="text-3xl font-serif font-bold text-stone-900">
+          <h1 className="text-3xl font-serif font-semibold text-stone-900">
             {t('book_a_visit') || 'Book a Visit'}
           </h1>
           <StepIndicator

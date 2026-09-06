@@ -61,7 +61,7 @@ export function TransferConfirmationCard({
             <Clock className="w-8 h-8" />
           )}
         </div>
-        <h2 className="font-serif text-2xl text-stone-900">
+        <h2 className="font-serif font-semibold text-2xl text-stone-900">
           {isCompleted
             ? t('transfer_complete') || 'Transfer Complete!'
             : isFailed
@@ -82,7 +82,7 @@ export function TransferConfirmationCard({
         </div>
         <div>
           <div className="text-stone-500">{t('amount') || 'Amount'}</div>
-          <div className="font-bold text-xl text-primary-600 font-serif">
+          <div className="text-xl text-primary-600 font-serif font-semibold">
             ETB {reconciliation.amountEtb}
           </div>
         </div>

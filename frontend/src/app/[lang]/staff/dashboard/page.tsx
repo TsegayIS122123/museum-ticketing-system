@@ -86,7 +86,7 @@ export default function StaffDashboardPage() {
         <div className="text-xs text-stone-400 uppercase tracking-wider mb-1">
           {t('welcome_back') || 'Welcome back'}
         </div>
-        <h1 className="font-serif text-4xl text-stone-900">
+        <h1 className="font-serif font-semibold text-4xl text-stone-900">
           {user?.full_name || t('staff') || 'Staff'}
         </h1>
         <p className="text-stone-500 mt-1">

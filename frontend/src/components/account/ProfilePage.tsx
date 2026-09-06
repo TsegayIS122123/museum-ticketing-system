@@ -63,7 +63,7 @@ export function ProfilePage() {
     <PageContainer maxWidth="md">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="mb-6">
-        <h1 className="font-serif text-3xl text-stone-900">{t('profile') || 'Profile'}</h1>
+        <h1 className="font-serif font-semibold text-3xl text-stone-900">{t('profile') || 'Profile'}</h1>
         <p className="mt-1 text-stone-500">{t('profile_description') || 'Manage your account details and language.'}</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border border-stone-200 bg-white p-4 sm:p-6 shadow-sm">

@@ -1,0 +1,97 @@
+/*
+ * Self-hosted bilingual type system.
+ *
+ * Every family below ships as an actual file in /public/fonts (OFL-1.1
+ * licensed — see the OFL.txt next to each family) and is referenced by
+ * local url(), so nothing is ever requested from fonts.googleapis.com or
+ * any other external font host.
+ *
+ * English and Amharic are given genuinely matched pairs rather than an
+ * English "display" face with an Amharic fallback:
+ *
+ *   - Headings: Noto Serif (Latin) + Noto Serif Ethiopic. Both are part of
+ *     Google's Noto family, whose explicit design goal is visual
+ *     harmonization — matching x-height, stroke contrast and weight —
+ *     across scripts, so the two act as one typeface rather than two
+ *     unrelated fonts that happen to render the same words.
+ *   - Body/UI text: Inter (Latin) + Noto Sans Ethiopic. Both are neutral,
+ *     high-x-height grotesques tuned for on-screen reading at small sizes.
+ *
+ * Each family is variable (weight 100–900 in a single file), so we load
+ * one file per script per role instead of one file per static weight.
+ * Only the Latin and Ethiopic subsets are shipped (this product has no
+ * Cyrillic/Greek/Vietnamese content); Latin-ext is intentionally dropped
+ * since neither English nor transliterated Amharic content in this app
+ * uses accented Latin characters.
+ */
+
+@font-face {
+  font-family: 'Noto Serif Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/noto-serif/noto-serif-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Noto Serif Ethiopic Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/noto-serif-ethiopic/noto-serif-ethiopic-ethiopic-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+030E, U+1200-1399, U+2D80-2DDE, U+AB01-AB2E, U+1E7E0-1E7E6, U+1E7E8-1E7EB,
+    U+1E7ED-1E7EE, U+1E7F0-1E7FE;
+}
+
+@font-face {
+  /* Latin glyphs (digits, punctuation, any embedded English) inside Amharic
+     headings, kept in the same family so a mixed-script heading doesn't
+     visibly switch fonts mid-word. */
+  font-family: 'Noto Serif Ethiopic Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/noto-serif-ethiopic/noto-serif-ethiopic-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/inter/inter-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Noto Sans Ethiopic Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/noto-sans-ethiopic/noto-sans-ethiopic-ethiopic-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+030E, U+1200-1399, U+2D80-2DDE, U+AB01-AB2E, U+1E7E0-1E7E6, U+1E7E8-1E7EB,
+    U+1E7ED-1E7EE, U+1E7F0-1E7FE;
+}
+
+@font-face {
+  font-family: 'Noto Sans Ethiopic Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/noto-sans-ethiopic/noto-sans-ethiopic-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}

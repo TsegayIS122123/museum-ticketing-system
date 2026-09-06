@@ -92,7 +92,7 @@ export default function SettlementPage() {
       )}
 
       <div className="mb-6">
-        <h1 className="font-serif text-3xl text-stone-900">
+        <h1 className="font-serif font-semibold text-3xl text-stone-900">
           {t('settlement') || 'Settlement'}
         </h1>
         <p className="text-stone-500 mt-1">

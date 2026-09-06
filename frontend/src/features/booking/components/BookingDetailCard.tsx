@@ -88,7 +88,7 @@ export function BookingDetailCard({
         )}
         <div>
           <p className="text-stone-500">{t('total')}</p>
-          <p className="font-bold text-lg text-primary-600 font-serif">
+          <p className="text-lg text-primary-600 font-serif font-semibold">
             ETB {booking.totalAmountEtb}
           </p>
         </div>

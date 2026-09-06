@@ -136,7 +136,7 @@ function ConfirmationPageContent() {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-serif font-bold text-stone-900">
+            <h1 className="text-2xl font-serif font-semibold text-stone-900">
               {t('booking_confirmed') || 'Booking Confirmed!'}
             </h1>
             <p className="text-stone-500 mt-1 text-sm">
