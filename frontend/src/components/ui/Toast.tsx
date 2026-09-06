@@ -38,7 +38,7 @@ export function Toast({
   }, [duration, onClose]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 max-w-sm animate-in slide-in-from-bottom-5">
+    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-sm animate-in slide-in-from-bottom-5 sm:bottom-6 sm:left-auto sm:right-6 sm:mx-0">
       <div
         className={cn(
           'flex items-center gap-3 px-5 py-3 rounded-xl border shadow-lg',

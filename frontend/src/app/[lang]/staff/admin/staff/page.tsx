@@ -156,7 +156,7 @@ export default function StaffManagementPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <StatCard
           label={t('total_staff') || 'Total Staff'}
           value={staff.length}

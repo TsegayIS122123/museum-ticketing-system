@@ -13,7 +13,7 @@ export function Card({
     <div
       className={cn(
         'bg-white rounded-xl border border-stone-200 shadow-sm',
-        padding && 'p-6',
+        padding && 'p-4 sm:p-6',
         className
       )}
     >

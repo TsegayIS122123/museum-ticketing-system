@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { Menu, X } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
@@ -48,6 +50,19 @@ export function StaffSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  // Sidebar collapses into an off-canvas drawer below the `md` breakpoint
+  // -- this only tracks whether that drawer is open; the desktop
+  // (`md:flex`) rendering below is never affected by it.
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Lock background scroll while the drawer is open, same approach as
+  // components/ui/Modal.tsx.
+  useEffect(() => {
+    document.body.style.overflow = isMobileOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileOpen]);
 
   if (!user || !isStaff(user.role)) {
     return null;
@@ -57,6 +72,7 @@ export function StaffSidebar() {
   const info = roleInfo[user.role];
 
   const handleSignOut = () => {
+    setIsMobileOpen(false);
     logout();
     router.push(`/${locale}`);
   };
@@ -65,8 +81,13 @@ export function StaffSidebar() {
     return pathname?.includes(path) || false;
   };
 
-  return (
-    <aside className="w-60 bg-brand-primary flex flex-col flex-shrink-0 h-full">
+  const handleNavigate = (path: string) => {
+    setIsMobileOpen(false);
+    router.push(`/${locale}${path}`);
+  };
+
+  const sidebarBody = (
+    <>
       {/* Logo */}
       <div className="p-5 border-b border-white/20">
         <div className="flex items-center gap-3">
@@ -96,7 +117,7 @@ export function StaffSidebar() {
           return (
             <button
               key={item.view}
-              onClick={() => router.push(`/${locale}${item.path}`)}
+              onClick={() => handleNavigate(item.path)}
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all text-left cursor-pointer rounded-none',
                 active
@@ -133,6 +154,49 @@ export function StaffSidebar() {
           ← Sign Out
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile toggle -- fixed so it stays reachable regardless of scroll
+          position, and only rendered below `md` since the sidebar itself
+          is always visible from `md` up. */}
+      <button
+        type="button"
+        onClick={() => setIsMobileOpen(true)}
+        aria-label={t('open_menu') || 'Open navigation menu'}
+        aria-expanded={isMobileOpen}
+        className="fixed left-4 top-20 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-brand-primary text-white shadow-lg md:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Mobile drawer */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setIsMobileOpen(false)}
+          />
+          <aside className="relative flex h-full w-64 max-w-[80vw] flex-col bg-brand-primary shadow-xl">
+            <button
+              type="button"
+              onClick={() => setIsMobileOpen(false)}
+              aria-label={t('close_menu') || 'Close navigation menu'}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            {sidebarBody}
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-60 bg-brand-primary flex-col flex-shrink-0 h-full">
+        {sidebarBody}
+      </aside>
+    </>
   );
 }
