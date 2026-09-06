@@ -11,6 +11,8 @@ export function Card({
 }) {
   return (
     <div
+      data-slot="card"
+      data-padding={padding}
       className={cn(
         'bg-white rounded-xl border border-stone-200 shadow-sm',
         padding && 'p-4 sm:p-6',

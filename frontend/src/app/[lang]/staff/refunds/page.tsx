@@ -108,7 +108,7 @@ export default function RefundsPage() {
   return (
     <PageContainer>
       <div className="mb-6">
-        <h1 className="font-serif font-semibold text-3xl text-stone-900">
+        <h1 className="font-serif font-semibold text-2xl text-stone-900">
           {t('refunds') || 'Refunds'}
         </h1>
         <p className="text-stone-500 mt-1">
@@ -149,7 +149,7 @@ export default function RefundsPage() {
         ) : error ? (
           <div className="p-8 text-center text-red-600">{error}</div>
         ) : (
-          <Table headers={headers} rows={rows} />
+          <Table headers={headers} rows={rows} dense numericColumns={[2]} />
         )}
       </Card>
     </PageContainer>

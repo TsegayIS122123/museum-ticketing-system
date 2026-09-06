@@ -9,10 +9,19 @@ interface TableProps {
   rows: ReactNode[][];
   className?: string;
   emptyMessage?: string;
+  /** Tighter row padding for surfaces where someone is scanning many rows
+   *  fast (the staff ledger tables) rather than browsing a short list. */
+  dense?: boolean;
+  /** Zero-based column indices that hold money/count values. Rendered
+   *  right-aligned with tabular figures so the digits stack into columns
+   *  instead of drifting with each row's proportional-width digits. */
+  numericColumns?: number[];
 }
 
-export function Table({ headers, rows, className, emptyMessage }: TableProps) {
+export function Table({ headers, rows, className, emptyMessage, dense, numericColumns }: TableProps) {
   const { t } = useTranslation();
+  const cellPadding = dense ? 'py-2 px-4' : 'py-3 px-4';
+  const isNumeric = (index: number) => numericColumns?.includes(index) ?? false;
   return (
     <div className={cn("overflow-x-auto", className)}>
       <table className="w-full text-sm">
@@ -21,7 +30,11 @@ export function Table({ headers, rows, className, emptyMessage }: TableProps) {
             {headers.map((header, index) => (
               <th
                 key={index}
-                className="text-left py-3 px-4 text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap"
+                className={cn(
+                  'text-left text-xs font-semibold text-stone-500 uppercase tracking-wider whitespace-nowrap',
+                  cellPadding,
+                  isNumeric(index) && 'text-right'
+                )}
               >
                 {header}
               </th>
@@ -45,7 +58,14 @@ export function Table({ headers, rows, className, emptyMessage }: TableProps) {
                 className="border-b border-stone-100 hover:bg-stone-50 transition-colors"
               >
                 {row.map((cell, cellIndex) => (
-                  <td key={cellIndex} className="py-3 px-4 text-stone-700">
+                  <td
+                    key={cellIndex}
+                    className={cn(
+                      'text-stone-700',
+                      cellPadding,
+                      isNumeric(cellIndex) && 'text-right font-mono tabular-nums'
+                    )}
+                  >
                     {cell}
                   </td>
                 ))}

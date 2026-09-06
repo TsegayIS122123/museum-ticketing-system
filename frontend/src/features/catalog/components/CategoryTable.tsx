@@ -107,7 +107,7 @@ export function CategoryTable({
         </div>
       )}
       <Card padding={false}>
-        <Table headers={headers} rows={rows} />
+        <Table headers={headers} rows={rows} dense numericColumns={[1]} />
       </Card>
     </div>
   );

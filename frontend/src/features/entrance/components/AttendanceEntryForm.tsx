@@ -167,7 +167,7 @@ export function AttendanceEntryForm({
             )}
             <div className="flex justify-between">
               <span className="text-stone-500">{t('amount_figures') || 'Amount (figures)'}</span>
-              <span className="font-medium text-stone-900">ETB {justCheckedIn.amountFigures}</span>
+              <span className="font-medium font-mono tabular-nums text-stone-900">ETB {justCheckedIn.amountFigures}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-stone-500">{t('amount_words') || 'Amount (words)'}</span>
@@ -233,7 +233,7 @@ export function AttendanceEntryForm({
             {t('already_checked_in') || 'Already Checked In'}
           </div>
           {booking.attendedQuantity !== null && (
-            <div className="text-sm text-green-600 mt-1">
+            <div className="text-sm text-green-600 mt-1 font-mono tabular-nums">
               {t('attended')}: {booking.attendedQuantity} / {booking.bookedQuantity}
             </div>
           )}
@@ -287,7 +287,7 @@ export function AttendanceEntryForm({
       : [booking.visitorEmail, booking.visitorPhone].filter(Boolean).join(' · ');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {toast && (
         <Toast
           message={toast.message}
@@ -302,12 +302,12 @@ export function AttendanceEntryForm({
         </div>
       )}
 
-      {/* Booking Details */}
       <Card>
+        {/* Booking details */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <span className="font-mono text-sm font-semibold text-stone-600">
+              <span className="font-mono tabular-nums text-sm font-semibold text-stone-600">
                 #{booking.reference}
               </span>
               <StatusBadge status={booking.status} />
@@ -367,11 +367,11 @@ export function AttendanceEntryForm({
           </div>
           <div>
             <div className="text-stone-500">{t('booked') || 'Booked'}</div>
-            <div className="font-bold text-lg text-primary-600">{booking.bookedQuantity}</div>
+            <div className="font-bold font-mono tabular-nums text-lg text-primary-600">{booking.bookedQuantity}</div>
           </div>
           <div>
             <div className="text-stone-500">{t('total')}</div>
-            <div className="font-medium text-stone-900">ETB {booking.totalAmountEtb}</div>
+            <div className="font-medium font-mono tabular-nums text-stone-900">ETB {booking.totalAmountEtb}</div>
           </div>
         </div>
 
@@ -400,85 +400,87 @@ export function AttendanceEntryForm({
             }}
           />
         )}
-      </Card>
 
-      {/* Attendance Entry */}
-      <Card>
-        <h4 className="text-lg font-semibold text-stone-900 mb-4">
-          {t('record_attendance') || 'Record Attendance'}
-        </h4>
+        {/* Attendance entry -- same card, hairline divider instead of a
+            second shadowed panel: this is one continuous task (look at
+            the booking, then record who showed up), not two. */}
+        <div className="mt-4 pt-4 border-t border-stone-200">
+          <h4 className="text-sm font-semibold text-stone-900 uppercase tracking-wider mb-3">
+            {t('record_attendance') || 'Record Attendance'}
+          </h4>
 
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-stone-700">
-              {t('attended_quantity') || 'Attended Quantity'}
-            </label>
-            <div className="flex items-center gap-4 mt-1">
-              <button
-                type="button"
-                onClick={() => setAttendedQuantity(Math.max(0, attendedQuantity - 1))}
-                className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
-                aria-label={t('decrease_attended_count') || 'Decrease attended count'}
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <input
-                type="number"
-                value={attendedQuantity}
-                onChange={handleQuantityChange}
-                min={0}
-                max={booking.bookedQuantity}
-                className="w-20 text-center px-2 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 text-lg font-semibold"
-              />
-              <button
-                type="button"
-                onClick={() => setAttendedQuantity(Math.min(booking.bookedQuantity, attendedQuantity + 1))}
-                className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
-                aria-label={t('increase_attended_count') || 'Increase attended count'}
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <span className="text-sm text-stone-500">
-                / {booking.bookedQuantity} {t('max') || 'max'}
-              </span>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-stone-700">
+                {t('attended_quantity') || 'Attended Quantity'}
+              </label>
+              <div className="flex items-center gap-4 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setAttendedQuantity(Math.max(0, attendedQuantity - 1))}
+                  className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
+                  aria-label={t('decrease_attended_count') || 'Decrease attended count'}
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <input
+                  type="number"
+                  value={attendedQuantity}
+                  onChange={handleQuantityChange}
+                  min={0}
+                  max={booking.bookedQuantity}
+                  className="w-20 text-center px-2 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 text-lg font-semibold font-mono tabular-nums"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAttendedQuantity(Math.min(booking.bookedQuantity, attendedQuantity + 1))}
+                  className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
+                  aria-label={t('increase_attended_count') || 'Increase attended count'}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-stone-500">
+                  / {booking.bookedQuantity} {t('max') || 'max'}
+                </span>
+              </div>
             </div>
-          </div>
 
-          {shortfall > 0 && (
-            <div className="p-3 bg-secondary-50 border border-secondary-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <span className="text-secondary-600"><AlertTriangle className="w-4 h-4" /></span>
-                <div>
-                  <div className="text-sm font-medium text-secondary-800">
-                    {t('partial_attendance') || 'Partial Attendance'}
-                  </div>
-                  <div className="text-xs text-secondary-700">
-                    {shortfall} {t('visitors_did_not_attend') || 'visitors did not attend.'}
-                    {t('refund_available_on_request') || 'Refund available on request.'}
+            {shortfall > 0 && (
+              <div className="p-3 bg-secondary-50 border border-secondary-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <span className="text-secondary-600"><AlertTriangle className="w-4 h-4" /></span>
+                  <div>
+                    <div className="text-sm font-medium text-secondary-800">
+                      {t('partial_attendance') || 'Partial Attendance'}
+                    </div>
+                    <div className="text-xs text-secondary-700">
+                      {shortfall} {t('visitors_did_not_attend') || 'visitors did not attend.'}
+                      {t('refund_available_on_request') || 'Refund available on request.'}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="flex gap-3 pt-2">
-            <Button
-              type="button"
-              variant="secondary"
-              className="flex-1"
-              onClick={onCancel}
-              disabled={isProcessing}
-            >
-              {t('cancel') || 'Cancel'}
-            </Button>
-            <Button
-              type="button"
-              className="flex-1 bg-brand-primary hover:bg-primary-700"
-              onClick={() => setShowConfirm(true)}
-              disabled={isProcessing || attendedQuantity === 0}
-            >
-              {isProcessing ? t('processing') || 'Processing...' : t('confirm_check_in') || 'Confirm Check-in'}
-            </Button>
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={onCancel}
+                disabled={isProcessing}
+              >
+                {t('cancel') || 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                className="flex-1 bg-brand-primary hover:bg-primary-700"
+                onClick={() => setShowConfirm(true)}
+                disabled={isProcessing || attendedQuantity === 0}
+              >
+                {isProcessing ? t('processing') || 'Processing...' : t('confirm_check_in') || 'Confirm Check-in'}
+              </Button>
+            </div>
           </div>
         </div>
       </Card>

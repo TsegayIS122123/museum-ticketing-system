@@ -161,6 +161,37 @@ html[lang="am"] {
   min-width: 32px;
 }
 
+/* Staff surface — ledger/terminal density (task 2 of the redesign
+   sequence). Someone here is scanning tickets or reconciling cash, not
+   browsing a leisurely dashboard, so cards lose their drop shadow for a
+   flatter, hairline-ruled treatment, body copy sits tighter, and money/
+   count values line up on tabular figures. Scoped to [data-surface="staff"]
+   so the visitor booking flow's Card/StatCard/Table instances are
+   untouched — this only restyles the shared components' existing
+   data-slot hooks, no new component variants were needed. */
+[data-surface="staff"] {
+  line-height: 1.35;
+}
+
+[data-surface="staff"] [data-slot="card"] {
+  border-radius: 0.375rem;
+  box-shadow: none;
+}
+
+[data-surface="staff"] [data-slot="card"][data-padding="true"] {
+  padding: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  [data-surface="staff"] [data-slot="card"][data-padding="true"] {
+    padding: 1rem;
+  }
+}
+
+[data-surface="staff"] [data-slot="stat-value"] {
+  font-family: var(--font-mono);
+}
+
 /* Utility classes */
 .tap-target {
   min-height: 44px;

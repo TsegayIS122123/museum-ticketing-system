@@ -82,7 +82,7 @@ export function TransferConfirmationCard({
         </div>
         <div>
           <div className="text-stone-500">{t('amount') || 'Amount'}</div>
-          <div className="text-xl text-primary-600 font-serif font-semibold">
+          <div className="text-xl text-primary-600 font-serif font-semibold font-mono tabular-nums">
             ETB {reconciliation.amountEtb}
           </div>
         </div>

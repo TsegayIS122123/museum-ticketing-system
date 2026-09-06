@@ -86,7 +86,7 @@ export default function StaffDashboardPage() {
         <div className="text-xs text-stone-400 uppercase tracking-wider mb-1">
           {t('welcome_back') || 'Welcome back'}
         </div>
-        <h1 className="font-serif font-semibold text-4xl text-stone-900">
+        <h1 className="font-serif font-semibold text-2xl text-stone-900">
           {user?.full_name || t('staff') || 'Staff'}
         </h1>
         <p className="text-stone-500 mt-1">
@@ -188,19 +188,19 @@ export default function StaffDashboardPage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between py-2 border-b border-stone-100">
                 <span className="text-stone-500">{t('pending')}</span>
-                <span className="font-medium">{statusMix.pending}</span>
+                <span className="font-medium font-mono tabular-nums">{statusMix.pending}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-stone-100">
                 <span className="text-stone-500">{t('visited')}</span>
-                <span className="font-medium">{statusMix.visited}</span>
+                <span className="font-medium font-mono tabular-nums">{statusMix.visited}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-stone-100">
                 <span className="text-stone-500">{t('cancelled')}</span>
-                <span className="font-medium text-red-500">{statusMix.cancelled}</span>
+                <span className="font-medium font-mono tabular-nums text-red-500">{statusMix.cancelled}</span>
               </div>
               <div className="flex justify-between py-2 font-bold text-lg">
                 <span>{t('total_revenue') || 'Total Revenue'}</span>
-                <span className="text-primary-600">ETB {dashboard?.revenueTotalEtb ?? 0}</span>
+                <span className="font-mono tabular-nums text-primary-600">ETB {dashboard?.revenueTotalEtb ?? 0}</span>
               </div>
             </div>
           </Card>
