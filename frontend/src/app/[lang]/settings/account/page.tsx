@@ -32,7 +32,11 @@ export default function AccountSettingsPage() {
     return (
       <div className="min-h-screen bg-stone-50" data-surface="staff">
         <SiteHeader />
-        <div className="flex min-h-[calc(100vh-4rem)]">
+        {/* `flex-col md:flex-row` mirrors [lang]/staff/layout.tsx: on
+            mobile, StaffSidebar's in-flow top bar needs to stack above
+            `main`, not sit squeezed into a row beside it (that's what
+            made the toggle bar render sideways/off on this page). */}
+        <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)]">
           <StaffSidebar />
           <main className="flex-1 overflow-auto">
             <ProfilePage />

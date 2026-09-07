@@ -150,7 +150,7 @@ export function StaffSidebar() {
         </div>
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-2 text-xs text-white/65 hover:text-white transition-colors py-1 text-left cursor-pointer"
+          className="w-full flex items-center gap-2 text-xs text-red-300 hover:text-red-200 transition-colors py-1 text-left cursor-pointer"
         >
           <LogOut className="w-3.5 h-3.5" /> {t('logout') || 'Logout'}
         </button>
@@ -160,18 +160,28 @@ export function StaffSidebar() {
 
   return (
     <>
-      {/* Mobile toggle -- fixed so it stays reachable regardless of scroll
-          position, and only rendered below `md` since the sidebar itself
-          is always visible from `md` up. */}
-      <button
-        type="button"
-        onClick={() => setIsMobileOpen(true)}
-        aria-label={t('open_nav_menu') || 'Open navigation menu'}
-        aria-expanded={isMobileOpen}
-        className="fixed left-4 top-20 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-brand-primary text-white shadow-lg md:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+      {/* Mobile top bar -- in-flow (not `fixed`), only rendered below
+          `md` since the sidebar itself is always visible from `md` up.
+          This used to be a `fixed` circular button pinned to the
+          viewport; since `main` scrolls independently
+          (`overflow-auto` in staff/layout.tsx), a `fixed` button stayed
+          on screen at all times and sat on top of whatever page content
+          happened to be underneath it, regardless of scroll position.
+          Rendering it as a normal block above `main` (staff/layout.tsx
+          now stacks them with `flex-col` on mobile) means it takes up
+          its own row and never overlays the scrollable content below. */}
+      <div className="flex items-center justify-between bg-brand-primary px-4 py-3 md:hidden">
+        <span className="text-sm font-semibold text-white">{t('staff_portal') || 'Staff Portal'}</span>
+        <button
+          type="button"
+          onClick={() => setIsMobileOpen(true)}
+          aria-label={t('open_nav_menu') || 'Open navigation menu'}
+          aria-expanded={isMobileOpen}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </div>
 
       {/* Mobile drawer */}
       {isMobileOpen && (

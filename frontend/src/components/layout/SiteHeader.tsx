@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
+import { isStaff } from '@/lib/auth/roles';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 
 export function SiteHeader() {
@@ -18,7 +19,19 @@ export function SiteHeader() {
   // locale tells us whether we're in the staff area -- the visitor-facing
   // links (Book a visit / Manage bookings / Visitor verification) don't
   // belong on any /staff/* page, which has its own StaffSidebar nav.
-  const isStaffArea = pathname?.split('/').filter(Boolean)[1] === 'staff';
+  //
+  // `/settings/account` is the one exception: it's a role-agnostic route
+  // (app/[lang]/settings/account/page.tsx) outside `/staff/*` on purpose
+  // -- StaffLayout redirects non-staff away, and this route must stay
+  // reachable for visitors too -- but it renders the *staff* chrome
+  // (StaffSidebar) for staff users. Without this check, `isStaffArea` was
+  // false there even for staff, so this header showed its visitor nav
+  // links, its own mobile hamburger, and the name/logout dropdown right
+  // alongside StaffSidebar's -- duplicated chrome, laid out for a
+  // visitor page, is what broke the mobile toggle bar's layout there.
+  const isStaffArea =
+    pathname?.split('/').filter(Boolean)[1] === 'staff' ||
+    (pathname?.includes('/settings/account') && !!user && isStaff(user.role));
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   // Primary nav + language toggle (and, when signed in, the profile menu)
   // don't fit next to the logo below `md` -- everything collapses into
@@ -76,7 +89,11 @@ export function SiteHeader() {
             <LanguageToggle />
           </div>
 
-          {isAuthenticated && user && (
+          {/* Staff pages already show the account name, profile link, and
+              logout action in StaffSidebar's left-hand nav -- repeating
+              them here is redundant, so this global header drops the
+              profile trigger entirely on /staff/* routes. */}
+          {isAuthenticated && user && !isStaffArea && (
             <div className="relative hidden md:block">
               <button
                 type="button"
@@ -103,20 +120,28 @@ export function SiteHeader() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setIsMobileMenuOpen((open) => !open)}
-            aria-expanded={isMobileMenuOpen}
-            aria-controls="mobile-primary-nav"
-            aria-label={isMobileMenuOpen ? t('close_menu') || 'Close menu' : t('open_menu') || 'Open menu'}
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-brand-primary hover:bg-brand-primary/10 md:hidden"
-          >
-            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          {/* This toggle only ever opens navLinks/profile/language-toggle
+              -- all already empty or hidden on /staff/* routes (navLinks
+              is `[]` for staff, profile is hidden above), and
+              StaffSidebar has its own mobile nav toggle already. So the
+              button (and the panel below) don't render at all here on
+              staff pages instead of opening an empty/near-empty panel. */}
+          {!isStaffArea && (
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen((open) => !open)}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-primary-nav"
+              aria-label={isMobileMenuOpen ? t('close_menu') || 'Close menu' : t('open_menu') || 'Open menu'}
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-brand-primary hover:bg-brand-primary/10 md:hidden"
+            >
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          )}
         </div>
       </div>
 
-      {isMobileMenuOpen && (
+      {isMobileMenuOpen && !isStaffArea && (
         // Overlay panel -- sits above the page (not inline in the header
         // flow), so opening it no longer pushes the rest of the page
         // down. The backdrop blurs/dims everything below the header,
@@ -145,10 +170,12 @@ export function SiteHeader() {
               </nav>
             )}
 
-            {isAuthenticated && user && (
+            {isAuthenticated && user && !isStaffArea && (
               // Only the profile and logout actions belong here -- unlike
               // the desktop trigger button, this collapsed panel doesn't
-              // surface the visitor's name.
+              // surface the visitor's name. Skipped entirely on /staff/*
+              // routes for the same reason as the desktop trigger above:
+              // StaffSidebar already has these.
               <div className="mt-3 border-t border-brand-primary/10 pt-3">
                 <Link
                   href={profilePath}

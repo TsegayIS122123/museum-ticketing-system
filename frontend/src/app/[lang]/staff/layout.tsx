@@ -46,7 +46,12 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
   return (
     <div className="min-h-screen bg-stone-50" data-surface="staff">
       <SiteHeader />
-      <div className="flex min-h-[calc(100vh-4rem)]">
+      {/* `flex-col` below `md`: the mobile nav toggle renders as an
+          in-flow top bar (StaffSidebar), stacked above `main` instead of
+          floating over it. `md:flex-row` restores the sidebar-beside-main
+          layout once StaffSidebar switches to its always-visible desktop
+          rendering. */}
+      <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)]">
         <StaffSidebar />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
