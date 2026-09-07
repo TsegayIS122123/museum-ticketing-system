@@ -198,6 +198,10 @@ export default function StaffDashboardPage() {
                 <span className="text-stone-500">{t('cancelled')}</span>
                 <span className="font-medium font-mono tabular-nums text-red-500">{statusMix.cancelled}</span>
               </div>
+              <div className="flex justify-between py-2 border-b border-stone-100">
+                <span className="text-stone-500">{t('refunded') || 'Refunded'}</span>
+                <span className="font-medium font-mono tabular-nums text-red-500">{statusMix.refunded}</span>
+              </div>
               <div className="flex justify-between py-2 font-bold text-lg">
                 <span>{t('total_revenue') || 'Total Revenue'}</span>
                 <span className="font-mono tabular-nums text-primary-600">ETB {dashboard?.revenueTotalEtb ?? 0}</span>

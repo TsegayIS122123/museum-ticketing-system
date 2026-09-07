@@ -12,6 +12,27 @@ import { StatCard } from '@/components/ui/StatCard';
 import { getRefunds, type Refund } from '@/features/refunds/api';
 import { downloadCsv } from '@/lib/utils/download';
 
+// GET /refunds is paginated (default 20, max 100 per page -- see
+// apps.core.pagination.EnvelopeLimitOffsetPagination). The stat cards
+// below claim to summarize "Total Refunds", so they need every refund,
+// not just whatever the first page happens to return -- otherwise the
+// moment an organization passes 20 refunds, this page silently starts
+// under-reporting its own totals with no indication anything was cut off.
+async function getAllRefunds(): Promise<Refund[]> {
+  const limit = 100;
+  let offset = 0;
+  const all: Refund[] = [];
+
+  while (true) {
+    const response = await getRefunds({ limit, offset });
+    all.push(...response.data);
+    offset += limit;
+    if (offset >= response.meta.total) break;
+  }
+
+  return all;
+}
+
 export default function RefundsPage() {
   const { t } = useTranslation();
   const [refunds, setRefunds] = useState<Refund[]>([]);
@@ -21,9 +42,9 @@ export default function RefundsPage() {
   useEffect(() => {
     let cancelled = false;
 
-    getRefunds()
-      .then((res) => {
-        if (!cancelled) setRefunds(res.data);
+    getAllRefunds()
+      .then((data) => {
+        if (!cancelled) setRefunds(data);
       })
       .catch((err: any) => {
         if (!cancelled) setError(err.message || 'Failed to load refunds');
@@ -45,6 +66,8 @@ export default function RefundsPage() {
         return t('partial_shortfall') || 'Partial Shortfall';
       case 'no_response':
         return t('no_response') || 'No Response';
+      case 'category_correction':
+        return t('category_correction') || 'Category Correction';
       default:
         return reason;
     }

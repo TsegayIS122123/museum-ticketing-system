@@ -73,7 +73,8 @@ export default function ReportsPage() {
       ['Total visitors', totalVisitors],
       ['Total revenue (period)', revenueTotal],
       ['Total revenue (overall)', dashboard?.revenueTotalEtb ?? 0],
-      ['Cancellations (overall)', dashboard?.statusMix.cancelled ?? 0],
+      ['Cancelled, refund pending (overall)', dashboard?.statusMix.cancelled ?? 0],
+      ['Cancelled and refunded (overall)', dashboard?.statusMix.refunded ?? 0],
       [],
       ['Revenue by category', ''],
       ...revenueByCategory.map((cat) => [cat.name, cat.amount]),
@@ -118,7 +119,7 @@ export default function ReportsPage() {
         <div className="p-8 text-center text-red-600">{error}</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <StatCard
               label={t('total_visitors') || 'Total Visitors'}
               value={totalVisitors}
@@ -136,9 +137,16 @@ export default function ReportsPage() {
               color="blue"
             />
             <StatCard
-              label={t('cancellations') || 'Cancellations (overall)'}
+              label={t('cancellations')}
               value={dashboard?.statusMix.cancelled ?? 0}
+              sub={t('cancellations_sub')}
               color="red"
+            />
+            <StatCard
+              label={t('refunded')}
+              value={dashboard?.statusMix.refunded ?? 0}
+              sub={t('refunded_sub')}
+              color="secondary"
             />
           </div>
 

@@ -12,6 +12,25 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { listReconciliations, type CashierReconciliation } from '@/features/settlement/api';
 
+// GET /settlement/reconciliations/ is paginated (default 20, max 100 --
+// see apps.core.pagination.EnvelopeLimitOffsetPagination). This page's own
+// subtitle promises "all past settlement reconciliations", so it needs to
+// walk every page rather than silently showing just the most recent 20.
+async function getAllReconciliations(): Promise<CashierReconciliation[]> {
+  const limit = 100;
+  let offset = 0;
+  const all: CashierReconciliation[] = [];
+
+  while (true) {
+    const response = await listReconciliations({ limit, offset });
+    all.push(...response.data);
+    offset += limit;
+    if (offset >= response.meta.total) break;
+  }
+
+  return all;
+}
+
 export default function SettlementTransfersPage() {
   const { t, locale } = useTranslation();
   const router = useRouter();
@@ -22,8 +41,8 @@ export default function SettlementTransfersPage() {
   const loadTransfers = async () => {
     setIsLoading(true);
     try {
-      const response = await listReconciliations();
-      setTransfers(response.data);
+      const data = await getAllReconciliations();
+      setTransfers(data);
     } catch (error) {
       console.error('Failed to load transfers:', error);
     } finally {
