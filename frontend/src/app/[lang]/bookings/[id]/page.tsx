@@ -15,6 +15,7 @@ import { getBooking, type BookingResponse } from '@/features/booking/api';
 import { requestPartialRefund } from '@/features/refunds/api';
 import { ApiError } from '@/lib/api/errors';
 import { Toast } from '@/components/ui/Toast';
+import { downloadReceipt } from '@/lib/utils/download';
 
 export default function BookingDetailPage() {
   const { t, locale } = useTranslation();
@@ -230,7 +231,13 @@ export default function BookingDetailPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => window.open(booking.receiptUrl!, '_blank')}
+                onClick={() =>
+                  downloadReceipt(
+                    `/bookings/${booking.id}/receipt/download`,
+                    booking.receiptUrl!,
+                    `receipt-${booking.reference}.pdf`
+                  )
+                }
               >
                 <FileDown className="w-4 h-4" /> {t('download_receipt')}
               </Button>

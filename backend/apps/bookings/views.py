@@ -5,6 +5,8 @@ response status codes. No business logic here (Design Spec Sec 3.1).
 
 from datetime import date as _date
 
+from django.core.files.storage import default_storage
+from django.http import FileResponse, Http404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError
@@ -152,6 +154,54 @@ class BookingDetailView(generics.RetrieveAPIView):
         if not (is_owner or is_staff):
             self.permission_denied(self.request)
         return booking
+
+
+class BookingReceiptDownloadView(APIView):
+    """GET /bookings/{id}/receipt/download/ -- the owning Visitor or any
+    Staff member (same access rule as BookingDetailView).
+
+    `booking.receipt_url` (exposed as `receiptUrl` on BookingSerializer)
+    is a direct link straight to storage, used to *view* the PDF in a
+    new tab. It isn't a reliable target for a forced download initiated
+    from frontend JS: browser navigation to it works fine, but a
+    scripted `fetch()` of it can be blocked by CORS (storage is served
+    by the reverse proxy/object storage in staging/production, not this
+    Django app -- see config/urls.py) or by mixed-content restrictions
+    if that storage host isn't on HTTPS. Streaming the same bytes back
+    through this API host instead -- which the frontend already talks
+    to successfully for everything else -- sidesteps both, and
+    `as_attachment=True` makes the browser save it regardless of how
+    the response is loaded.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, id):
+        booking = get_object_or_404(Booking, id=id)
+        user = request.user
+        is_owner = getattr(user, "role", None) == "visitor" and booking.visitor_id == user.id
+        is_staff = IsStaff().has_permission(request, self)
+        if not (is_owner or is_staff):
+            self.permission_denied(request)
+
+        if not booking.receipt_url:
+            raise Http404("No receipt has been generated for this booking yet.")
+
+        # Local import: apps.payments depends on apps.bookings, not the
+        # reverse (Design Spec Sec 3.2) -- see BookingListCreateView.post
+        # for the same rationale applied to create_checkout_session.
+        from apps.payments.tasks import _RECEIPT_STORAGE_PATH
+
+        storage_path = _RECEIPT_STORAGE_PATH.format(booking_id=booking.id)
+        if not default_storage.exists(storage_path):
+            raise Http404("Receipt file is missing from storage.")
+
+        return FileResponse(
+            default_storage.open(storage_path, "rb"),
+            as_attachment=True,
+            filename=f"receipt-{booking.reference}.pdf",
+            content_type="application/pdf",
+        )
 
 
 class BookingCancelView(APIView):

@@ -20,6 +20,11 @@ urlpatterns = [
         name="reconciliation-list",
     ),
     path(
+        "reconciliations/<uuid:id>/transfer-receipt/download/",
+        views.ReconciliationReceiptDownloadView.as_view(),
+        name="reconciliation-receipt-download",
+    ),
+    path(
         "webhook/chapa-transfer/",
         views.ChapaTransferWebhookView.as_view(),
         name="chapa-transfer-webhook",

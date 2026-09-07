@@ -15,6 +15,11 @@ app_name = "bookings"
 urlpatterns = [
     path("", views.BookingListCreateView.as_view(), name="booking-list"),
     path("<uuid:id>/", views.BookingDetailView.as_view(), name="booking-detail"),
+    path(
+        "<uuid:id>/receipt/download/",
+        views.BookingReceiptDownloadView.as_view(),
+        name="booking-receipt-download",
+    ),
     path("<uuid:id>/cancel/", views.BookingCancelView.as_view(), name="booking-cancel"),
     path(
         "<uuid:id>/reschedule/",

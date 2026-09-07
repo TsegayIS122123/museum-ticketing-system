@@ -10,6 +10,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { Toast } from '@/components/ui/Toast';
+import { Select } from '@/components/ui/Select';
 
 export function ProfilePage() {
   const { t, locale } = useTranslation();
@@ -88,10 +89,15 @@ export function ProfilePage() {
           <label className="text-sm font-medium text-stone-700" htmlFor="profile-language">
             {t('language') || 'Language'}
           </label>
-          <select id="profile-language" value={language} onChange={(event) => setLanguage(event.target.value as 'en' | 'am')} className="w-full max-w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500">
-            <option value="en">{t('english') || 'English'}</option>
-            <option value="am">{t('amharic') || 'አማርኛ'}</option>
-          </select>
+          <Select
+            id="profile-language"
+            value={language}
+            onChange={(value) => setLanguage(value as 'en' | 'am')}
+            options={[
+              { value: 'en', label: t('english') || 'English' },
+              { value: 'am', label: t('amharic') || 'አማርኛ' },
+            ]}
+          />
         </div>
         <Button type="submit" disabled={isSaving}>{isSaving ? t('saving') || 'Saving...' : t('save_changes') || 'Save changes'}</Button>
       </form>

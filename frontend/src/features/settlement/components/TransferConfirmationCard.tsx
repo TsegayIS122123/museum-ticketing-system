@@ -5,6 +5,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { downloadReceipt } from '@/lib/utils/download';
 import type { CashierReconciliation } from '../api';
 
 interface TransferConfirmationCardProps {
@@ -104,16 +105,18 @@ export function TransferConfirmationCard({
 
       <div className="mt-6 flex flex-col sm:flex-row gap-3">
         {reconciliation.transferReceiptUrl && (
-          <a
-            href={reconciliation.transferReceiptUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex-1"
+          <Button
+            className="flex-1 bg-brand-primary hover:bg-primary-700"
+            onClick={() =>
+              downloadReceipt(
+                `/settlement/reconciliations/${reconciliation.id}/transfer-receipt/download`,
+                reconciliation.transferReceiptUrl!,
+                `transfer-receipt-${reconciliation.chapaTransferReference || reconciliation.id}.pdf`
+              )
+            }
           >
-            <Button className="w-full bg-brand-primary hover:bg-primary-700">
-              <FileDown className="w-4 h-4" /> {t('download_receipt') || 'Download Transfer Receipt'}
-            </Button>
-          </a>
+            <FileDown className="w-4 h-4" /> {t('download_receipt') || 'Download Transfer Receipt'}
+          </Button>
         )}
         <Button
           variant="secondary"

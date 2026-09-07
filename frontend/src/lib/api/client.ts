@@ -180,8 +180,54 @@ async function request<T>(
   return data as T;
 }
 
+// Fetches a binary file (a receipt PDF, etc.) through the same
+// authenticated API host every other call above uses, and returns it as
+// a Blob rather than parsed JSON.
+//
+// This deliberately does NOT hit a storage-hosted URL (e.g. a
+// `receiptUrl` field from a response) directly -- that host is served
+// by the reverse proxy/object storage in staging and production, not
+// this Django app, so it doesn't carry this app's CORS configuration
+// and can be on a different scheme, both of which silently break a
+// scripted `fetch()` (mixed-content or CORS) even though a plain
+// browser navigation to the same link works fine. Routing through
+// `API_BASE` instead reuses the exact path -- and auth -- every other
+// successful request on this page already goes through.
+async function downloadFile(path: string): Promise<Blob> {
+  const normalizedPath = normalizePath(path);
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  let response = await fetch(`${API_BASE}${normalizedPath}`, {
+    headers,
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (response.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await fetch(`${API_BASE}${normalizedPath}`, {
+        headers: { Authorization: `Bearer ${newToken}` },
+        credentials: 'include',
+        cache: 'no-store',
+      });
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error('Could not download the file.');
+  }
+
+  return response.blob();
+}
+
 export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: 'GET' }),
+  downloadFile,
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: 'POST',

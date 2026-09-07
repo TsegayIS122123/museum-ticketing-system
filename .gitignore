@@ -31,3 +31,5 @@ out/
 # so the whole team builds against the same types without everyone running
 # the generator.
 *.tsbuildinfo
+
+patches/

@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { getReconciliation, type CashierReconciliation } from '@/features/settlement/api';
+import { downloadReceipt } from '@/lib/utils/download';
 
 export default function TransferDetailPage() {
   const { t, locale } = useTranslation();
@@ -145,11 +146,18 @@ export default function TransferDetailPage() {
           </h3>
           <div className="space-y-3">
             {transfer.transferReceiptUrl && (
-              <a href={transfer.transferReceiptUrl} target="_blank" rel="noreferrer">
-                <Button className="w-full bg-brand-primary hover:bg-primary-700">
-                  <FileDown className="w-4 h-4" /> {t('download_transfer_receipt') || 'Download Transfer Receipt'}
-                </Button>
-              </a>
+              <Button
+                className="w-full bg-brand-primary hover:bg-primary-700"
+                onClick={() =>
+                  downloadReceipt(
+                    `/settlement/reconciliations/${transfer.id}/transfer-receipt/download`,
+                    transfer.transferReceiptUrl!,
+                    `transfer-receipt-${transfer.chapaTransferReference || transfer.id}.pdf`
+                  )
+                }
+              >
+                <FileDown className="w-4 h-4" /> {t('download_transfer_receipt') || 'Download Transfer Receipt'}
+              </Button>
             )}
             <Button
               variant="secondary"

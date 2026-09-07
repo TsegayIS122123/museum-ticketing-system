@@ -9,8 +9,11 @@ Chapa/IFMIS accountability is tied to the individual who checked visitors
 in, not the platform as a whole.
 """
 
+from django.core.files.storage import default_storage
+from django.http import FileResponse, Http404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -82,6 +85,46 @@ class ReconciliationListView(generics.ListAPIView):
     @extend_schema(operation_id="listReconciliations")
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+
+
+class ReconciliationReceiptDownloadView(APIView):
+    """GET /settlement/reconciliations/{id}/transfer-receipt/download/ --
+    same ownership scoping as ReconciliationListView (a Cashier may only
+    download her own; Museum Manager/Platform Admin may download any).
+
+    See BookingReceiptDownloadView (apps.bookings.views) for why this
+    exists alongside `transfer_receipt_url`: that field points straight
+    at storage for *viewing* the PDF in a new tab, but isn't reliable
+    for a forced download triggered from frontend JS (CORS/mixed-content
+    depending on how storage is served). Streaming the same bytes back
+    through this API host, with `as_attachment=True`, sidesteps that.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, id):
+        reconciliation = get_object_or_404(
+            services.list_reconciliations(user=request.user), id=id
+        )
+
+        if not reconciliation.transfer_receipt_url:
+            raise Http404("No transfer receipt has been generated for this reconciliation yet.")
+
+        # Local import: mirrors the local import of _RECEIPT_STORAGE_PATH
+        # in apps.bookings.views.BookingReceiptDownloadView.
+        from .tasks import _RECEIPT_STORAGE_PATH
+
+        storage_path = _RECEIPT_STORAGE_PATH.format(reconciliation_id=reconciliation.id)
+        if not default_storage.exists(storage_path):
+            raise Http404("Transfer receipt file is missing from storage.")
+
+        filename_ref = reconciliation.chapa_transfer_reference or reconciliation.id
+        return FileResponse(
+            default_storage.open(storage_path, "rb"),
+            as_attachment=True,
+            filename=f"transfer-receipt-{filename_ref}.pdf",
+            content_type="application/pdf",
+        )
 
 
 class ChapaTransferWebhookView(APIView):

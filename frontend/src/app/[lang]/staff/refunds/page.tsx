@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { StatCard } from '@/components/ui/StatCard';
 import { getRefunds, type Refund } from '@/features/refunds/api';
+import { downloadCsv } from '@/lib/utils/download';
 
 export default function RefundsPage() {
   const { t } = useTranslation();
@@ -77,6 +78,21 @@ export default function RefundsPage() {
   const pendingCount = refunds.filter(r => r.status === 'pending').length;
   const completedCount = refunds.filter(r => r.status === 'completed').length;
 
+  const handleExportCsv = () => {
+    downloadCsv(
+      'refunds.csv',
+      ['Reference', 'Booking', 'Amount (ETB)', 'Reason', 'Status', 'Date'],
+      refunds.map((refund) => [
+        refund.id,
+        refund.bookingId,
+        refund.amountEtb,
+        getReasonLabel(refund.reason),
+        refund.status,
+        formatDateTime(refund.createdAt),
+      ])
+    );
+  };
+
   const headers = [
     t('reference') || 'Reference',
     t('booking') || 'Booking',
@@ -140,7 +156,7 @@ export default function RefundsPage() {
           <div className="font-semibold text-stone-900">
             {t('refund_requests') || 'Refund Requests'}
           </div>
-          <Button variant="secondary" size="sm">
+          <Button variant="secondary" size="sm" onClick={handleExportCsv} disabled={refunds.length === 0}>
             <Download className="w-4 h-4" /> {t('export') || 'Export'}
           </Button>
         </div>

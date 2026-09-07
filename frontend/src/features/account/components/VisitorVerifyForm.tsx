@@ -138,9 +138,6 @@ export function VisitorVerifyForm() {
   return (
     <Card className="max-w-md mx-auto">
       <div className="text-center mb-6">
-        <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-          <span className="text-white font-bold text-xl">SM</span>
-        </div>
         <h2 className="text-2xl font-serif font-semibold text-stone-900">
           {t('verify_visitor')}
         </h2>

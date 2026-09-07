@@ -14,6 +14,7 @@ import {
   type ReportSummaryResponse,
   type ReportPeriod,
 } from '@/features/reports/api';
+import { downloadCsv } from '@/lib/utils/download';
 
 export default function ReportsPage() {
   const { t } = useTranslation();
@@ -66,6 +67,20 @@ export default function ReportsPage() {
     { value: 'yearly', label: t('yearly') || 'Yearly' },
   ];
 
+  const handleExportCsv = () => {
+    if (!summary) return;
+    const rows: (string | number)[][] = [
+      ['Total visitors', totalVisitors],
+      ['Total revenue (period)', revenueTotal],
+      ['Total revenue (overall)', dashboard?.revenueTotalEtb ?? 0],
+      ['Cancellations (overall)', dashboard?.statusMix.cancelled ?? 0],
+      [],
+      ['Revenue by category', ''],
+      ...revenueByCategory.map((cat) => [cat.name, cat.amount]),
+    ];
+    downloadCsv(`report-${period}-${summary.from}-to-${summary.to}.csv`, ['Metric', 'Value'], rows);
+  };
+
   return (
     <PageContainer>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -91,7 +106,7 @@ export default function ReportsPage() {
               {p.label}
             </button>
           ))}
-          <Button variant="secondary" size="sm">
+          <Button variant="secondary" size="sm" onClick={handleExportCsv} disabled={!summary}>
             <Download className="w-4 h-4" /> {t('export') || 'Export'}
           </Button>
         </div>
