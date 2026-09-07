@@ -31,6 +31,7 @@ unreachable (NFR-IDEMPOTENT-001).
 """
 
 import logging
+import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 import requests
@@ -168,7 +169,33 @@ def call_chapa_refund_api(*, tx_ref, amount, reason, reference):
     Returns Chapa's `data.ref_id`, which `apps.refunds.tasks.process_refund`
     stores as `Refund.chapa_refund_reference` and which the separate Verify
     Refund endpoint (`GET /v1/refund/:ref_id/verify`) is keyed on.
+
+    TEMPORARY -- remove this block once Chapa goes live:
+    Chapa's sandbox does not support refunds at all -- `GET
+    /transaction/verify/<tx_ref>` confirms the tx_ref exists, but `POST
+    /refund/<tx_ref>` 404s on that same tx_ref regardless of payload, and
+    Chapa's own dashboard can't manually refund it either. That's a
+    gateway-side sandbox restriction, not something fixable in this
+    codebase. Until this environment's CHAPA_SECRET_KEY is swapped for a
+    live (`CHASECK-`) key, `settings.CHAPA_MOCK_REFUNDS` short-circuits
+    this call with a fake ref_id so the rest of the refund pipeline (fee
+    bookkeeping, Refund/Booking status, audit log, notification) is still
+    exercisable locally/in sandbox. DELETE this `if` block -- and flip
+    `CHAPA_MOCK_REFUNDS` to False everywhere -- once real refunds are
+    needed against this environment; `production.py` already leaves it
+    unset (False) so this is inert in production as-is.
     """
+    if settings.CHAPA_MOCK_REFUNDS:
+        fake_ref_id = f"mock-refund-{uuid.uuid4()}"
+        logger.warning(
+            "CHAPA_MOCK_REFUNDS is on -- skipping the real Chapa refund call "
+            "for tx_ref %s and returning a fake ref_id (%s) instead. This "
+            "must never happen in production.",
+            tx_ref,
+            fake_ref_id,
+        )
+        return fake_ref_id
+
     payload = {
         "amount": str(amount),
         "reason": reason,

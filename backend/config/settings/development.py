@@ -13,5 +13,13 @@ from .base import env
 DEBUG = True
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
+# Chapa's sandbox rejects refunds outright (verify succeeds, refund 404s --
+# a gateway-side sandbox restriction, not a bug here). Mock it locally so
+# the refund pipeline is still testable; see base.CHAPA_MOCK_REFUNDS and
+# apps.refunds.services.call_chapa_refund_api. Flip back to real calls by
+# setting CHAPA_MOCK_REFUNDS=False once Chapa goes live and real refunds
+# are needed against this environment.
+CHAPA_MOCK_REFUNDS = env.bool("CHAPA_MOCK_REFUNDS", default=True)
+
 # Local dev default is SQLite unless DATABASE_URL is set (docker-compose sets it).
 # See docker-compose.yml -- the `db` service provides Postgres.

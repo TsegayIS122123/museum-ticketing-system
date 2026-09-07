@@ -338,6 +338,19 @@ CHAPA_PUBLIC_KEY = env("CHAPA_PUBLIC_KEY", default="")
 CHAPA_SECRET_KEY = env("CHAPA_SECRET_KEY", default="")
 CHAPA_WEBHOOK_SECRET = env("CHAPA_WEBHOOK_SECRET", default="")
 
+# Chapa's sandbox does not support the Refund endpoint at all (confirmed
+# against both the API -- verify succeeds, refund 404s on the same
+# tx_ref -- and Chapa's own dashboard). This short-circuits
+# `apps.refunds.services.call_chapa_refund_api` with a fake ref_id so the
+# rest of the refund pipeline (fee bookkeeping, Refund/Booking status,
+# audit log, notification) can be exercised locally without touching
+# Chapa. Defaults to False here; `development.py` turns it on.
+#
+# *** MUST be False (or unset) in production. *** `production.py` never
+# sets this, so it inherits the safe default -- do not set
+# CHAPA_MOCK_REFUNDS=True via environment variable on any live deployment.
+CHAPA_MOCK_REFUNDS = env.bool("CHAPA_MOCK_REFUNDS", default=False)
+
 # --------------------------------------------------------------------------
 # Finance's fixed bank destination -- apps.settlement.services.
 # call_chapa_transfer_api moves each cashier's outstanding balance here via
