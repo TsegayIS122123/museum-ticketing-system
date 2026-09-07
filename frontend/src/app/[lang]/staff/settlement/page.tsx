@@ -125,10 +125,9 @@ export default function SettlementPage() {
         onClose={() => setShowConfirm(false)}
         onConfirm={handleInitiateTransfer}
         title={t('initiate_transfer_title') || 'Initiate Settlement Reconciliation'}
-        message={
-          t('transfer_confirmation_message') ||
-          `You are about to reconcile your full outstanding balance of ETB ${balance?.balanceEtb ?? '0.00'}. This action cannot be undone.`
-        }
+        message={t('transfer_confirmation_message', {
+          amount: balance?.balanceEtb ?? '0.00',
+        })}
         confirmLabel={t('confirm_transfer') || 'Confirm'}
         danger={false}
       />

@@ -21,6 +21,7 @@ from . import services
 from .models import Booking
 from .serializers import (
     BookingCategoryCorrectionSerializer,
+    BookingItemAddSerializer,
     BookingCreateSerializer,
     BookingRescheduleSerializer,
     BookingSerializer,
@@ -288,6 +289,40 @@ class BookingCategoryCorrectionView(APIView):
             trigger_category_correction_refund(
                 booking=booking, amount=-delta, actor=request.user
             )
+
+        return Response(BookingSerializer(booking).data)
+
+
+class BookingItemAddView(APIView):
+    """POST /bookings/{id}/items -- Cashier only (walk-up addendum to the
+    ID-verification correction flow).
+
+    Adds a brand-new line for a category that wasn't on the booking at
+    all -- e.g. a group booked as 3 Students shows up with 2 Adults never
+    part of the original booking -- then reopens payment for the new
+    item's full price. See `services.add_booking_item`'s own docstring
+    for why this is a distinct operation from
+    `BookingCategoryCorrectionView`, which only ever edits an existing
+    line. Lives here for the same `apps.payments` composition/module-
+    boundary reasons as `BookingCategoryCorrectionView` above."""
+
+    permission_classes = [IsCashier]
+
+    @extend_schema(request=BookingItemAddSerializer, responses=BookingSerializer)
+    def post(self, request, id):
+        booking = get_object_or_404(Booking, id=id)
+        serializer = BookingItemAddSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        booking, new_item = services.add_booking_item(
+            booking=booking, actor=request.user, **serializer.to_service_kwargs()
+        )
+
+        # Local import: see BookingListCreateView.post/BookingCancelView/
+        # BookingCategoryCorrectionView above for why apps.payments is
+        # only ever imported here, at the view layer.
+        from apps.payments.services import create_checkout_session
+
+        create_checkout_session(booking=booking, amount=new_item.subtotal_etb)
 
         return Response(BookingSerializer(booking).data)
 

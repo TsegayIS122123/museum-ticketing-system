@@ -274,3 +274,24 @@ class BookingCategoryCorrectionSerializer(serializers.Serializer):
             "category_id": self.validated_data.get("categoryId"),
             "quantity": self.validated_data.get("quantity"),
         }
+
+
+class BookingItemAddSerializer(serializers.Serializer):
+    """`BookingItemAddRequest` -- Cashier only (walk-up addendum to the
+    ID-verification correction flow). Adds a brand-new line for a
+    category that isn't already on the booking -- see
+    `services.add_booking_item`'s own docstring for why this is a
+    separate operation from `BookingCategoryCorrectionSerializer`, which
+    only ever edits an existing line.
+
+    Both fields are required, unlike the correction serializer above: an
+    added item has no existing category/quantity to leave unchanged."""
+
+    categoryId = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+
+    def to_service_kwargs(self):
+        return {
+            "category_id": self.validated_data["categoryId"],
+            "quantity": self.validated_data["quantity"],
+        }

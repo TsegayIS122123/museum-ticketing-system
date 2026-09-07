@@ -285,3 +285,90 @@ def test_check_in_already_visited_booking_cannot_be_checked_in_again():
         services.check_in_booking(
             booking=booking, attended_items=_attend(booking, 20), actor=cashier
         )
+
+
+# --------------------------------------------------------------------------
+# compute_attended_amount_etb -- the IFMIS voucher must reflect who
+# actually attended, never the full booked amount (the bug this covers:
+# a shortfall's worth of money is refund-eligible, not museum revenue).
+# --------------------------------------------------------------------------
+
+
+def test_attended_amount_full_attendance_equals_total_amount():
+    booking = _make_pending_booking(quantity=20)  # unit price 50.00
+    cashier = _make_cashier()
+    booking = services.check_in_booking(
+        booking=booking, attended_items=_attend(booking, 20), actor=cashier
+    )
+
+    assert services.compute_attended_amount_etb(booking=booking) == Decimal("1000.00")
+    assert services.compute_attended_amount_etb(booking=booking) == booking.total_amount_etb
+
+
+def test_attended_amount_reflects_shortfall_not_full_booked_amount():
+    """The bug report: a voucher for a booking with a shortfall must not
+    be for the whole booked amount -- only for who showed up."""
+    booking = _make_pending_booking(quantity=20)  # unit price 50.00
+    cashier = _make_cashier()
+    booking = services.check_in_booking(
+        booking=booking, attended_items=_attend(booking, 15), actor=cashier
+    )
+
+    assert services.compute_attended_amount_etb(booking=booking) == Decimal("750.00")
+    assert services.compute_attended_amount_etb(booking=booking) != booking.total_amount_etb
+
+
+def test_attended_amount_per_category_mixed_shortfall():
+    """3 Adult (100.00) + 4 Student (50.00) booked; 1 Adult and 2 Student
+    no-shows. The voucher must reflect 2*100 + 2*50 = 300.00, not a
+    blended average across every category on the booking."""
+    visitor = _make_visitor()
+    adult = Category.objects.create(name_en="Adult", name_am="Adult", price_etb=Decimal("100.00"))
+    student = _make_category(price_etb="50.00")
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+        booked_quantity=7,
+        total_amount_etb=Decimal("500.00"),
+        status=Booking.Status.PENDING,
+    )
+    adult_item = BookingItem.objects.create(
+        booking=booking,
+        category=adult,
+        category_name_en=adult.name_en,
+        category_name_am=adult.name_am,
+        unit_price_etb=adult.price_etb,
+        quantity=3,
+        subtotal_etb=adult.price_etb * 3,
+    )
+    student_item = BookingItem.objects.create(
+        booking=booking,
+        category=student,
+        category_name_en=student.name_en,
+        category_name_am=student.name_am,
+        unit_price_etb=student.price_etb,
+        quantity=4,
+        subtotal_etb=student.price_etb * 4,
+    )
+    cashier = _make_cashier()
+
+    booking = services.check_in_booking(
+        booking=booking,
+        attended_items=[
+            {"item_id": adult_item.id, "attended_quantity": 2},
+            {"item_id": student_item.id, "attended_quantity": 2},
+        ],
+        actor=cashier,
+    )
+
+    assert services.compute_attended_amount_etb(booking=booking) == Decimal("300.00")
+
+
+def test_attended_amount_falls_back_to_total_before_check_in():
+    """Before check-in, no `attended_quantity` exists yet on any item --
+    fall back to the full booked amount rather than treating "not
+    attended yet" as "zero attended"."""
+    booking = _make_pending_booking(quantity=20)
+
+    assert services.compute_attended_amount_etb(booking=booking) == booking.total_amount_etb

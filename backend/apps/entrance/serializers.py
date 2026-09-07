@@ -8,12 +8,14 @@ serializers below build on `apps.bookings.serializers.BookingSerializer`
 since it's the same underlying `Booking` row either way.
 """
 
+from decimal import Decimal
+
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.bookings.serializers import BookingSerializer
 
-from .services import amount_in_words_etb
+from .services import amount_in_words_etb, compute_attended_amount_etb
 
 
 class CheckInItemSerializer(serializers.Serializer):
@@ -66,9 +68,11 @@ class CheckInResponseSerializer(BookingSerializer):
     # tin` guarantees it's set whenever `payerName` resolves to a group
     # name), null for an individual one, same shape as `payerName` itself.
     payerTin = serializers.SerializerMethodField()
-    amountFigures = serializers.DecimalField(
-        source="total_amount_etb", read_only=True, max_digits=12, decimal_places=2
-    )
+    # NOT `total_amount_etb` (the full booked amount) -- a partial
+    # no-show means part of that money is refund-eligible, not museum
+    # revenue, so both figures below reflect only what was actually
+    # attended. See `compute_attended_amount_etb`'s docstring.
+    amountFigures = serializers.SerializerMethodField()
     amountWords = serializers.SerializerMethodField()
     ifmisPurpose = serializers.SerializerMethodField()
 
@@ -102,9 +106,13 @@ class CheckInResponseSerializer(BookingSerializer):
             return booking.group_tin
         return None
 
+    @extend_schema_field(serializers.DecimalField(max_digits=12, decimal_places=2))
+    def get_amountFigures(self, booking) -> Decimal:
+        return compute_attended_amount_etb(booking=booking)
+
     @extend_schema_field(serializers.CharField)
     def get_amountWords(self, booking) -> str:
-        return amount_in_words_etb(booking.total_amount_etb)
+        return amount_in_words_etb(compute_attended_amount_etb(booking=booking))
 
     @extend_schema_field(serializers.CharField)
     def get_ifmisPurpose(self, booking) -> str:

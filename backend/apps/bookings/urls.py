@@ -31,6 +31,11 @@ urlpatterns = [
         views.BookingCategoryCorrectionView.as_view(),
         name="booking-category-correction",
     ),
+    path(
+        "<uuid:id>/items/",
+        views.BookingItemAddView.as_view(),
+        name="booking-item-add",
+    ),
 ]
 
 # Included at /api/v1/ directly (config/urls.py) -- top-level, like

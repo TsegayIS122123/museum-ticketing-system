@@ -55,16 +55,40 @@ def test_list_active_categories_excludes_retired():
     assert [c.id for c in categories] == [active.id]
 
 
-def test_list_active_categories_is_cached_until_invalidated():
+def test_list_active_categories_is_cached(django_assert_num_queries):
+    _make_category(name_en="Student")
+
+    with django_assert_num_queries(1):
+        services.list_active_categories()
+        services.list_active_categories()  # second call hits the cache, not the DB
+
+
+def test_direct_model_writes_also_invalidate_the_cache():
+    """Regression test: a category created via the ORM directly (i.e. any
+    write path that doesn't go through create_category/update_category/
+    retire_category above, like Django Admin -- see signals.py's module
+    docstring) must still invalidate the cache. Before signals.py existed,
+    this returned `len(first) == len(second) == 1` -- an Admin-created or
+    Admin-reactivated category would silently not show up anywhere
+    GET /categories is read from until the cache's timeout happened to
+    expire on its own."""
     _make_category(name_en="Student")
 
     first = services.list_active_categories()
-    # A category created after the first read bypasses the ORM entirely on
-    # a second read if the cache is doing its job.
     _make_category(name_en="Adult / Teacher")
     second = services.list_active_categories()
 
-    assert len(first) == len(second) == 1
+    assert len(first) == 1
+    assert len(second) == 2
+
+
+def test_direct_model_delete_also_invalidates_the_cache():
+    category = _make_category(name_en="Student")
+    services.list_active_categories()  # warm the cache
+
+    category.delete()
+
+    assert services.list_active_categories() == []
 
 
 # --------------------------------------------------------------------------

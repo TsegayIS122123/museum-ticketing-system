@@ -28,10 +28,23 @@ export function useTranslation() {
   // (string & {})` keeps autocomplete/type-checking for keys that DO
   // exist in en.json while still accepting any string, matching how t()
   // is actually used everywhere.
-  const t = (key: TranslationKey | (string & {})): string => {
+  // Optional `values` map fills in `{{placeholder}}` tokens inside the
+  // translated string, e.g. t('greeting', { name: 'Abel' }) for a JSON
+  // entry of "Hello, {{name}}!". Translations must never contain raw JS
+  // template-literal syntax (`${...}`) -- that text is copied verbatim
+  // since t() only does a plain lookup, it never evaluates expressions.
+  const t = (
+    key: TranslationKey | (string & {}),
+    values?: Record<string, string | number>
+  ): string => {
     const enTranslations: Record<string, string> = translations.en;
     const localeTranslations: Record<string, string> = translations[locale] ?? enTranslations;
-    return localeTranslations[key] ?? enTranslations[key] ?? humanizeKey(key);
+    const raw = localeTranslations[key] ?? enTranslations[key] ?? humanizeKey(key);
+    if (!values) return raw;
+    return Object.entries(values).reduce(
+      (result, [name, value]) => result.replaceAll(`{{${name}}}`, String(value)),
+      raw
+    );
   };
 
   return { t, locale };

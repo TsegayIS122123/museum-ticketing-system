@@ -607,6 +607,114 @@ def test_correct_category_rejects_a_category_another_item_already_has():
 
 
 # --------------------------------------------------------------------------
+# add_booking_item (walk-up addendum)
+# --------------------------------------------------------------------------
+
+
+def test_add_item_creates_a_new_line_and_reopens_payment():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    booking = _make_correctable_booking(student, quantity=3)
+    cashier = _make_cashier()
+
+    booking, new_item = services.add_booking_item(
+        booking=booking, category_id=adult.id, quantity=2, actor=cashier
+    )
+
+    assert new_item.category_id == adult.id
+    assert new_item.quantity == 2
+    assert new_item.unit_price_etb == Decimal("100.00")
+    assert new_item.subtotal_etb == Decimal("200.00")
+    assert booking.items.count() == 2
+    assert booking.booked_quantity == 5
+    assert booking.total_amount_etb == Decimal("350.00")
+    assert booking.status == Booking.Status.AWAITING_PAYMENT
+    assert booking.category_corrected_by_user_id_id == cashier.id
+    assert booking.category_corrected_at is not None
+
+
+def test_add_item_rejects_a_category_already_on_the_booking():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    booking = _make_correctable_booking(student, quantity=3)
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.add_booking_item(
+            booking=booking, category_id=student.id, quantity=2, actor=cashier
+        )
+
+
+def test_add_item_rejects_an_inactive_category():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    inactive = _make_category(name_en="Retired Category", price_etb="75.00", active=False)
+    booking = _make_correctable_booking(student, quantity=3)
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.add_booking_item(
+            booking=booking, category_id=inactive.id, quantity=1, actor=cashier
+        )
+
+
+def test_add_item_rejects_quantity_less_than_one():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    booking = _make_correctable_booking(student, quantity=3)
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.add_booking_item(
+            booking=booking, category_id=adult.id, quantity=0, actor=cashier
+        )
+
+
+def test_add_item_rejected_once_no_longer_pending():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    booking = _make_correctable_booking(student, quantity=3)
+    booking.status = Booking.Status.VISITED
+    booking.save(update_fields=["status", "updated_at"])
+    cashier = _make_cashier()
+
+    with pytest.raises(Conflict):
+        services.add_booking_item(
+            booking=booking, category_id=adult.id, quantity=1, actor=cashier
+        )
+
+
+def test_add_item_on_a_mixed_booking_leaves_existing_items_untouched():
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    student = _make_category(name_en="Student", price_etb="50.00")
+    foreign = _make_category(name_en="Foreign Resident", price_etb="300.00")
+    visitor = _make_visitor()
+    booking = services.create_booking(
+        visitor=visitor,
+        items=[
+            {"category_id": adult.id, "quantity": 1},
+            {"category_id": student.id, "quantity": 2},
+        ],
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+    )
+    booking.status = Booking.Status.PENDING
+    booking.save(update_fields=["status", "updated_at"])
+    cashier = _make_cashier()
+
+    booking, new_item = services.add_booking_item(
+        booking=booking, category_id=foreign.id, quantity=1, actor=cashier
+    )
+
+    adult_item = booking.items.get(category=adult)
+    student_item = booking.items.get(category=student)
+    assert adult_item.quantity == 1
+    assert student_item.quantity == 2
+    assert new_item.category_id == foreign.id
+    assert booking.items.count() == 3
+    assert booking.booked_quantity == 4
+    assert booking.total_amount_etb == Decimal("400.00")
+
+
+# --------------------------------------------------------------------------
 # cancel_booking (FR-BOOK-005/006)
 # --------------------------------------------------------------------------
 

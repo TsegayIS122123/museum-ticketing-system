@@ -91,7 +91,11 @@ export function AttendanceEntryForm({
       const shortfall = booking.bookedQuantity - totalAttended;
       let message = t('check_in_success') || 'Check-in successful!';
       if (shortfall > 0) {
-        message = t('partial_check_in') || `${totalAttended} of ${booking.bookedQuantity} checked in. ${shortfall} did not attend.`;
+        message = t('partial_check_in', {
+          attended: totalAttended,
+          total: booking.bookedQuantity,
+          shortfall,
+        });
       }
 
       setToast({ message, type: 'success' });
@@ -315,11 +319,29 @@ export function AttendanceEntryForm({
       <Card>
         {/* Booking details */}
         <div>
-          <div className="flex items-center gap-3">
-            <span className="font-mono tabular-nums text-sm font-semibold text-stone-600">
-              #{booking.reference}
-            </span>
-            <StatusBadge status={booking.status} />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="font-mono tabular-nums text-sm font-semibold text-stone-600">
+                #{booking.reference}
+              </span>
+              <StatusBadge status={booking.status} />
+            </div>
+            {/* Category/headcount correction (ID-verification addendum)
+                -- a full bordered button in the header, not a small
+                underlined link buried next to the "Category" field
+                below, so it's actually noticeable at a busy gate
+                counter. Label spells out what it does rather than just
+                saying "Correct", which on its own doesn't say correct
+                *what*. */}
+            {canCheckIn && (
+              <button
+                type="button"
+                onClick={() => setShowCorrection((v) => !v)}
+                className="shrink-0 text-xs font-medium text-secondary-700 border border-secondary-300 bg-secondary-50 hover:bg-secondary-100 rounded-lg px-3 py-1.5 transition-colors"
+              >
+                {t('correct_category') || 'Fix category / headcount'}
+              </button>
+            )}
           </div>
           <h3 className="text-xl font-semibold text-stone-900 mt-2">
             {displayName}
@@ -347,18 +369,7 @@ export function AttendanceEntryForm({
             <div className="font-medium text-stone-900">{formatDate(booking.visitDate)}</div>
           </div>
           <div>
-            <div className="text-stone-500 flex items-center justify-between gap-2">
-              <span>{t('category')}</span>
-              {canCheckIn && (
-                <button
-                  type="button"
-                  onClick={() => setShowCorrection((v) => !v)}
-                  className="text-xs font-medium text-secondary-600 hover:text-secondary-700 underline"
-                >
-                  {t('correct_category') || 'Correct'}
-                </button>
-              )}
-            </div>
+            <div className="text-stone-500">{t('category')}</div>
             <div className="font-medium text-stone-900">
               {booking.items
                 .map((item) =>

@@ -448,6 +448,117 @@ def correct_booking_category(*, booking, item_id, actor, category_id=None, quant
     return booking, delta
 
 
+def add_booking_item(*, booking, actor, category_id, quantity):
+    """Implements the Cashier-only `POST /bookings/{id}/items` (walk-up
+    addendum to the ID-verification correction flow above).
+
+    `correct_booking_category` only ever touches an *existing*
+    `BookingItem` -- it re-prices or re-sizes one already-booked category
+    line, or moves one ticket-holder from one category to another.
+    Neither branch covers a walk-up party joining an already-paid booking
+    under a category that wasn't on it at all (e.g. a group booked as 3
+    Students shows up with 2 Adults in tow who were never part of the
+    original booking) -- there is no existing item for the Cashier to
+    "correct" into that category, and forcing this through
+    `correct_booking_category` would either collide with
+    `booking_item_unique_category_per_booking` (if another Adult line
+    already existed) or silently reassign one of the Students' tickets to
+    Adult (wrong: that Student ticket-holder is still there too). This
+    function creates the missing line instead of repurposing one.
+
+    Always an undercharge -- a brand-new item only ever adds to the
+    total, unlike `correct_booking_category` where the delta can go
+    either way -- so, mirroring that function's undercharge branch
+    exactly, this always reopens payment for the new item's full price
+    and never calls into `apps.payments` itself (view layer's job, same
+    boundary reasons as `BookingCategoryCorrectionView` above).
+
+    Only on a `Pending` booking, same gate-side window as
+    `correct_booking_category` (before `apps.entrance.services.
+    check_in_booking` has moved it to `Visited`).
+
+    Returns `(booking, new_item)`.
+    """
+    if booking.status != Booking.Status.PENDING:
+        raise Conflict("Items can only be added to a Pending booking.")
+
+    if quantity < 1:
+        raise ValidationError({"quantity": "Must be at least 1."})
+
+    try:
+        category = Category.objects.get(id=category_id, active=True)
+    except Category.DoesNotExist:
+        raise ValidationError({"categoryId": "Not a known, active category."})
+
+    if booking.items.filter(category=category).exists():
+        # Already has a line for this category -- that's a quantity
+        # correction on the existing item (`correct_booking_category`),
+        # not a new one; adding a second row here would collide with
+        # `booking_item_unique_category_per_booking`.
+        raise ValidationError(
+            {"categoryId": "This booking already has a line for that category -- correct its quantity instead."}
+        )
+
+    old_total = booking.total_amount_etb
+    old_booked_quantity = booking.booked_quantity
+
+    unit_price = category.price_etb
+    subtotal = unit_price * quantity
+
+    new_item = BookingItem.objects.create(
+        booking=booking,
+        category=category,
+        category_name_en=category.name_en,
+        category_name_am=category.name_am,
+        unit_price_etb=unit_price,
+        quantity=quantity,
+        subtotal_etb=subtotal,
+    )
+
+    new_total = old_total + subtotal
+    new_booked_quantity = old_booked_quantity + quantity
+    delta = new_total - old_total
+
+    booking.total_amount_etb = new_total
+    booking.booked_quantity = new_booked_quantity
+    booking.category_corrected_at = timezone.now()
+    booking.category_corrected_by_user_id = actor
+    # Same reopen-for-the-difference path as correct_booking_category's
+    # undercharge branch: this is unconditional here since a brand-new
+    # item is always additive.
+    booking.status = Booking.Status.AWAITING_PAYMENT
+
+    booking.save(
+        update_fields=[
+            "total_amount_etb",
+            "booked_quantity",
+            "category_corrected_at",
+            "category_corrected_by_user_id",
+            "status",
+            "updated_at",
+        ]
+    )
+
+    write_audit_log(
+        actor_id=actor.id,
+        action="booking.item_added",
+        target_type="booking",
+        target_id=booking.id,
+        metadata={
+            "item_id": str(new_item.id),
+            "category_id": str(category.id),
+            "quantity": quantity,
+            "subtotal_etb": str(subtotal),
+            "old_total_amount_etb": str(old_total),
+            "new_total_amount_etb": str(new_total),
+            "old_booked_quantity": old_booked_quantity,
+            "new_booked_quantity": new_booked_quantity,
+            "delta_etb": str(delta),
+        },
+    )
+    return booking, new_item
+
+
 # --------------------------------------------------------------------------
 # Cancel / reschedule (FR-BOOK-005 - FR-BOOK-007)
 # --------------------------------------------------------------------------

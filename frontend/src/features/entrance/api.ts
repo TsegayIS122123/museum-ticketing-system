@@ -87,3 +87,22 @@ export async function correctBookingCategory(
     ...(correction.quantity !== undefined ? { quantity: correction.quantity } : {}),
   });
 }
+
+// POST /bookings/{id}/items/ -- Cashier only, and only on a Pending
+// booking (apps.bookings.services.add_booking_item enforces both).
+// Walk-up addendum: called when extra people show up under a category
+// that wasn't on the booking at all (e.g. a group booked as 3 Students
+// arrives with 2 Adults who were never part of the original booking) --
+// distinct from correctBookingCategory above, which only ever edits an
+// existing line. Always reopens the booking for payment (an added item
+// is always additive), so the caller only ever needs the returned
+// Booking, same as correctBookingCategory.
+export async function addBookingItem(
+  bookingId: string,
+  addition: { categoryId: string; quantity: number }
+): Promise<Booking> {
+  return apiClient.post<Booking>(`/bookings/${bookingId}/items/`, {
+    categoryId: addition.categoryId,
+    quantity: addition.quantity,
+  });
+}

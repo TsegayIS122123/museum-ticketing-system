@@ -53,14 +53,18 @@ def list_all_categories_for_manager():
 
 
 def create_category(*, name_en, name_am, price_etb, is_free=False):
-    """Implements FR-CAT-002's creation path."""
+    """Implements FR-CAT-002's creation path. Cache invalidation is
+    handled by the post_save signal in signals.py, not here -- see that
+    module's docstring for why centralizing it there (rather than an
+    explicit call in each of these three functions) is what makes it
+    also cover writes that don't go through this module at all (Django
+    Admin, a shell one-off, etc)."""
     category = Category.objects.create(
         name_en=name_en,
         name_am=name_am,
         price_etb=price_etb,
         is_free=is_free,
     )
-    _invalidate_active_categories_cache()
     return category
 
 
@@ -71,7 +75,8 @@ def update_category(
     changed freely; per FR-CAT-002 this never touches an already-issued
     ticket, since a `booking` row (once `apps.bookings` exists) snapshots
     its own copy of these fields at creation time rather than reading this
-    row live."""
+    row live. See `create_category`'s docstring above for why cache
+    invalidation isn't called explicitly here."""
     if name_en is not None:
         category.name_en = name_en
     if name_am is not None:
@@ -83,7 +88,6 @@ def update_category(
     if active is not None:
         category.active = active
     category.save()
-    _invalidate_active_categories_cache()
     return category
 
 
@@ -92,8 +96,8 @@ def retire_category(*, category):
     -- a soft delete only (`active=False`); Section 1.3's no-physical-
     delete convention applies here too, since a `booking` row's FK to this
     category (`ON DELETE RESTRICT`, Document 05 Sec 3.3) must keep
-    resolving even after retirement."""
+    resolving even after retirement. See `create_category`'s docstring
+    above for why cache invalidation isn't called explicitly here."""
     category.active = False
     category.save(update_fields=["active", "updated_at"])
-    _invalidate_active_categories_cache()
     return category

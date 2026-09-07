@@ -290,8 +290,10 @@ export default function AvailabilityPage() {
         title={t('confirm_change') || 'Confirm Availability Change'}
         message={
           confirmDialog
-            ? t('availability_change_confirmation') ||
-              `Are you sure you want to change ${formatDate(confirmDialog.date)} to "${getStatusLabel(confirmDialog.status)}"?`
+            ? t('availability_change_confirmation', {
+                date: formatDate(confirmDialog.date),
+                status: getStatusLabel(confirmDialog.status),
+              })
             : ''
         }
         confirmLabel={t('confirm') || 'Confirm'}

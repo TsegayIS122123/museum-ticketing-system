@@ -230,6 +230,34 @@ def _integer_to_words(n: int) -> str:
     return " ".join(words)
 
 
+def compute_attended_amount_etb(*, booking) -> Decimal:
+    """The amount that actually belongs on the IFMIS voucher: the sum of
+    each `BookingItem`'s `unit_price_etb * attended_quantity`, never the
+    booking's full `total_amount_etb`.
+
+    `total_amount_etb` is what was *booked* (and paid online up front),
+    but a shortfall at the gate means some of that money is refund-
+    eligible to the Visitor/group, not museum revenue -- FR-TICKET-002's
+    own wording. Putting the full booked amount on the voucher for a
+    partial-attendance booking would overstate the day's actual IFMIS
+    revenue by however much is owed back. This mirrors
+    `apps.refunds.services.compute_refundable_amount`'s per-category sum
+    (kept local here rather than imported, per this module's docstring:
+    `entrance` depends on `bookings` only, never on `refunds`).
+
+    Falls back to `total_amount_etb` when per-item attendance isn't
+    available yet (before check-in, or for a legacy booking checked in
+    before per-item `attended_quantity` existed) -- the same "no way to
+    recover per-category no-shows after the fact" situation
+    `compute_refundable_amount` documents for its own legacy fallback.
+    """
+    items = list(booking.items.all())
+    if items and all(item.attended_quantity is not None for item in items):
+        total = sum(item.unit_price_etb * item.attended_quantity for item in items)
+        return Decimal(total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return booking.total_amount_etb
+
+
 def amount_in_words_etb(amount: Decimal) -> str:
     """The "amount in words" field a Cashier copies onto an IFMIS
     voucher -- e.g. `Decimal("1250.50")` -> `"One Thousand Two Hundred
