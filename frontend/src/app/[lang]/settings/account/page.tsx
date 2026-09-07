@@ -4,7 +4,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { isStaff } from '@/lib/auth/roles';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { StaffSidebar } from '@/components/layout/StaffSidebar';
-import { VisitorSidebar } from '@/components/layout/VisitorSidebar';
 import { ProfilePage } from '@/components/account/ProfilePage';
 
 // "Account settings (language, contact info)" -- Document 06 Sec 5.1
@@ -16,8 +15,8 @@ import { ProfilePage } from '@/components/account/ProfilePage';
 // around the same shared `ProfilePage` component (components/account/
 // ProfilePage.tsx), which already branches its own field set on
 // `user.role`. Those two routes have been deleted; every link that used
-// to point at `/profile` or `/staff/profile` (VisitorSidebar,
-// StaffSidebar, SiteHeader's profile menu item) now points here instead.
+// to point at `/profile` or `/staff/profile` (StaffSidebar, SiteHeader's
+// profile menu item) now points here instead.
 //
 // Chrome is intentionally duplicated rather than shared with
 // [lang]/staff/layout.tsx: that layout guards every route under
@@ -49,8 +48,7 @@ export default function AccountSettingsPage() {
   return (
     <div className="min-h-screen" data-surface="visitor">
       <SiteHeader />
-      <div className="flex flex-1">
-        <VisitorSidebar />
+      <div className="flex flex-1 flex-col">
         <ProfilePage />
       </div>
     </div>

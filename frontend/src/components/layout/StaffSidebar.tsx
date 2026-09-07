@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import Image from 'next/image';
 import {
   Menu,
   X,
@@ -103,23 +102,10 @@ export function StaffSidebar() {
 
   const sidebarBody = (
     <>
-      {/* Logo */}
+      {/* The global SiteHeader above already shows the logo + museum name,
+          so this only needs to identify the portal, not repeat them. */}
       <div className="p-5 border-b border-white/20">
-        <div className="flex items-center gap-3">
-          <Image
-            src="/aau-logo.png"
-            alt={t('aau_logo_alt') || 'Addis Ababa University'}
-            width={36}
-            height={36}
-            className="rounded-lg flex-shrink-0"
-          />
-          <div>
-            <div className="text-white font-semibold text-sm leading-tight">
-              {t('museum_name') || 'Zoological Natural History Museum'}
-            </div>
-            <div className="text-white/65 text-xs">{t('staff_portal') || 'Staff Portal'}</div>
-          </div>
-        </div>
+        <p className="text-sm font-semibold text-white">{t('staff_portal') || 'Staff Portal'}</p>
       </div>
 
       {/* Navigation */}

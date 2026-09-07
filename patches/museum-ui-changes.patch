@@ -1,0 +1,334 @@
+--- a/frontend/src/components/layout/SiteHeader.tsx
++++ b/frontend/src/components/layout/SiteHeader.tsx
+@@ -3,7 +3,7 @@
+ import Image from 'next/image';
+ import Link from 'next/link';
+ import { usePathname, useRouter } from 'next/navigation';
+-import { useState } from 'react';
++import { useEffect, useState } from 'react';
+ import { Menu, X } from 'lucide-react';
+ import { useTranslation } from '@/lib/i18n/useTranslation';
+ import { useAuth } from '@/lib/auth/auth-context';
+@@ -25,6 +25,16 @@
+   // this single toggle-able panel instead of wrapping or overflowing.
+   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+ 
++  // Lock background scroll while the mobile overlay is open, same
++  // approach as components/ui/Modal.tsx -- this now opens as a modal-like
++  // overlay over the page instead of pushing page content down.
++  useEffect(() => {
++    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
++    return () => {
++      document.body.style.overflow = '';
++    };
++  }, [isMobileMenuOpen]);
++
+   const handleSignOut = () => {
+     logout();
+     setIsMobileMenuOpen(false);
+@@ -44,7 +54,7 @@
+   const displayName = user ? (user.full_name || user.email) : '';
+ 
+   return (
+-    <header className="border-b border-brand-primary/15 bg-white">
++    <header className="relative z-50 border-b border-brand-primary/15 bg-white">
+       <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
+         <Link href={`/${locale}`} className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
+           <Image src="/aau-logo.png" alt={t('aau_logo_alt') || 'Addis Ababa University'} width={40} height={40} priority className="shrink-0" />
+@@ -85,7 +95,7 @@
+                   <Link href={profilePath} role="menuitem" onClick={() => setIsProfileOpen(false)} className="block rounded px-3 py-2 text-sm text-stone-700 hover:bg-stone-100">
+                     {t('profile') || 'Profile'}
+                   </Link>
+-                  <button type="button" role="menuitem" onClick={handleSignOut} className="block w-full rounded px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100">
++                  <button type="button" role="menuitem" onClick={handleSignOut} className="block w-full rounded px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+                     {t('logout') || 'Logout'}
+                   </button>
+                 </div>
+@@ -107,49 +117,59 @@
+       </div>
+ 
+       {isMobileMenuOpen && (
+-        <div id="mobile-primary-nav" className="border-t border-brand-primary/15 px-4 py-3 md:hidden">
+-          {navLinks.length > 0 && (
+-            <nav aria-label={t('primary_navigation') || 'Primary'} className="flex flex-col gap-1 text-sm font-semibold text-brand-primary">
+-              {navLinks.map((link) => (
++        // Overlay panel -- sits above the page (not inline in the header
++        // flow), so opening it no longer pushes the rest of the page
++        // down. The backdrop blurs/dims everything below the header,
++        // same modal pattern as VisitorSidebar's old mobile drawer.
++        <div className="fixed inset-x-0 top-16 bottom-0 z-40 md:hidden">
++          <div
++            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
++            onClick={() => setIsMobileMenuOpen(false)}
++          />
++          <div
++            id="mobile-primary-nav"
++            className="relative max-h-full overflow-y-auto border-t border-brand-primary/15 bg-white px-4 py-3 shadow-xl"
++          >
++            {navLinks.length > 0 && (
++              <nav aria-label={t('primary_navigation') || 'Primary'} className="flex flex-col gap-1 text-sm font-semibold text-brand-primary">
++                {navLinks.map((link) => (
++                  <Link
++                    key={link.href}
++                    href={link.href}
++                    onClick={() => setIsMobileMenuOpen(false)}
++                    className="rounded-lg px-2 py-2 hover:bg-brand-primary/5"
++                  >
++                    {link.label}
++                  </Link>
++                ))}
++              </nav>
++            )}
++
++            {isAuthenticated && user && (
++              // Only the profile and logout actions belong here -- unlike
++              // the desktop trigger button, this collapsed panel doesn't
++              // surface the visitor's name.
++              <div className="mt-3 border-t border-brand-primary/10 pt-3">
+                 <Link
+-                  key={link.href}
+-                  href={link.href}
++                  href={profilePath}
+                   onClick={() => setIsMobileMenuOpen(false)}
+-                  className="rounded-lg px-2 py-2 hover:bg-brand-primary/5"
++                  className="block rounded-lg px-2 py-2 text-sm font-semibold text-brand-primary hover:bg-brand-primary/5"
+                 >
+-                  {link.label}
++                  {t('profile') || 'Profile'}
+                 </Link>
+-              ))}
+-            </nav>
+-          )}
+-
+-          {isAuthenticated && user && (
+-            <div className="mt-3 border-t border-brand-primary/10 pt-3">
+-              <div className="flex min-w-0 items-center gap-2 px-2 py-1">
+-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary text-xs text-white">
+-                  {displayName.charAt(0).toUpperCase()}
+-                </span>
+-                <span className="truncate text-sm font-semibold text-brand-primary">{displayName}</span>
++                <button
++                  type="button"
++                  onClick={handleSignOut}
++                  className="block w-full rounded-lg px-2 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
++                >
++                  {t('logout') || 'Logout'}
++                </button>
+               </div>
+-              <Link
+-                href={profilePath}
+-                onClick={() => setIsMobileMenuOpen(false)}
+-                className="block rounded-lg px-2 py-2 text-sm font-semibold text-brand-primary hover:bg-brand-primary/5"
+-              >
+-                {t('profile') || 'Profile'}
+-              </Link>
+-              <button
+-                type="button"
+-                onClick={handleSignOut}
+-                className="block w-full rounded-lg px-2 py-2 text-left text-sm font-semibold text-brand-primary hover:bg-brand-primary/5"
+-              >
+-                {t('logout') || 'Logout'}
+-              </button>
+-            </div>
+-          )}
++            )}
+ 
+-          <div className="mt-3 border-t border-brand-primary/10 pt-3 sm:hidden">
+-            <LanguageToggle />
++            <div className="mt-3 border-t border-brand-primary/10 pt-3 sm:hidden">
++              <LanguageToggle />
++            </div>
+           </div>
+         </div>
+       )}
+
+--- a/frontend/src/app/[lang]/book/page.tsx
++++ b/frontend/src/app/[lang]/book/page.tsx
+@@ -14,7 +14,6 @@
+ import { BookingSummary } from '@/features/booking/components/BookingSummary';
+ import { createBooking } from '@/features/booking/api';
+ import { Toast } from '@/components/ui/Toast';
+-import { VisitorSidebar } from '@/components/layout/VisitorSidebar';
+ 
+ type Step = 'category' | 'datetime' | 'payment';
+ 
+@@ -180,8 +179,7 @@
+   return (
+     <div className="min-h-screen flex flex-col" data-surface="visitor">
+       <PublicHeader />
+-      <div className="flex flex-col md:flex-row flex-1">
+-        <VisitorSidebar />
++      <div className="flex flex-col flex-1">
+         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+         <div className="mb-8">
+           <h1 className="text-3xl font-bold text-stone-900">
+
+--- a/frontend/src/app/[lang]/bookings/page.tsx
++++ b/frontend/src/app/[lang]/bookings/page.tsx
+@@ -10,7 +10,6 @@
+ import { getMyBookings } from '@/features/booking/api';
+ import { Toast } from '@/components/ui/Toast';
+ import { useRouter } from 'next/navigation';
+-import { VisitorSidebar } from '@/components/layout/VisitorSidebar';
+ 
+ export default function MyBookingsPage() {
+   const { t, locale } = useTranslation();
+@@ -72,8 +71,7 @@
+   return (
+     <div className="min-h-screen flex flex-col" data-surface="visitor">
+       <PublicHeader />
+-      <div className="flex flex-col md:flex-row flex-1">
+-        <VisitorSidebar />
++      <div className="flex flex-col flex-1">
+         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+         <div className="mb-8">
+           <h1 className="text-3xl font-bold text-stone-900">
+
+--- a/frontend/src/app/[lang]/settings/account/page.tsx
++++ b/frontend/src/app/[lang]/settings/account/page.tsx
+@@ -4,7 +4,6 @@
+ import { isStaff } from '@/lib/auth/roles';
+ import { SiteHeader } from '@/components/layout/SiteHeader';
+ import { StaffSidebar } from '@/components/layout/StaffSidebar';
+-import { VisitorSidebar } from '@/components/layout/VisitorSidebar';
+ import { ProfilePage } from '@/components/account/ProfilePage';
+ 
+ // "Account settings (language, contact info)" -- Document 06 Sec 5.1
+@@ -16,8 +15,8 @@
+ // around the same shared `ProfilePage` component (components/account/
+ // ProfilePage.tsx), which already branches its own field set on
+ // `user.role`. Those two routes have been deleted; every link that used
+-// to point at `/profile` or `/staff/profile` (VisitorSidebar,
+-// StaffSidebar, SiteHeader's profile menu item) now points here instead.
++// to point at `/profile` or `/staff/profile` (StaffSidebar, SiteHeader's
++// profile menu item) now points here instead.
+ //
+ // Chrome is intentionally duplicated rather than shared with
+ // [lang]/staff/layout.tsx: that layout guards every route under
+@@ -49,8 +48,7 @@
+   return (
+     <div className="min-h-screen" data-surface="visitor">
+       <SiteHeader />
+-      <div className="flex flex-col md:flex-row flex-1">
+-        <VisitorSidebar />
++      <div className="flex flex-1 flex-col">
+         <ProfilePage />
+       </div>
+     </div>
+--- a/frontend/src/components/layout/VisitorSidebar.tsx
++++ /dev/null
+@@ -1,114 +0,0 @@
+-'use client';
+-
+-import { useEffect, useState } from 'react';
+-import { usePathname, useRouter } from 'next/navigation';
+-import { Menu, X } from 'lucide-react';
+-import { useTranslation } from '@/lib/i18n/useTranslation';
+-import { cn } from '@/lib/utils/cn';
+-import { useAuth } from '@/lib/auth/auth-context';
+-
+-const items = [
+-  { labelKey: 'nav_my_bookings', labelFallback: 'My Bookings', path: '/bookings' },
+-  { labelKey: 'nav_book_a_visit', labelFallback: 'Book a Visit', path: '/book' },
+-  { labelKey: 'profile', labelFallback: 'Profile', path: '/settings/account' },
+-];
+-
+-export function VisitorSidebar() {
+-  const { t, locale } = useTranslation();
+-  const pathname = usePathname();
+-  const router = useRouter();
+-  const { user } = useAuth();
+-  // Sidebar collapses into an off-canvas drawer below the `md` breakpoint
+-  // -- this only tracks whether that drawer is open; the desktop
+-  // (`md:flex`) rendering below is never affected by it.
+-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+-
+-  // Lock background scroll while the drawer is open, same approach as
+-  // components/ui/Modal.tsx.
+-  useEffect(() => {
+-    document.body.style.overflow = isMobileOpen ? 'hidden' : '';
+-    return () => {
+-      document.body.style.overflow = '';
+-    };
+-  }, [isMobileOpen]);
+-
+-  if (!user || user.role !== 'visitor') return null;
+-
+-  const handleNavigate = (path: string) => {
+-    setIsMobileOpen(false);
+-    router.push(`/${locale}${path}`);
+-  };
+-
+-  const sidebarBody = (
+-    <>
+-      <div className="border-b border-white/20 p-5">
+-        <p className="text-sm font-semibold">{t('visitor_portal') || 'Visitor Portal'}</p>
+-        <p className="mt-1 truncate text-xs text-white/70">{user.full_name || user.email}</p>
+-      </div>
+-      <nav className="space-y-1 p-3" aria-label={t('visitor_navigation') || 'Visitor navigation'}>
+-        {items.map((item) => (
+-          <button
+-            key={item.path}
+-            type="button"
+-            onClick={() => handleNavigate(item.path)}
+-            className={cn(
+-              'min-h-11 w-full px-4 py-2.5 text-left text-sm font-medium transition-colors',
+-              pathname?.includes(item.path) ? 'bg-white/20 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'
+-            )}
+-          >
+-            {t(item.labelKey) || item.labelFallback}
+-          </button>
+-        ))}
+-      </nav>
+-    </>
+-  );
+-
+-  return (
+-    <>
+-      {/* Mobile toggle -- sits at the top of the content column (right
+-          under the global header) rather than floating fixed over the
+-          page, and only rendered below `md` since the sidebar itself
+-          is always visible from `md` up. `sticky` keeps it reachable
+-          while scrolling without ever covering the header, since it's
+-          bounded to this column rather than the whole viewport. */}
+-      <div className="shrink-0 border-b border-brand-primary/10 bg-white px-4 py-2 md:hidden">
+-        <button
+-          type="button"
+-          onClick={() => setIsMobileOpen(true)}
+-          aria-label={t('open_nav_menu') || 'Open navigation menu'}
+-          aria-expanded={isMobileOpen}
+-          className="sticky top-2 flex h-11 w-11 items-center justify-center rounded-full bg-brand-primary text-white shadow-lg"
+-        >
+-          <Menu className="h-5 w-5" />
+-        </button>
+-      </div>
+-
+-      {/* Mobile drawer -- starts below the global header (top-16, matching
+-          its min-h-16) instead of inset-0, so it never surfaces over it. */}
+-      {isMobileOpen && (
+-        <div className="fixed inset-x-0 top-16 bottom-0 z-40 md:hidden" role="dialog" aria-modal="true">
+-          <div
+-            className="absolute inset-0 bg-black/40"
+-            onClick={() => setIsMobileOpen(false)}
+-          />
+-          <aside className="relative flex h-full w-64 max-w-[80vw] flex-col bg-brand-primary text-white shadow-xl">
+-            <button
+-              type="button"
+-              onClick={() => setIsMobileOpen(false)}
+-              aria-label={t('close_nav_menu') || 'Close navigation menu'}
+-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
+-            >
+-              <X className="h-5 w-5" />
+-            </button>
+-            {sidebarBody}
+-          </aside>
+-        </div>
+-      )}
+-
+-      {/* Desktop sidebar */}
+-      <aside className="hidden md:flex w-60 shrink-0 flex-col bg-brand-primary text-white">
+-        {sidebarBody}
+-      </aside>
+-    </>
+-  );
+-}

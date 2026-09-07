@@ -107,10 +107,6 @@ export function StaffLoginForm() {
         >
           {isLoading ? t('loading') || 'Loading...' : t('sign_in') || 'Sign In'}
         </Button>
-
-        <div className="text-xs text-stone-400 text-center mt-2">
-          {t('staff_only_notice') || 'This page is for museum staff only. Visitors should use the verification flow.'}
-        </div>
       </form>
     </Card>
   );

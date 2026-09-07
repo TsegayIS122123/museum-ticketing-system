@@ -10,7 +10,6 @@ import { BookingList } from '@/features/booking/components/BookingList';
 import { getMyBookings } from '@/features/booking/api';
 import { Toast } from '@/components/ui/Toast';
 import { useRouter } from 'next/navigation';
-import { VisitorSidebar } from '@/components/layout/VisitorSidebar';
 
 export default function MyBookingsPage() {
   const { t, locale } = useTranslation();
@@ -72,8 +71,7 @@ export default function MyBookingsPage() {
   return (
     <div className="min-h-screen flex flex-col" data-surface="visitor">
       <PublicHeader />
-      <div className="flex flex-1">
-        <VisitorSidebar />
+      <div className="flex flex-col flex-1">
         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-stone-900">

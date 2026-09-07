@@ -197,7 +197,7 @@ class CurrentUserView(APIView):
 
     @extend_schema(request=AccountUpdateSerializer, responses=AccountSerializer)
     def put(self, request):
-        serializer = AccountUpdateSerializer(data=request.data, partial=True)
+        serializer = AccountUpdateSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         account = services.update_profile(account=request.user, **serializer.validated_data)
         return Response(AccountSerializer(account).data)

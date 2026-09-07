@@ -29,7 +29,17 @@ export function ProfilePage() {
   // object changes identity (first load, or a fresh object after a save)
   // -- adjusted during render rather than in an effect, per
   // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
-  const [prevUser, setPrevUser] = useState<typeof user>(user);
+  //
+  // `prevUser` is deliberately seeded with `null`, NOT `user`: if `user`
+  // is already populated when this component first mounts (e.g. you
+  // navigate here client-side while already authenticated, rather than
+  // landing here via a fresh page load), seeding with `user` would make
+  // `prevUser` equal to `user` on that very first render, so the
+  // `user !== prevUser` check below would never fire and fullName/phone
+  // would stay stuck at their empty-string defaults -- exactly the "only
+  // email is filled in" bug this fixes. Seeding with `null` guarantees a
+  // real, already-loaded user is always detected as a change.
+  const [prevUser, setPrevUser] = useState<typeof user>(null);
   if (user !== prevUser) {
     setPrevUser(user);
     if (user) {
@@ -74,13 +84,15 @@ export function ProfilePage() {
         ) : (
           <div className="text-sm text-stone-700"><span className="font-medium">{t('role') || 'Role'}:</span> {getRoleDisplayName(user.role, t)}</div>
         )}
-        <label className="block text-sm font-medium text-stone-700" htmlFor="profile-language">
-          {t('language') || 'Language'}
-          <select id="profile-language" value={language} onChange={(event) => setLanguage(event.target.value as 'en' | 'am')} className="mt-1 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-secondary-500">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-stone-700" htmlFor="profile-language">
+            {t('language') || 'Language'}
+          </label>
+          <select id="profile-language" value={language} onChange={(event) => setLanguage(event.target.value as 'en' | 'am')} className="w-full max-w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500">
             <option value="en">{t('english') || 'English'}</option>
             <option value="am">{t('amharic') || 'አማርኛ'}</option>
           </select>
-        </label>
+        </div>
         <Button type="submit" disabled={isSaving}>{isSaving ? t('saving') || 'Saving...' : t('save_changes') || 'Save changes'}</Button>
       </form>
     </PageContainer>

@@ -116,13 +116,13 @@ export function BookingSummary({
               the booking request, see the prop-level note above. */}
           <div className="grid grid-cols-2 gap-2 py-3">
             <div className="text-stone-500">{t('name') || 'Name'}</div>
-            <div className="font-medium text-stone-900 text-right">{visitorName}</div>
+            <div className="min-w-0 break-words font-medium text-stone-900 text-right">{visitorName}</div>
             <div className="text-stone-500">{t('email')}</div>
-            <div className="font-medium text-stone-900 text-right">{visitorEmail}</div>
+            <div className="min-w-0 break-all font-medium text-stone-900 text-right">{visitorEmail}</div>
             {visitorPhone && (
               <>
                 <div className="text-stone-500">{t('phone')}</div>
-                <div className="font-medium text-stone-900 text-right">{visitorPhone}</div>
+                <div className="min-w-0 break-words font-medium text-stone-900 text-right">{visitorPhone}</div>
               </>
             )}
           </div>

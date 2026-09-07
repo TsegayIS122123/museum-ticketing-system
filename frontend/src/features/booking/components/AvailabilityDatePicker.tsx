@@ -105,21 +105,21 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-2 mb-4">
         <button
           type="button"
           onClick={goToPrevMonth}
           disabled={isPrevDisabled}
-          className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          className="shrink-0 px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           aria-label={t('previous_month') || 'Previous month'}
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <div className="font-semibold text-stone-900">{monthLabel}</div>
+        <div className="font-semibold text-stone-900 truncate text-center">{monthLabel}</div>
         <button
           type="button"
           onClick={goToNextMonth}
-          className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 cursor-pointer"
+          className="shrink-0 px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 cursor-pointer"
           aria-label={t('next_month') || 'Next month'}
         >
           <ChevronRight className="w-4 h-4" />
@@ -173,7 +173,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
               className={`
                 text-sm py-2.5 rounded-lg font-medium border-2 transition-all
                 ${cellStyle}
-                ${isSelected ? 'ring-2 ring-secondary-500 ring-offset-1 border-secondary-600' : 'border-transparent'}
+                ${isSelected ? 'ring-2 ring-inset ring-secondary-500 border-secondary-600' : 'border-transparent'}
               `}
             >
               {new Date(date).getDate()}

@@ -1,0 +1,117 @@
+diff --git a/frontend/src/app/[lang]/book/page.tsx b/frontend/src/app/[lang]/book/page.tsx
+index 3734d43..2eab218 100644
+--- a/frontend/src/app/[lang]/book/page.tsx
++++ b/frontend/src/app/[lang]/book/page.tsx
+@@ -180,7 +180,7 @@ export default function BookPage() {
+   return (
+     <div className="min-h-screen flex flex-col" data-surface="visitor">
+       <PublicHeader />
+-      <div className="flex flex-1">
++      <div className="flex flex-col md:flex-row flex-1">
+         <VisitorSidebar />
+         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+         <div className="mb-8">
+diff --git a/frontend/src/app/[lang]/bookings/page.tsx b/frontend/src/app/[lang]/bookings/page.tsx
+index c500167..5514232 100644
+--- a/frontend/src/app/[lang]/bookings/page.tsx
++++ b/frontend/src/app/[lang]/bookings/page.tsx
+@@ -72,7 +72,7 @@ export default function MyBookingsPage() {
+   return (
+     <div className="min-h-screen flex flex-col" data-surface="visitor">
+       <PublicHeader />
+-      <div className="flex flex-1">
++      <div className="flex flex-col md:flex-row flex-1">
+         <VisitorSidebar />
+         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+         <div className="mb-8">
+diff --git a/frontend/src/app/[lang]/settings/account/page.tsx b/frontend/src/app/[lang]/settings/account/page.tsx
+index 8885fa5..cd85147 100644
+--- a/frontend/src/app/[lang]/settings/account/page.tsx
++++ b/frontend/src/app/[lang]/settings/account/page.tsx
+@@ -49,7 +49,7 @@ export default function AccountSettingsPage() {
+   return (
+     <div className="min-h-screen" data-surface="visitor">
+       <SiteHeader />
+-      <div className="flex flex-1">
++      <div className="flex flex-col md:flex-row flex-1">
+         <VisitorSidebar />
+         <ProfilePage />
+       </div>
+diff --git a/frontend/src/features/account/components/StaffLoginForm.tsx b/frontend/src/features/account/components/StaffLoginForm.tsx
+index 1312bf4..33603d4 100644
+--- a/frontend/src/features/account/components/StaffLoginForm.tsx
++++ b/frontend/src/features/account/components/StaffLoginForm.tsx
+@@ -107,10 +107,6 @@ export function StaffLoginForm() {
+         >
+           {isLoading ? t('loading') || 'Loading...' : t('sign_in') || 'Sign In'}
+         </Button>
+-
+-        <div className="text-xs text-stone-400 text-center mt-2">
+-          {t('staff_only_notice') || 'This page is for museum staff only. Visitors should use the verification flow.'}
+-        </div>
+       </form>
+     </Card>
+   );
+diff --git a/frontend/src/features/booking/components/AvailabilityDatePicker.tsx b/frontend/src/features/booking/components/AvailabilityDatePicker.tsx
+index cfaca60..e98b7ca 100644
+--- a/frontend/src/features/booking/components/AvailabilityDatePicker.tsx
++++ b/frontend/src/features/booking/components/AvailabilityDatePicker.tsx
+@@ -105,21 +105,21 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
+ 
+   return (
+     <div>
+-      <div className="flex items-center justify-between mb-4">
++      <div className="flex items-center justify-between gap-2 mb-4">
+         <button
+           type="button"
+           onClick={goToPrevMonth}
+           disabled={isPrevDisabled}
+-          className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
++          className="shrink-0 px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+           aria-label={t('previous_month') || 'Previous month'}
+         >
+           <ChevronLeft className="w-4 h-4" />
+         </button>
+-        <div className="font-semibold text-stone-900">{monthLabel}</div>
++        <div className="font-semibold text-stone-900 truncate text-center">{monthLabel}</div>
+         <button
+           type="button"
+           onClick={goToNextMonth}
+-          className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 cursor-pointer"
++          className="shrink-0 px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 cursor-pointer"
+           aria-label={t('next_month') || 'Next month'}
+         >
+           <ChevronRight className="w-4 h-4" />
+@@ -173,7 +173,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
+               className={`
+                 text-sm py-2.5 rounded-lg font-medium border-2 transition-all
+                 ${cellStyle}
+-                ${isSelected ? 'ring-2 ring-secondary-500 ring-offset-1 border-secondary-600' : 'border-transparent'}
++                ${isSelected ? 'ring-2 ring-inset ring-secondary-500 border-secondary-600' : 'border-transparent'}
+               `}
+             >
+               {new Date(date).getDate()}
+diff --git a/frontend/src/lib/i18n/locales/am/common.json b/frontend/src/lib/i18n/locales/am/common.json
+index 25fae80..3ec3934 100644
+--- a/frontend/src/lib/i18n/locales/am/common.json
++++ b/frontend/src/lib/i18n/locales/am/common.json
+@@ -360,7 +360,6 @@
+   "staff_edit_note": "ኢሜል ወይም ስልክ መቀየር የአሁኑን የይለፍ ቃል ማዘጋጃ ማገናኛ ያሰርዛል። አዲስ ማገናኛ ለብቻው መጠየቅ አለበት።",
+   "staff_login": "የሰራተኛ መግቢያ",
+   "staff_login_subtitle": "ወደ ሰራተኛ ዳሽቦርድ ለመግባት ይግቡ",
+-  "staff_only_notice": "ይህ ገጽ ለሙዚየም ሰራተኞች ብቻ ነው። ጎብኝዎች የማረጋገጫ ሂደቱን መጠቀም አለባቸው።",
+   "staff_portal": "የሰራተኛ መግቢያ",
+   "staff_updated": "የሰራተኛ መለያ በተሳካ ሁኔታ ተዘምኗል!",
+   "status": "ሁኔታ",
+diff --git a/frontend/src/lib/i18n/locales/en/common.json b/frontend/src/lib/i18n/locales/en/common.json
+index a12f6fd..b2f11e0 100644
+--- a/frontend/src/lib/i18n/locales/en/common.json
++++ b/frontend/src/lib/i18n/locales/en/common.json
+@@ -360,7 +360,6 @@
+   "staff_edit_note": "Changing email or phone invalidates the current password setup link. A new link must be requested separately.",
+   "staff_login": "Staff Login",
+   "staff_login_subtitle": "Sign in to access the staff dashboard",
+-  "staff_only_notice": "This page is for museum staff only. Visitors should use the verification flow.",
+   "staff_portal": "Staff Portal",
+   "staff_updated": "Staff account updated successfully!",
+   "status": "Status",

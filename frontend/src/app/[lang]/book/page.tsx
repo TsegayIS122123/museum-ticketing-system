@@ -14,7 +14,6 @@ import { AvailabilityDatePicker } from '@/features/booking/components/Availabili
 import { BookingSummary } from '@/features/booking/components/BookingSummary';
 import { createBooking } from '@/features/booking/api';
 import { Toast } from '@/components/ui/Toast';
-import { VisitorSidebar } from '@/components/layout/VisitorSidebar';
 
 type Step = 'category' | 'datetime' | 'payment';
 
@@ -180,8 +179,7 @@ export default function BookPage() {
   return (
     <div className="min-h-screen flex flex-col" data-surface="visitor">
       <PublicHeader />
-      <div className="flex flex-1">
-        <VisitorSidebar />
+      <div className="flex flex-col flex-1">
         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-stone-900">
