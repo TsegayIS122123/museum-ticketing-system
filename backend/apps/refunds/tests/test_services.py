@@ -119,7 +119,11 @@ def test_compute_refundable_amount_no_response_is_full_total():
 
 
 def test_compute_refundable_amount_shortfall_is_unattended_portion_only():
-    # Booked 20, attended 15 -- FR-REFUND-002's headline example.
+    # Booked 20, attended 15 -- FR-REFUND-002's headline example. The
+    # single `BookingItem` here has no per-item `attended_quantity`
+    # (legacy shape), so this exercises the blended-average fallback --
+    # which for a single-category booking gives exactly the same figure
+    # as the exact per-item calculation below.
     booking = _make_booking(
         status=Booking.Status.VISITED, quantity=20, attended_quantity=15, unit_price=Decimal("100")
     )
@@ -127,6 +131,94 @@ def test_compute_refundable_amount_shortfall_is_unattended_portion_only():
         booking=booking, reason=Refund.Reason.PARTIAL_SHORTFALL
     )
     assert amount == Decimal("500")  # 5 unattended x 100 ETB
+
+
+def test_compute_refundable_amount_shortfall_uses_each_categorys_own_price():
+    # 3 Adult (100 ETB) + 4 Student (30 ETB) booked together, 2 Students
+    # absent -- the correct refund is 2 x 30 = 60 ETB, not
+    # 2 x blended_average (130 * 7 / 7 = ~18.57 x 2 = ~37.14), and
+    # definitely not 2 x the Adult price.
+    visitor = _make_visitor()
+    adult = Category.objects.create(name_en="Adult", name_am="Adult", price_etb=Decimal("100"))
+    student = Category.objects.create(name_en="Student", name_am="Student", price_etb=Decimal("30"))
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+        booked_quantity=7,
+        attended_quantity=5,
+        total_amount_etb=Decimal("420"),  # 3*100 + 4*30
+        status=Booking.Status.VISITED,
+    )
+    BookingItem.objects.create(
+        booking=booking,
+        category=adult,
+        category_name_en=adult.name_en,
+        category_name_am=adult.name_am,
+        unit_price_etb=adult.price_etb,
+        quantity=3,
+        attended_quantity=3,  # every Adult showed up
+        subtotal_etb=Decimal("300"),
+    )
+    BookingItem.objects.create(
+        booking=booking,
+        category=student,
+        category_name_en=student.name_en,
+        category_name_am=student.name_am,
+        unit_price_etb=student.price_etb,
+        quantity=4,
+        attended_quantity=2,  # 2 of 4 Students absent
+        subtotal_etb=Decimal("120"),
+    )
+
+    amount = services.compute_refundable_amount(
+        booking=booking, reason=Refund.Reason.PARTIAL_SHORTFALL
+    )
+    assert amount == Decimal("60.00")
+
+
+def test_compute_refundable_amount_shortfall_falls_back_when_item_data_missing():
+    # A booking checked in before per-item attendance existed: every
+    # `BookingItem.attended_quantity` is NULL even though
+    # `Booking.attended_quantity` (the old combined total) is set. This
+    # must fall back to the blended-average calculation rather than
+    # crash or silently treat the missing items as zero shortfall.
+    visitor = _make_visitor()
+    adult = Category.objects.create(name_en="Adult", name_am="Adult", price_etb=Decimal("100"))
+    student = Category.objects.create(name_en="Student", name_am="Student", price_etb=Decimal("30"))
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+        booked_quantity=7,
+        attended_quantity=5,
+        total_amount_etb=Decimal("420"),
+        status=Booking.Status.VISITED,
+    )
+    BookingItem.objects.create(
+        booking=booking,
+        category=adult,
+        category_name_en=adult.name_en,
+        category_name_am=adult.name_am,
+        unit_price_etb=adult.price_etb,
+        quantity=3,
+        subtotal_etb=Decimal("300"),
+    )
+    BookingItem.objects.create(
+        booking=booking,
+        category=student,
+        category_name_en=student.name_en,
+        category_name_am=student.name_am,
+        unit_price_etb=student.price_etb,
+        quantity=4,
+        subtotal_etb=Decimal("120"),
+    )
+
+    amount = services.compute_refundable_amount(
+        booking=booking, reason=Refund.Reason.PARTIAL_SHORTFALL
+    )
+    # blended average: 420/7 = 60 per ticket, x 2 shortfall = 120
+    assert amount == Decimal("120.00")
 
 
 # --------------------------------------------------------------------------

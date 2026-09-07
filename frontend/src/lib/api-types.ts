@@ -881,6 +881,7 @@ export interface components {
             readonly categoryNameEn: string;
             readonly categoryNameAm: string;
             readonly quantity: number;
+            readonly attendedQuantity: number | null;
             /** Format: decimal */
             readonly unitPriceEtb: string;
             /** Format: decimal */
@@ -1006,15 +1007,32 @@ export interface components {
             currency?: string | null;
         };
         /**
-         * @description `CheckInRequest` (Document 04) -- FR-TICKET-001. `attendedQuantity`
-         *     may be 0 (nobody in the party showed up) but never negative; the
-         *     upper bound (must not exceed bookedQuantity, FR-TICKET-005) is a
-         *     cross-field business rule against the booking being checked in, not a
-         *     field-level constraint this serializer can express on its own -- that
-         *     check lives in services.check_in_booking.
+         * @description One `{itemId, attendedQuantity}` entry of a `CheckInRequest`'s
+         *     `items` list -- one per `BookingItem`/category on the booking being
+         *     checked in. `attendedQuantity` may be 0 (nobody in that category
+         *     showed up) but never negative; the upper bound (must not exceed that
+         *     item's own booked `quantity`, FR-TICKET-005) and "every item must be
+         *     covered exactly once" are cross-field business rules against the
+         *     booking being checked in, not field-level constraints this serializer
+         *     can express on its own -- both checks live in services.
+         *     check_in_booking.
+         */
+        CheckInItem: {
+            /** Format: uuid */
+            itemId: string;
+            attendedQuantity: number;
+        };
+        /**
+         * @description `CheckInRequest` (Document 04) -- FR-TICKET-001. Per-category, not
+         *     a single combined headcount: a booking can mix categories
+         *     (`BookingItem`), and recording only one blended total throws away
+         *     exactly the information `apps.refunds.services.
+         *     compute_refundable_amount` needs to refund a later no-show at that
+         *     category's own price rather than a blended average across every
+         *     category on the booking (FR-REFUND-002).
          */
         CheckInRequest: {
-            attendedQuantity: number;
+            items: components["schemas"]["CheckInItem"][];
         };
         /**
          * @description `Booking`, extended with the IFMIS voucher-prep fields the Cashier

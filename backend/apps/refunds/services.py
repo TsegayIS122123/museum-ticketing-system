@@ -78,20 +78,38 @@ def compute_refundable_amount(*, booking, reason):
     figure a Cashier or Visitor types in themselves.
     """
     if reason == Refund.Reason.PARTIAL_SHORTFALL:
-        attended = booking.attended_quantity or 0
-        shortfall = booking.booked_quantity - attended
-        # A booking can now mix categories (`BookingItem`), and
-        # `check_in_booking` records only a single total headcount, never
-        # which category each no-show belonged to -- so there is no
-        # single `unit_price_etb` to multiply by the shortfall anymore.
-        # This uses the booking's blended average price per ticket
-        # instead: total paid divided across every ticket booked, times
-        # however many didn't show up. For a single-category booking
-        # (still the common case) this is exactly the old calculation;
-        # for a mixed booking it's a reasonable, price-neutral
-        # approximation in the absence of per-category attendance data.
         if booking.booked_quantity == 0:
             return Decimal("0")
+
+        items = list(booking.items.all())
+        # `check_in_booking` now records attendance per `BookingItem`
+        # (per category), not only as one combined total on `Booking` --
+        # so the correct refund for a shortfall is the sum of each
+        # no-show category's *own* unit_price_etb, e.g. 3 Adult + 4
+        # Student booked with 2 Students absent refunds
+        # `2 * student_unit_price_etb`, never `2 * blended_average_price`
+        # (FR-REFUND-002). This is exact, not an approximation, whenever
+        # every item on the booking has per-category attendance data.
+        if items and all(item.attended_quantity is not None for item in items):
+            total = sum(
+                (item.unit_price_etb * (item.quantity - item.attended_quantity))
+                for item in items
+            )
+            return Decimal(total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Legacy fallback: a booking checked in before per-item
+        # attendance existed has every `BookingItem.attended_quantity`
+        # NULL forever (there is no way to recover, after the fact,
+        # which category its no-shows belonged to -- `Booking.
+        # attended_quantity` only ever recorded one combined total). For
+        # that case only, fall back to the old blended-average price:
+        # total paid divided across every ticket booked, times however
+        # many didn't show up. For a single-category booking this is
+        # exactly the same figure the exact calculation above would give;
+        # for an old mixed-category booking it remains a price-neutral
+        # approximation, same as before this fix.
+        attended = booking.attended_quantity or 0
+        shortfall = booking.booked_quantity - attended
         average_unit_price = booking.total_amount_etb / booking.booked_quantity
         return (average_unit_price * shortfall).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP

@@ -342,6 +342,20 @@ class BookingItem(TimeStampedModel):
     # never being recomputed from a live join either.
     subtotal_etb = models.DecimalField(max_digits=12, decimal_places=2)
 
+    # How many of *this* category's tickets actually showed up, recorded
+    # per line item by `apps.entrance.services.check_in_booking`
+    # alongside (not instead of) `Booking.attended_quantity` -- the
+    # latter stays the denormalized sum across every item on the
+    # booking, exactly as before, for every consumer that only ever
+    # needed the booking-level total (headcount displays, the "was this
+    # booking checked in at all" flag). This field is what lets
+    # `apps.refunds.services.compute_refundable_amount` refund the
+    # *actual* no-show category's own price instead of a blended average
+    # across every category on the booking (FR-REFUND-002). Null until
+    # check-in; `None` (not 0) is how a not-yet-checked-in item is told
+    # apart from one where nobody in that category showed up.
+    attended_quantity = models.PositiveIntegerField(null=True, blank=True)
+
     class Meta:
         app_label = "bookings"
         db_table = "booking_item"
@@ -350,6 +364,19 @@ class BookingItem(TimeStampedModel):
             models.CheckConstraint(
                 condition=models.Q(quantity__gte=1),
                 name="booking_item_quantity_at_least_one",
+            ),
+            models.CheckConstraint(
+                # Same "null until checked in, then within bounds"
+                # invariant as `Booking.booking_attended_within_booked`,
+                # scoped to this one line item's own quantity.
+                condition=(
+                    models.Q(attended_quantity__isnull=True)
+                    | (
+                        models.Q(attended_quantity__gte=0)
+                        & models.Q(attended_quantity__lte=models.F("quantity"))
+                    )
+                ),
+                name="booking_item_attended_within_quantity",
             ),
             # One row per category per booking -- a visitor adding more
             # Adult tickets increases this row's quantity, it never gets

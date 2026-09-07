@@ -16,15 +16,31 @@ from apps.bookings.serializers import BookingSerializer
 from .services import amount_in_words_etb
 
 
-class CheckInRequestSerializer(serializers.Serializer):
-    """`CheckInRequest` (Document 04) -- FR-TICKET-001. `attendedQuantity`
-    may be 0 (nobody in the party showed up) but never negative; the
-    upper bound (must not exceed bookedQuantity, FR-TICKET-005) is a
-    cross-field business rule against the booking being checked in, not a
-    field-level constraint this serializer can express on its own -- that
-    check lives in services.check_in_booking."""
+class CheckInItemSerializer(serializers.Serializer):
+    """One `{itemId, attendedQuantity}` entry of a `CheckInRequest`'s
+    `items` list -- one per `BookingItem`/category on the booking being
+    checked in. `attendedQuantity` may be 0 (nobody in that category
+    showed up) but never negative; the upper bound (must not exceed that
+    item's own booked `quantity`, FR-TICKET-005) and "every item must be
+    covered exactly once" are cross-field business rules against the
+    booking being checked in, not field-level constraints this serializer
+    can express on its own -- both checks live in services.
+    check_in_booking."""
 
+    itemId = serializers.UUIDField()
     attendedQuantity = serializers.IntegerField(min_value=0)
+
+
+class CheckInRequestSerializer(serializers.Serializer):
+    """`CheckInRequest` (Document 04) -- FR-TICKET-001. Per-category, not
+    a single combined headcount: a booking can mix categories
+    (`BookingItem`), and recording only one blended total throws away
+    exactly the information `apps.refunds.services.
+    compute_refundable_amount` needs to refund a later no-show at that
+    category's own price rather than a blended average across every
+    category on the booking (FR-REFUND-002)."""
+
+    items = CheckInItemSerializer(many=True, allow_empty=False)
 
 
 class CheckInResponseSerializer(BookingSerializer):

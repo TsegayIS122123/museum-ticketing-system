@@ -21,6 +21,7 @@
   "amount_words": "መጠን (በፊደል)",
   "attended": "የተገኙ",
   "attended_quantity": "የተገኙ ብዛት",
+  "total_attended": "ጠቅላላ የተገኙ",
   "availability_change_confirmation": "${formatDate(confirmDialog.date)}ን ወደ \"${getStatusLabel(confirmDialog.status)}\" መቀየር ይፈልጋሉ?",
   "availability_description": "ለመስመር ላይ ቦታ ማስያዝ የመጎብኘት ቀናትን ክፈት እና ዝጋ",
   "availability_management": "የተገኝነት አስተዳደር",

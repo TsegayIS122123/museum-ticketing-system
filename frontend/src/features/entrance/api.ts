@@ -28,11 +28,21 @@ export async function lookupBooking(reference: string): Promise<BookingLookupRes
 }
 
 // POST /bookings/{id}/check-in -- Cashier only (FR-TICKET-001 -
-// FR-TICKET-003, FR-TICKET-005). `attendedQuantity` may be 0 but must not
-// exceed the booking's bookedQuantity (services.check_in_booking enforces
-// the upper bound; the serializer only enforces min_value=0).
-export async function checkInBooking(bookingId: string, attendedQuantity: number): Promise<CheckInResponse> {
-  return apiClient.post<CheckInResponse>(`/bookings/${bookingId}/check-in`, { attendedQuantity });
+// FR-TICKET-003, FR-TICKET-005). Per-category: one `{itemId,
+// attendedQuantity}` entry per `BookingItem` on the booking, not a
+// single combined headcount -- this is what lets the backend refund a
+// later shortfall at the actual no-show category's own price instead of
+// a blended average across the booking (FR-REFUND-002).
+// `attendedQuantity` may be 0 but must not exceed that item's own
+// booked quantity (services.check_in_booking enforces the upper bound;
+// the serializer only enforces min_value=0).
+export async function checkInBooking(
+  bookingId: string,
+  attendedItems: { itemId: string; attendedQuantity: number }[]
+): Promise<CheckInResponse> {
+  return apiClient.post<CheckInResponse>(`/bookings/${bookingId}/check-in`, {
+    items: attendedItems,
+  });
 }
 
 // GET /bookings/{id} -- the owning Visitor or any Staff member. Used here

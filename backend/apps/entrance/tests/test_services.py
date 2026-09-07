@@ -7,6 +7,7 @@ permission boundary, a view concern this module doesn't own.
 
 from datetime import date, timedelta
 from decimal import Decimal
+import uuid
 
 import pytest
 from django.utils import timezone
@@ -103,11 +104,22 @@ def test_lookup_unknown_reference_is_not_found():
 # --------------------------------------------------------------------------
 
 
+def _attend(booking, attended_quantity):
+    """Builds the `attended_items` payload `check_in_booking` now expects
+    -- one `{item_id, attended_quantity}` entry per `BookingItem` on the
+    booking. Every booking in this test module has exactly one item, so
+    this just points the whole `attended_quantity` at it."""
+    (item,) = booking.items.all()
+    return [{"item_id": item.id, "attended_quantity": attended_quantity}]
+
+
 def test_check_in_full_attendance_marks_visited():
     booking = _make_pending_booking(quantity=20)
     cashier = _make_cashier()
 
-    booking = services.check_in_booking(booking=booking, attended_quantity=20, actor=cashier)
+    booking = services.check_in_booking(
+        booking=booking, attended_items=_attend(booking, 20), actor=cashier
+    )
 
     assert booking.status == Booking.Status.VISITED
     assert booking.attended_quantity == 20
@@ -121,7 +133,9 @@ def test_check_in_partial_attendance_flags_refund_eligible_but_does_not_refund()
     booking = _make_pending_booking(quantity=20)
     cashier = _make_cashier()
 
-    booking = services.check_in_booking(booking=booking, attended_quantity=15, actor=cashier)
+    booking = services.check_in_booking(
+        booking=booking, attended_items=_attend(booking, 15), actor=cashier
+    )
 
     assert booking.status == Booking.Status.VISITED
     assert booking.attended_quantity == 15
@@ -129,11 +143,86 @@ def test_check_in_partial_attendance_flags_refund_eligible_but_does_not_refund()
     assert entry.metadata["refund_eligible"] is True
 
 
+def test_check_in_records_attendance_per_category():
+    # 3 Adult + 4 Student booked together, 2 Students absent -- the
+    # per-item attendance is what lets `apps.refunds.services.
+    # compute_refundable_amount` later refund exactly those 2 Students'
+    # own price (FR-REFUND-002), not a blended average across the
+    # booking.
+    visitor = _make_visitor()
+    adult = Category.objects.create(name_en="Adult", name_am="Adult", price_etb=Decimal("100"))
+    student = Category.objects.create(name_en="Student", name_am="Student", price_etb=Decimal("30"))
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+        booked_quantity=7,
+        total_amount_etb=Decimal("420"),
+        status=Booking.Status.PENDING,
+    )
+    adult_item = BookingItem.objects.create(
+        booking=booking,
+        category=adult,
+        category_name_en=adult.name_en,
+        category_name_am=adult.name_am,
+        unit_price_etb=adult.price_etb,
+        quantity=3,
+        subtotal_etb=Decimal("300"),
+    )
+    student_item = BookingItem.objects.create(
+        booking=booking,
+        category=student,
+        category_name_en=student.name_en,
+        category_name_am=student.name_am,
+        unit_price_etb=student.price_etb,
+        quantity=4,
+        subtotal_etb=Decimal("120"),
+    )
+    cashier = _make_cashier()
+
+    booking = services.check_in_booking(
+        booking=booking,
+        attended_items=[
+            {"item_id": adult_item.id, "attended_quantity": 3},
+            {"item_id": student_item.id, "attended_quantity": 2},
+        ],
+        actor=cashier,
+    )
+
+    assert booking.attended_quantity == 5
+    adult_item.refresh_from_db()
+    student_item.refresh_from_db()
+    assert adult_item.attended_quantity == 3
+    assert student_item.attended_quantity == 2
+
+
+def test_check_in_rejects_missing_item():
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.check_in_booking(booking=booking, attended_items=[], actor=cashier)
+
+
+def test_check_in_rejects_unknown_item_id():
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_cashier()
+
+    with pytest.raises(ValidationError):
+        services.check_in_booking(
+            booking=booking,
+            attended_items=[{"item_id": uuid.uuid4(), "attended_quantity": 20}],
+            actor=cashier,
+        )
+
+
 def test_check_in_zero_attendance_is_allowed():
     booking = _make_pending_booking(quantity=5)
     cashier = _make_cashier()
 
-    booking = services.check_in_booking(booking=booking, attended_quantity=0, actor=cashier)
+    booking = services.check_in_booking(
+        booking=booking, attended_items=_attend(booking, 0), actor=cashier
+    )
 
     assert booking.status == Booking.Status.VISITED
     assert booking.attended_quantity == 0
@@ -144,7 +233,9 @@ def test_check_in_rejects_attendance_exceeding_booked_quantity():
     cashier = _make_cashier()
 
     with pytest.raises(ValidationError):
-        services.check_in_booking(booking=booking, attended_quantity=21, actor=cashier)
+        services.check_in_booking(
+            booking=booking, attended_items=_attend(booking, 21), actor=cashier
+        )
 
     booking.refresh_from_db()
     assert booking.status == Booking.Status.PENDING
@@ -156,7 +247,9 @@ def test_check_in_rejects_negative_attendance():
     cashier = _make_cashier()
 
     with pytest.raises(ValidationError):
-        services.check_in_booking(booking=booking, attended_quantity=-1, actor=cashier)
+        services.check_in_booking(
+            booking=booking, attended_items=_attend(booking, -1), actor=cashier
+        )
 
 
 @pytest.mark.parametrize(
@@ -175,7 +268,9 @@ def test_check_in_rejects_non_pending_booking(status):
     cashier = _make_cashier()
 
     with pytest.raises(Conflict):
-        services.check_in_booking(booking=booking, attended_quantity=20, actor=cashier)
+        services.check_in_booking(
+            booking=booking, attended_items=_attend(booking, 20), actor=cashier
+        )
 
 
 def test_check_in_already_visited_booking_cannot_be_checked_in_again():
@@ -184,7 +279,9 @@ def test_check_in_already_visited_booking_cannot_be_checked_in_again():
     the first attendance count."""
     booking = _make_pending_booking(quantity=20)
     cashier = _make_cashier()
-    services.check_in_booking(booking=booking, attended_quantity=15, actor=cashier)
+    services.check_in_booking(booking=booking, attended_items=_attend(booking, 15), actor=cashier)
 
     with pytest.raises(Conflict):
-        services.check_in_booking(booking=booking, attended_quantity=20, actor=cashier)
+        services.check_in_booking(
+            booking=booking, attended_items=_attend(booking, 20), actor=cashier
+        )

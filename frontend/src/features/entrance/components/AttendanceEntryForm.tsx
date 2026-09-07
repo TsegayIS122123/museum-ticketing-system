@@ -36,7 +36,15 @@ export function AttendanceEntryForm({
   // is the fastest, most reliable way to reflect the new state -- no
   // extra round trip back through `lookupBooking`.
   const [booking, setBooking] = useState<BookingLookupResponse>(initialBooking);
-  const [attendedQuantity, setAttendedQuantity] = useState<number>(booking.bookedQuantity);
+  // One entry per `BookingItem`/category on this booking (e.g. 3 Adult +
+  // 4 Student booked together are two separate counters here) -- not a
+  // single combined total. Per-category attendance is what lets the
+  // backend later refund a shortfall at the actual no-show category's
+  // own price instead of a blended average across the booking
+  // (FR-REFUND-002).
+  const [attendedByItem, setAttendedByItem] = useState<Record<string, number>>(() =>
+    Object.fromEntries(booking.items.map((item) => [item.id, item.quantity]))
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -74,12 +82,16 @@ export function AttendanceEntryForm({
     setError(null);
 
     try {
-      const result = await checkInBooking(booking.id, attendedQuantity);
+      const attendedItems = booking.items.map((item) => ({
+        itemId: item.id,
+        attendedQuantity: attendedByItem[item.id] ?? 0,
+      }));
+      const result = await checkInBooking(booking.id, attendedItems);
 
-      const shortfall = booking.bookedQuantity - attendedQuantity;
+      const shortfall = booking.bookedQuantity - totalAttended;
       let message = t('check_in_success') || 'Check-in successful!';
       if (shortfall > 0) {
-        message = t('partial_check_in') || `${attendedQuantity} of ${booking.bookedQuantity} checked in. ${shortfall} did not attend.`;
+        message = t('partial_check_in') || `${totalAttended} of ${booking.bookedQuantity} checked in. ${shortfall} did not attend.`;
       }
 
       setToast({ message, type: 'success' });
@@ -118,17 +130,16 @@ export function AttendanceEntryForm({
     }
   };
 
-  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
-    if (isNaN(value)) {
-      setAttendedQuantity(0);
-      return;
-    }
-    const clamped = Math.min(Math.max(value, 0), booking.bookedQuantity);
-    setAttendedQuantity(clamped);
+  const handleItemQuantityChange = (itemId: string, max: number, value: number) => {
+    const clamped = Math.min(Math.max(value, 0), max);
+    setAttendedByItem((prev) => ({ ...prev, [itemId]: clamped }));
   };
 
-  const shortfall = booking.bookedQuantity - attendedQuantity;
+  const totalAttended = booking.items.reduce(
+    (sum, item) => sum + (attendedByItem[item.id] ?? 0),
+    0
+  );
+  const shortfall = booking.bookedQuantity - totalAttended;
 
   // Just checked in this booking -- show the IFMIS voucher-prep step
   // (payer name / amount in figures & words / purpose string) and let
@@ -372,6 +383,13 @@ export function AttendanceEntryForm({
             onCancel={() => setShowCorrection(false)}
             onCorrected={(updated) => {
               setBooking(updated);
+              // A correction can change an item's category/quantity (or
+              // even remove/replace it) -- re-seed the per-category
+              // counters from the corrected booking rather than leaving
+              // stale counts keyed to quantities that no longer exist.
+              setAttendedByItem(
+                Object.fromEntries(updated.items.map((item) => [item.id, item.quantity]))
+              );
               setShowCorrection(false);
               setToast(
                 updated.status === 'awaiting_payment'
@@ -401,39 +419,61 @@ export function AttendanceEntryForm({
           </h4>
 
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-stone-700">
-                {t('attended_quantity') || 'Attended Quantity'}
-              </label>
-              <div className="flex items-center gap-4 mt-1">
-                <button
-                  type="button"
-                  onClick={() => setAttendedQuantity(Math.max(0, attendedQuantity - 1))}
-                  className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
-                  aria-label={t('decrease_attended_count') || 'Decrease attended count'}
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <input
-                  type="number"
-                  value={attendedQuantity}
-                  onChange={handleQuantityChange}
-                  min={0}
-                  max={booking.bookedQuantity}
-                  className="w-20 text-center px-2 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 text-lg font-semibold font-mono tabular-nums"
-                />
-                <button
-                  type="button"
-                  onClick={() => setAttendedQuantity(Math.min(booking.bookedQuantity, attendedQuantity + 1))}
-                  className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
-                  aria-label={t('increase_attended_count') || 'Increase attended count'}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-                <span className="text-sm text-stone-500">
-                  / {booking.bookedQuantity} {t('max') || 'max'}
-                </span>
-              </div>
+            {/* One counter per category (`BookingItem`), not one combined
+                total -- e.g. 3 Adult + 4 Student booked together get two
+                separate steppers here, so the Cashier records exactly
+                which category's ticket-holders didn't show up. This is
+                what lets a later shortfall refund use that category's
+                own price instead of a blended average (FR-REFUND-002). */}
+            {booking.items.map((item) => {
+              const categoryLabel = locale === 'en' ? item.categoryNameEn : item.categoryNameAm;
+              const value = attendedByItem[item.id] ?? 0;
+              return (
+                <div key={item.id}>
+                  <label className="text-sm font-medium text-stone-700">
+                    {categoryLabel}
+                  </label>
+                  <div className="flex items-center gap-4 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleItemQuantityChange(item.id, item.quantity, value - 1)}
+                      className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
+                      aria-label={`${t('decrease_attended_count') || 'Decrease attended count'} — ${categoryLabel}`}
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <input
+                      type="number"
+                      value={value}
+                      onChange={(e) => {
+                        const parsed = parseInt(e.target.value);
+                        handleItemQuantityChange(item.id, item.quantity, isNaN(parsed) ? 0 : parsed);
+                      }}
+                      min={0}
+                      max={item.quantity}
+                      className="w-20 text-center px-2 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 text-lg font-semibold font-mono tabular-nums"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleItemQuantityChange(item.id, item.quantity, value + 1)}
+                      className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
+                      aria-label={`${t('increase_attended_count') || 'Increase attended count'} — ${categoryLabel}`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm text-stone-500">
+                      / {item.quantity} {t('max') || 'max'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="text-sm text-stone-600 border-t border-stone-100 pt-3">
+              {t('total_attended') || 'Total attended'}:{' '}
+              <span className="font-semibold font-mono tabular-nums text-stone-900">
+                {totalAttended} / {booking.bookedQuantity}
+              </span>
             </div>
 
             {shortfall > 0 && (
@@ -467,7 +507,7 @@ export function AttendanceEntryForm({
                 type="button"
                 className="flex-1 bg-brand-primary hover:bg-primary-700"
                 onClick={() => setShowConfirm(true)}
-                disabled={isProcessing || attendedQuantity === 0}
+                disabled={isProcessing || totalAttended === 0}
               >
                 {isProcessing ? t('processing') || 'Processing...' : t('confirm_check_in') || 'Confirm Check-in'}
               </Button>
@@ -483,8 +523,8 @@ export function AttendanceEntryForm({
         title={t('confirm_check_in') || 'Confirm Check-in'}
         message={
           shortfall === 0
-            ? `${t('confirm_check_in_message') || 'Confirm check-in for'} ${displayName} (${attendedQuantity} ${t('visitors') || 'visitors'})?`
-            : `${t('partial_check_in_confirmation') || 'Only'} ${attendedQuantity} ${t('out_of') || 'out of'} ${booking.bookedQuantity} ${t('visitors_attending') || 'visitors are attending'}. ${shortfall} ${t('will_not_attend') || 'will not attend'}. ${t('refund_available_on_request_confirm') || 'A refund for the shortfall is available on request.'}`
+            ? `${t('confirm_check_in_message') || 'Confirm check-in for'} ${displayName} (${totalAttended} ${t('visitors') || 'visitors'})?`
+            : `${t('partial_check_in_confirmation') || 'Only'} ${totalAttended} ${t('out_of') || 'out of'} ${booking.bookedQuantity} ${t('visitors_attending') || 'visitors are attending'}. ${shortfall} ${t('will_not_attend') || 'will not attend'}. ${t('refund_available_on_request_confirm') || 'A refund for the shortfall is available on request.'}`
         }
         confirmLabel={t('confirm') || 'Confirm'}
       />

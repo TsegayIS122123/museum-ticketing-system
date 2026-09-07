@@ -48,6 +48,16 @@ class BookingItemSerializer(serializers.ModelSerializer):
     subtotalEtb = serializers.DecimalField(
         source="subtotal_etb", read_only=True, max_digits=12, decimal_places=2
     )
+    # Per-category headcount recorded by `apps.entrance.services.
+    # check_in_booking` -- null until this item's booking is checked in
+    # (see the field's own comment on the model). Feeds the Cashier's
+    # attendance-entry screen (pre-filled per category) and lets
+    # `apps.refunds.services.compute_refundable_amount` refund a
+    # shortfall at this item's own `unitPriceEtb` rather than a blended
+    # average across the booking's other categories (FR-REFUND-002).
+    attendedQuantity = serializers.IntegerField(
+        source="attended_quantity", read_only=True, allow_null=True
+    )
 
     class Meta:
         model = BookingItem
@@ -57,6 +67,7 @@ class BookingItemSerializer(serializers.ModelSerializer):
             "categoryNameEn",
             "categoryNameAm",
             "quantity",
+            "attendedQuantity",
             "unitPriceEtb",
             "subtotalEtb",
         ]

@@ -68,6 +68,15 @@ def _make_pending_booking(quantity=20):
     return booking
 
 
+def _items_payload(booking, attended_quantity):
+    """Builds the `{"items": [...]}` request body `POST .../check-in`
+    now expects -- one `{itemId, attendedQuantity}` entry per
+    `BookingItem`. Every booking in this test module has exactly one
+    item, so this just points the whole `attended_quantity` at it."""
+    (item,) = booking.items.all()
+    return {"items": [{"itemId": str(item.id), "attendedQuantity": attended_quantity}]}
+
+
 # --------------------------------------------------------------------------
 # GET /bookings/lookup
 # --------------------------------------------------------------------------
@@ -129,7 +138,7 @@ def test_check_in_requires_authentication():
     client = APIClient()
 
     response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 20}, format="json"
+        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 20), format="json"
     )
 
     assert response.status_code == 401
@@ -141,7 +150,7 @@ def test_check_in_rejects_visitor():
     client = _authed_client(visitor)
 
     response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 20}, format="json"
+        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 20), format="json"
     )
 
     assert response.status_code == 403
@@ -153,7 +162,7 @@ def test_check_in_succeeds_for_cashier():
     client = _authed_client(cashier)
 
     response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 15}, format="json"
+        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 15), format="json"
     )
 
     assert response.status_code == 200
@@ -171,7 +180,7 @@ def test_check_in_group_booking_includes_payer_name_and_tin_for_ifmis_voucher():
     client = _authed_client(cashier)
 
     response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 25}, format="json"
+        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 25), format="json"
     )
 
     assert response.status_code == 200
@@ -185,7 +194,7 @@ def test_check_in_individual_booking_has_no_payer_tin():
     client = _authed_client(cashier)
 
     response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 1}, format="json"
+        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 1), format="json"
     )
 
     assert response.status_code == 200
@@ -199,7 +208,7 @@ def test_check_in_excess_attendance_is_bad_request():
     client = _authed_client(cashier)
 
     response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 21}, format="json"
+        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 21), format="json"
     )
 
     assert response.status_code == 400
@@ -213,7 +222,7 @@ def test_check_in_non_pending_booking_conflicts():
     client = _authed_client(cashier)
 
     response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", {"attendedQuantity": 20}, format="json"
+        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 20), format="json"
     )
 
     assert response.status_code == 409

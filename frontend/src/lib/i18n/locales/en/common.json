@@ -21,6 +21,7 @@
   "amount_words": "Amount (words)",
   "attended": "Attended",
   "attended_quantity": "Attended Quantity",
+  "total_attended": "Total attended",
   "availability_change_confirmation": "Are you sure you want to change ${formatDate(confirmDialog.date)} to \"${getStatusLabel(confirmDialog.status)}\"?",
   "availability_description": "Open and close visiting dates for online booking",
   "availability_management": "Availability Management",

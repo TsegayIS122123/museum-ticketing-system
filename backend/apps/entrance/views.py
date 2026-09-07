@@ -79,9 +79,13 @@ class CheckInView(APIView):
         booking = get_object_or_404(Booking.objects.select_related("visitor"), id=id)
         serializer = CheckInRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        attended_items = [
+            {"item_id": entry["itemId"], "attended_quantity": entry["attendedQuantity"]}
+            for entry in serializer.validated_data["items"]
+        ]
         booking = services.check_in_booking(
             booking=booking,
-            attended_quantity=serializer.validated_data["attendedQuantity"],
+            attended_items=attended_items,
             actor=request.user,
         )
         return Response(CheckInResponseSerializer(booking).data)

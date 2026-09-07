@@ -32,7 +32,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
-from apps.bookings.models import Booking
+from apps.bookings.models import Booking, BookingItem
 from apps.core.exceptions import Conflict
 from apps.core.services import write_audit_log
 
@@ -74,45 +74,90 @@ def lookup_booking_by_reference(*, reference):
 
 
 @transaction.atomic
-def check_in_booking(*, booking, attended_quantity, actor):
+def check_in_booking(*, booking, attended_items, actor):
     """Implements `POST /bookings/{id}/check-in`.
 
-    - FR-TICKET-001: records the actual number of visitors who showed up.
-    - FR-TICKET-002: the booking becomes `Visited`; if `attended_quantity`
-      is less than `booked_quantity` the shortfall is flagged as
+    `attended_items` is a list of `{"item_id": <BookingItem.id>,
+    "attended_quantity": <int>}` -- one entry per `BookingItem` on this
+    booking, per category. This is per-category, not a single blended
+    headcount, precisely *because* `apps.refunds.services.
+    compute_refundable_amount` needs to know which category a
+    subsequent shortfall belonged to (FR-REFUND-002): recording only one
+    combined total (the old shape) throws that information away at the
+    moment it's actually available -- the Cashier, standing at the gate,
+    knows exactly which ticket-holders didn't show up.
+
+    - FR-TICKET-001: records the actual number of visitors who showed up,
+      per category.
+    - FR-TICKET-002: the booking becomes `Visited`; if the booking-level
+      total is less than `booked_quantity` the shortfall is flagged as
       refund-eligible in the response, but is never auto-refunded here --
       that requires the Visitor/group leader to ask (`apps.refunds`).
     - FR-TICKET-003: only a `Pending` booking is checkable-in -- once this
       succeeds the booking is no longer `Pending` and the Visitor can no
       longer cancel/reschedule it themselves (enforced independently by
       `bookings.services._require_own_pending_booking`).
-    - FR-TICKET-005: `attended_quantity` may not exceed `booked_quantity`
-      -- the excess is rejected outright, not clamped or partially
-      admitted. Also enforced at the DB level by `Booking`'s
-      `booking_attended_within_booked` CheckConstraint, so this is
-      belt-and-braces, not the only guard.
+    - FR-TICKET-005: no item's attended quantity may exceed that item's
+      own booked quantity -- the excess is rejected outright, not clamped
+      or partially admitted. Also enforced at the DB level by
+      `BookingItem`'s `booking_item_attended_within_quantity`
+      CheckConstraint (and, for the booking-level total,  `Booking`'s own
+      `booking_attended_within_booked`), so this is belt-and-braces, not
+      the only guard.
+
+    `Booking.attended_quantity` is still written, as the denormalized sum
+    across every item -- every existing consumer that only ever needed
+    the booking-level total (headcount displays, the "is this booking
+    checked in" flag, `apps.refunds`' no-shortfall-eligible check) keeps
+    working unchanged; it's simply derived from the per-item counts now
+    instead of being the only number captured.
     """
     if booking.status != Booking.Status.PENDING:
         raise Conflict("This booking is not in a checkable-in state.")
 
-    if attended_quantity < 0:
-        raise ValidationError({"attendedQuantity": "Must not be negative."})
+    items_by_id = {str(item.id): item for item in booking.items.all()}
 
-    if attended_quantity > booking.booked_quantity:
-        # FR-TICKET-005: extra visitors are not admitted under this
-        # booking -- they must book/pay separately, exactly as any other
-        # new visitor would. This is a 400, not a 409: the request itself
-        # is invalid, not merely conflicting with current state.
+    provided_ids = [str(entry["item_id"]) for entry in attended_items]
+    if set(provided_ids) != set(items_by_id.keys()) or len(provided_ids) != len(
+        set(provided_ids)
+    ):
+        # Every category on this booking must be accounted for exactly
+        # once -- a missing item would silently leave its
+        # `attended_quantity` NULL (indistinguishable from "not checked
+        # in yet"), and a duplicate/unknown item id is simply malformed
+        # input. This is a 400, not a 409: the request itself is
+        # malformed, not merely conflicting with current state.
         raise ValidationError(
-            {
-                "attendedQuantity": (
-                    "Exceeds the booked quantity. Excess visitors must book "
-                    "separately, online or at the manual counter."
-                )
-            }
+            {"items": "Must include exactly one entry for each of this booking's items."}
         )
 
-    booking.attended_quantity = attended_quantity
+    for entry in attended_items:
+        item = items_by_id[str(entry["item_id"])]
+        attended = entry["attended_quantity"]
+        if attended < 0:
+            raise ValidationError({"items": "attendedQuantity must not be negative."})
+        if attended > item.quantity:
+            # FR-TICKET-005: extra visitors are not admitted under this
+            # category -- they must book/pay separately, exactly as any
+            # other new visitor would.
+            raise ValidationError(
+                {
+                    "items": (
+                        f"attendedQuantity for {item.category_name_en} exceeds the "
+                        "quantity booked for that category. Excess visitors must "
+                        "book separately, online or at the manual counter."
+                    )
+                }
+            )
+
+    total_attended = 0
+    for entry in attended_items:
+        item = items_by_id[str(entry["item_id"])]
+        item.attended_quantity = entry["attended_quantity"]
+        total_attended += entry["attended_quantity"]
+    BookingItem.objects.bulk_update(items_by_id.values(), ["attended_quantity"])
+
+    booking.attended_quantity = total_attended
     booking.status = Booking.Status.VISITED
     booking.checked_in_at = timezone.now()
     booking.checked_in_by_user_id = actor
@@ -126,7 +171,7 @@ def check_in_booking(*, booking, attended_quantity, actor):
         ]
     )
 
-    shortfall = booking.booked_quantity - attended_quantity
+    shortfall = booking.booked_quantity - total_attended
     write_audit_log(
         actor_id=actor.id,
         action="booking.checked_in",
@@ -134,7 +179,10 @@ def check_in_booking(*, booking, attended_quantity, actor):
         target_id=booking.id,
         metadata={
             "booked_quantity": booking.booked_quantity,
-            "attended_quantity": attended_quantity,
+            "attended_quantity": total_attended,
+            "attended_items": {
+                str(entry["item_id"]): entry["attended_quantity"] for entry in attended_items
+            },
             "refund_eligible": shortfall > 0,
         },
     )
