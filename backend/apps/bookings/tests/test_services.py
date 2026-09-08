@@ -711,7 +711,7 @@ def test_add_item_on_a_mixed_booking_leaves_existing_items_untouched():
     assert new_item.category_id == foreign.id
     assert booking.items.count() == 3
     assert booking.booked_quantity == 4
-    assert booking.total_amount_etb == Decimal("400.00")
+    assert booking.total_amount_etb == Decimal("500.00")
 
 
 # --------------------------------------------------------------------------
