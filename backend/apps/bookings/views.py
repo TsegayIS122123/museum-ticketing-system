@@ -20,6 +20,7 @@ from apps.core.permissions import IsCashier, IsMuseumManager, IsStaff, IsVisitor
 from . import services
 from .models import Booking
 from .serializers import (
+    BookingCategoryCorrectionBatchSerializer,
     BookingCategoryCorrectionSerializer,
     BookingItemAddSerializer,
     BookingCreateSerializer,
@@ -279,6 +280,53 @@ class BookingCategoryCorrectionView(APIView):
         # Local imports: see BookingListCreateView.post/BookingCancelView
         # above for why apps.payments/apps.refunds are only ever imported
         # here, at the view layer, never from bookings/services.py.
+        if delta > 0:
+            from apps.payments.services import create_checkout_session
+
+            create_checkout_session(booking=booking, amount=delta)
+        elif delta < 0:
+            from apps.refunds.services import trigger_category_correction_refund
+
+            trigger_category_correction_refund(
+                booking=booking, amount=-delta, actor=request.user
+            )
+
+        return Response(BookingSerializer(booking).data)
+
+
+class BookingCategoryCorrectionBatchView(APIView):
+    """PATCH /bookings/{id}/category-corrections/batch -- Cashier only
+    (ID-verification addendum, batch extension).
+
+    Batch sibling of `BookingCategoryCorrectionView`/`BookingItemAddView`
+    above: accepts a list of the same per-item edit/add shapes those two
+    single-item endpoints take, and applies the whole list as one atomic
+    correction with a single combined delta. This is what actually fixes
+    the gate-workflow gap those two single-item endpoints have -- a
+    Cashier who needs to bump two categories' headcounts in the same
+    visit (both undercharges) previously couldn't, because the first
+    single-item PATCH flips the booking out of `Pending` and the second
+    then 409s. See `services.apply_booking_corrections`'s own docstring
+    for the full rationale, including how it orders category-moves within
+    the batch and rejects an unresolvable two-way swap."""
+
+    permission_classes = [IsCashier]
+
+    @extend_schema(
+        request=BookingCategoryCorrectionBatchSerializer, responses=BookingSerializer
+    )
+    def patch(self, request, id):
+        booking = get_object_or_404(Booking, id=id)
+        serializer = BookingCategoryCorrectionBatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        booking, delta = services.apply_booking_corrections(
+            booking=booking, actor=request.user, ops=serializer.to_service_ops()
+        )
+
+        # Local imports: see BookingCategoryCorrectionView above for why
+        # apps.payments/apps.refunds are only ever imported here, at the
+        # view layer, never from bookings/services.py. One call either
+        # way, for the batch's single combined delta -- never one per op.
         if delta > 0:
             from apps.payments.services import create_checkout_session
 

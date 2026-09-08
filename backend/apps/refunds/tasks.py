@@ -22,7 +22,18 @@ logger = logging.getLogger(__name__)
 _MINIMUM_REFUND_AMOUNT_ETB = Decimal("0.01")
 
 
-@shared_task(bind=True, max_retries=5)
+# `ignore_result=True`: this task is always fired with `.delay()` and
+# never awaited via `.get()` anywhere in the codebase, so nothing needs
+# its return value stored. That matters here specifically because the
+# function returns a `Refund` model instance below -- Celery's
+# django-db/JSON result backend has no encoder for that, so without
+# `ignore_result` the task raises `EncodeError` at the *result-storage*
+# step, after the refund itself (Chapa call, Refund row, booking status,
+# audit log, notification) has already fully committed. That looked like
+# "the refund silently failed" in the worker log even though it hadn't --
+# ignoring the result removes the storage step (and the crash) entirely
+# without changing what the task actually does.
+@shared_task(bind=True, max_retries=5, ignore_result=True)
 def process_refund(self, *, refund_id):
     """Implements FR-REFUND-001-004 (Visitor cancellation, shortfall
     request, or no-response auto-refund).

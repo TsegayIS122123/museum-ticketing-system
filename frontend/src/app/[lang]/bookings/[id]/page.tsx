@@ -12,7 +12,7 @@ import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
 import { DigitalTicket } from '@/components/ui/DigitalTicket';
 import { CancelRescheduleControls } from '@/features/booking/components/CancelRescheduleControls';
 import { getBooking, type BookingResponse } from '@/features/booking/api';
-import { requestPartialRefund } from '@/features/refunds/api';
+import { requestPartialRefund, getRefunds } from '@/features/refunds/api';
 import { ApiError } from '@/lib/api/errors';
 import { Toast } from '@/components/ui/Toast';
 import { downloadReceipt } from '@/lib/utils/download';
@@ -97,6 +97,36 @@ export default function BookingDetailPage() {
     // every render instead of only when the booking to load changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId, isAuthenticated, authLoading, locale, router]);
+
+  useEffect(() => {
+    // `refundRequested` above is only ever set from *this session's* own
+    // click (or its 409 response) -- it has no memory of a refund
+    // requested in an earlier session, so a plain page refresh used to
+    // show the button as active again even though the backend already
+    // has a non-failed Refund row for this shortfall (see
+    // services._ensure_no_existing_refund's own guard). Reconstruct that
+    // state from the same `GET /refunds` a Visitor can already see their
+    // own refunds through, instead of leaving it to a second click to
+    // discover via the 409.
+    if (!booking) return;
+    let cancelled = false;
+    getRefunds({ reason: 'partial_shortfall' })
+      .then((response) => {
+        if (cancelled) return;
+        const alreadyRequested = response.data.some(
+          (refund) => refund.bookingId === booking.id && refund.status !== 'failed'
+        );
+        if (alreadyRequested) setRefundRequested(true);
+      })
+      .catch(() => {
+        // Non-fatal -- worst case the button stays active and a genuine
+        // duplicate click still gets safely rejected server-side (the
+        // existing conflict handling in handleRequestRefund below).
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [booking]);
 
   if (authLoading || isLoading) {
     return (

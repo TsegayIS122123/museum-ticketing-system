@@ -32,6 +32,11 @@ urlpatterns = [
         name="booking-category-correction",
     ),
     path(
+        "<uuid:id>/category-corrections/batch/",
+        views.BookingCategoryCorrectionBatchView.as_view(),
+        name="booking-category-correction-batch",
+    ),
+    path(
         "<uuid:id>/items/",
         views.BookingItemAddView.as_view(),
         name="booking-item-add",

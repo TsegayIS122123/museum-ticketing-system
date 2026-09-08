@@ -7,16 +7,17 @@ import { Button } from '@/components/ui/Button';
 import { QuantityInput } from '@/components/ui/QuantityInput';
 import { getCategories } from '@/features/catalog/api';
 import type { Category } from '@/features/catalog/schemas';
-import { correctBookingCategory, addBookingItem } from '../api';
+import { correctBookingCategoryBatch } from '../api';
 import type { BookingLookupResponse } from '../api';
 import { ApiError } from '@/lib/api/errors';
 
 interface CategoryCorrectionPanelProps {
   booking: BookingLookupResponse;
   onCancel: () => void;
-  // `partialError` is set when the batch below stopped partway through --
-  // `updated` is still the latest booking state actually persisted on the
-  // server (whatever succeeded before the failure), never stale.
+  // The batch endpoint applies every queued change atomically, so there
+  // is no partial-success state any more -- `partialError` is kept only
+  // for the (now unreachable in practice) case of a caller that still
+  // wants to distinguish a soft warning from a hard failure.
   onCorrected: (updated: BookingLookupResponse, partialError?: string) => void;
 }
 
@@ -52,10 +53,16 @@ interface CorrectionPlan {
   blocked: string | null;
 }
 
-// Orders the queued ops into a sequence of PATCH/POST calls that's safe
-// to fire at the real, single-item backend, or reports why no such
-// sequence exists. See the component docstring below for the two
-// backend rules this is enforcing.
+// Orders the queued ops the same way the backend's
+// apply_booking_corrections will apply them, purely so the panel can
+// preview that order and catch the one case the backend still can't do
+// anything about -- a genuine two-way category swap -- before the
+// Cashier hits Confirm, rather than only finding out after a failed
+// request. The backend now applies the whole batch as one atomic
+// correction (a single combined reopen-for-payment/refund, however many
+// of the queued changes are individually undercharges), so this no
+// longer needs to reject multiple reopening changes -- only an
+// unresolvable swap.
 function buildCorrectionPlan(
   plannedOps: PlannedOp[],
   originalOwnerByCategory: Map<string, string>,
@@ -74,29 +81,11 @@ function buildCorrectionPlan(
     const blocker = editOps.find((o) => o.itemId === blockerId);
     if (blocker) blockerKeyByOpKey.set(op.key, blocker.key);
   }
-  const isDependedOn = (key: string) =>
-    editOps.some((o) => blockerKeyByOpKey.get(o.key) === key);
 
-  const reopeningOps = [...editOps, ...addOps].filter((o) => o.isReopening);
-  if (reopeningOps.length > 1) {
-    return {
-      ordered: [],
-      blocked:
-        t('too_many_reopening_changes') ||
-        'Only one change that increases the total can go in a single confirmation -- it reopens payment and blocks any further correction until paid. Remove one of the highlighted changes, confirm the rest, then come back for it.',
-    };
-  }
-  if (reopeningOps.some((o) => isDependedOn(o.key))) {
-    return {
-      ordered: [],
-      blocked:
-        t('reopening_blocks_dependent') ||
-        "One change needs a category that's only freed up by another change that itself increases the total -- that combination can't be done in one visit. Apply the balance-increasing change on its own first, wait for it to be paid, then come back for the rest.",
-    };
-  }
-
-  // Kahn's algorithm, preferring a ready non-reopening op at each step so
-  // the (at most one) reopening op naturally ends up last.
+  // Kahn's algorithm -- same ordering apply_booking_corrections computes
+  // server-side, ported here just to preview it and to surface a genuine
+  // two-way swap (a cycle: no ready op left) as a friendly message before
+  // submitting, rather than as a 409 after.
   const ordered: PlannedOp[] = [];
   const doneKeys = new Set<string>();
   let remaining = editOps;
@@ -113,10 +102,9 @@ function buildCorrectionPlan(
           "Two of these changes each need the other's category freed up first, so that swap can't be applied directly. Remove one of them, confirm the rest, then come back and move that one into its now-free category.",
       };
     }
-    const pick = ready.find((o) => !o.isReopening) ?? ready[0];
-    ordered.push(pick);
-    doneKeys.add(pick.key);
-    remaining = remaining.filter((o) => o.key !== pick.key);
+    ordered.push(...ready);
+    ready.forEach((o) => doneKeys.add(o.key));
+    remaining = remaining.filter((o) => !doneKeys.has(o.key));
   }
   ordered.push(...addOps);
   return { ordered, blocked: null };
@@ -125,39 +113,28 @@ function buildCorrectionPlan(
 // ID-verification addendum to Document 02 Sec 2.2: shown inline on the
 // gate check-in screen (AttendanceEntryForm), before check-in.
 //
-// The backend only exposes two single-item primitives -- PATCH
-// .../category-correction (re-price/re-size *one* existing line, or move
-// it into a category the booking doesn't have yet) and POST .../items
-// (add a brand-new line) -- there is no batch endpoint and no "move N
-// from line A to line B" endpoint. Moving people between two categories
-// that are *both* already on the booking (e.g. 1 of 3 "Student" holders
-// turns out to be an "Adult") only works as two of those PATCH calls: a
-// quantity-only decrement on the Student line and a quantity-only
-// increment on the Adult line -- never a category change on either,
-// since correct_booking_category rejects re-pointing a line at a
-// category another line already holds.
+// The backend exposes a single batch endpoint -- PATCH
+// .../category-corrections/batch (apps.bookings.services.
+// apply_booking_corrections) -- that accepts the whole queue of edits to
+// existing lines (re-price/re-size, or move into a category the booking
+// doesn't have yet) and brand-new walk-up lines, and applies all of them
+// as ONE atomic correction with a single combined delta. That's what
+// lets this component queue up as many changes as the situation needs --
+// category fixes, headcount fixes (including bumping *several*
+// categories' headcounts in the same visit), category-to-category moves
+// (expressed just by editing two rows' quantities), and walk-up adds --
+// in one table and fire them all on a single Confirm click, with the
+// booking reopened for payment (or refunded) at most once no matter how
+// many of the queued changes are individually undercharges.
 //
-// This component lets the Cashier make as many such edits as the
-// situation needs -- category fixes, headcount fixes, category-to-
-// category moves (expressed just by editing two rows' quantities), and
-// walk-up adds -- in one table, then fires the whole batch off as a
-// sequence of those same PATCH/POST calls on a single Confirm click. Two
-// backend rules constrain what a single confirm can contain:
-//
-// 1. `correct_booking_category`/`add_booking_item` both require the
-//    booking to still be `Pending`, and both flip it to
-//    `AwaitingPayment` the moment a change is a net undercharge (or, for
-//    an add, unconditionally) -- so at most one such "reopening" change
-//    can be in a batch, and it must run last, or every call after it
-//    would 409.
-// 2. A row can only be pointed at a category currently held by another
-//    row once that other row's own edit has already gone through on the
-//    server -- so category moves have to run in dependency order, and a
-//    genuine two-way swap (A wants B's category, B wants A's) can't be
-//    expressed as a sequence of single-item calls at all.
-//
-// `plan` below computes that order and refuses to submit (with an
-// explanation) when either rule can't be satisfied.
+// One thing the batch endpoint still can't do anything about: a row can
+// only be pointed at a category currently held by another row once that
+// other row's own edit in the same batch has already moved it off that
+// category (`booking_item_unique_category_per_booking`) -- so a genuine
+// two-way swap (A wants B's category, B wants A's) has no valid order and
+// is rejected. `plan` below previews the server's own ordering and
+// surfaces that one case as a friendly message before Confirm is even
+// enabled, rather than only after a failed request.
 export function CategoryCorrectionPanel({
   booking,
   onCancel,
@@ -175,7 +152,6 @@ export function CategoryCorrectionPanel({
     }))
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -296,43 +272,35 @@ export function CategoryCorrectionPanel({
   const plan = buildCorrectionPlan(plannedOps, originalOwnerByCategory, t);
 
   const hasChanges = plannedOps.length > 0;
-  const reopeningKey = plannedOps.find((o) => o.isReopening)?.key ?? null;
+  const hasReopeningChange = plannedOps.some((o) => o.isReopening);
 
   const handleSubmit = async () => {
     if (!hasChanges || plan.blocked || isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
-    setProgress({ done: 0, total: plan.ordered.length });
-    let latest = booking;
     try {
-      for (let i = 0; i < plan.ordered.length; i++) {
-        const op = plan.ordered[i];
-        latest =
-          op.itemId === null
-            ? await addBookingItem(booking.id, { categoryId: op.categoryId, quantity: op.quantity })
-            : await correctBookingCategory(booking.id, op.itemId, {
-                categoryId: op.categoryChanged ? op.categoryId : undefined,
-                quantity: op.quantityChanged ? op.quantity : undefined,
-              });
-        setProgress({ done: i + 1, total: plan.ordered.length });
-      }
-      onCorrected(latest);
+      // One request for the whole queued batch -- apply_booking_corrections
+      // applies every op atomically server-side and returns the booking
+      // with a single combined delta already resolved (reopened for
+      // payment, refunded, or unchanged), so there's no partial-progress
+      // state to reconcile here any more.
+      const updated = await correctBookingCategoryBatch(
+        booking.id,
+        plan.ordered.map((op) => ({
+          itemId: op.itemId,
+          categoryId: op.categoryChanged ? op.categoryId : undefined,
+          quantity: op.quantityChanged ? op.quantity : undefined,
+        }))
+      );
+      onCorrected(updated);
     } catch (err) {
-      // Whatever already went through above is already committed
-      // server-side -- hand the parent the latest booking actually
-      // returned so it isn't left showing stale data, and say so rather
-      // than pretending the whole batch failed cleanly.
       const message =
         err instanceof ApiError
           ? err.message
-          : t('correction_failed') || 'Failed to apply that change. Please try again.';
-      onCorrected(
-        latest,
-        (t('correction_partial') || 'Some changes were applied before this one failed:') + ' ' + message
-      );
+          : t('correction_failed') || 'Failed to apply those changes. Please try again.';
+      setError(message);
     } finally {
       setIsSubmitting(false);
-      setProgress(null);
     }
   };
 
@@ -455,12 +423,6 @@ export function CategoryCorrectionPanel({
 
       {plan.blocked && <div className="text-sm text-amber-700 mt-3">{plan.blocked}</div>}
       {error && <div className="text-sm text-red-600 mt-2">{error}</div>}
-      {progress && (
-        <div className="text-sm text-stone-500 mt-2">
-          {t('applying_changes') || 'Applying change'}{' '}
-          {Math.min(progress.done + 1, progress.total)} {t('of') || 'of'} {progress.total}...
-        </div>
-      )}
 
       <div className="flex gap-3 mt-3">
         <Button
@@ -487,10 +449,10 @@ export function CategoryCorrectionPanel({
               : t('confirm') || 'Confirm'}
         </Button>
       </div>
-      {reopeningKey && !plan.blocked && (
+      {hasReopeningChange && !plan.blocked && (
         <div className="text-xs text-stone-400 mt-2">
           {t('one_reopening_note') ||
-            'One of the queued changes increases the total, so it will be applied last and will reopen payment.'}
+            'One or more of the queued changes increases the total, so confirming will reopen payment for the combined difference.'}
         </div>
       )}
     </div>

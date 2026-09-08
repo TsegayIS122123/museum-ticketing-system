@@ -276,6 +276,55 @@ class BookingCategoryCorrectionSerializer(serializers.Serializer):
         }
 
 
+class BookingCorrectionOpSerializer(serializers.Serializer):
+    """One line of a `BookingCategoryCorrectionBatchSerializer` -- same
+    field shape as `BookingCategoryCorrectionSerializer` (edit) or
+    `BookingItemAddSerializer` (add), disambiguated by whether `itemId` is
+    given. See `services.apply_booking_corrections`'s own docstring for
+    why a batch of these exists at all."""
+
+    itemId = serializers.UUIDField(required=False, allow_null=True, default=None)
+    categoryId = serializers.UUIDField(required=False)
+    quantity = serializers.IntegerField(required=False, min_value=1)
+
+    def validate(self, attrs):
+        if attrs.get("itemId") is None:
+            # A walk-up add: both fields are required, mirroring
+            # BookingItemAddSerializer.
+            if "categoryId" not in attrs or "quantity" not in attrs:
+                raise serializers.ValidationError(
+                    {"categoryId": "A new (walk-up) line needs both categoryId and quantity."}
+                )
+        elif "categoryId" not in attrs and "quantity" not in attrs:
+            raise serializers.ValidationError(
+                {"categoryId": "Provide categoryId, quantity, or both -- at least one is required."}
+            )
+        return attrs
+
+
+class BookingCategoryCorrectionBatchSerializer(serializers.Serializer):
+    """`BookingCategoryCorrectionBatchRequest` -- Cashier only
+    (ID-verification addendum, batch extension). Wraps a list of
+    `BookingCorrectionOpSerializer` lines and applies all of them as one
+    atomic correction with a single combined delta -- see
+    `services.apply_booking_corrections`'s own docstring for the full
+    rationale (in short: the single-item `category-correction`/`items`
+    endpoints can each only carry one undercharging change per Pending
+    booking before the next call 409s)."""
+
+    ops = BookingCorrectionOpSerializer(many=True, allow_empty=False)
+
+    def to_service_ops(self):
+        return [
+            {
+                "item_id": op.get("itemId"),
+                "category_id": op.get("categoryId"),
+                "quantity": op.get("quantity"),
+            }
+            for op in self.validated_data["ops"]
+        ]
+
+
 class BookingItemAddSerializer(serializers.Serializer):
     """`BookingItemAddRequest` -- Cashier only (walk-up addendum to the
     ID-verification correction flow). Adds a brand-new line for a

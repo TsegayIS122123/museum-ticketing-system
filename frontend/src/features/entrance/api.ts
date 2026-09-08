@@ -88,6 +88,30 @@ export async function correctBookingCategory(
   });
 }
 
+// PATCH /bookings/{id}/category-corrections/batch/ -- Cashier only, and
+// only on a Pending booking (apps.bookings.services.
+// apply_booking_corrections enforces both). Batch sibling of
+// correctBookingCategory/addBookingItem above: takes the whole queue of
+// edits/adds CategoryCorrectionPanel built up and applies them as ONE
+// atomic correction with a single combined delta, so multiple
+// undercharging changes (e.g. bumping two categories' headcounts in the
+// same visit) reopen payment once, not once-per-change -- see
+// apply_booking_corrections's own docstring for why the single-item
+// endpoints above couldn't do this (the first undercharge flips the
+// booking out of Pending and 409s any further single-item call).
+export async function correctBookingCategoryBatch(
+  bookingId: string,
+  ops: { itemId: string | null; categoryId?: string; quantity?: number }[]
+): Promise<Booking> {
+  return apiClient.patch<Booking>(`/bookings/${bookingId}/category-corrections/batch/`, {
+    ops: ops.map((op) => ({
+      itemId: op.itemId,
+      ...(op.categoryId ? { categoryId: op.categoryId } : {}),
+      ...(op.quantity !== undefined ? { quantity: op.quantity } : {}),
+    })),
+  });
+}
+
 // POST /bookings/{id}/items/ -- Cashier only, and only on a Pending
 // booking (apps.bookings.services.add_booking_item enforces both).
 // Walk-up addendum: called when extra people show up under a category

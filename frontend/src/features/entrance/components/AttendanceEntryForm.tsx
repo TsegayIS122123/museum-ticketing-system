@@ -468,7 +468,8 @@ export function AttendanceEntryForm({
                     <button
                       type="button"
                       onClick={() => handleItemQuantityChange(item.id, item.quantity, value - 1)}
-                      className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
+                      disabled={value <= 0}
+                      className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       aria-label={`${t('decrease_attended_count') || 'Decrease attended count'} — ${categoryLabel}`}
                     >
                       <Minus className="w-4 h-4" />
@@ -487,7 +488,17 @@ export function AttendanceEntryForm({
                     <button
                       type="button"
                       onClick={() => handleItemQuantityChange(item.id, item.quantity, value + 1)}
-                      className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors"
+                      // Attendance can never exceed what was actually
+                      // booked for this line -- increasing the headcount
+                      // itself is a category correction (Fix Category &
+                      // Headcount above), not something check-in does.
+                      // handleItemQuantityChange already clamps to
+                      // item.quantity, but disabling the button once
+                      // that ceiling is reached makes it visibly a hard
+                      // stop rather than a no-op the Cashier has to
+                      // discover by tapping it.
+                      disabled={value >= item.quantity}
+                      className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                       aria-label={`${t('increase_attended_count') || 'Increase attended count'} — ${categoryLabel}`}
                     >
                       <Plus className="w-4 h-4" />

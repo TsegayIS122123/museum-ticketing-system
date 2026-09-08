@@ -448,6 +448,288 @@ def correct_booking_category(*, booking, item_id, actor, category_id=None, quant
     return booking, delta
 
 
+# --------------------------------------------------------------------------
+# Cashier-only batched correction (fixes the "Too many reopening changes"
+# gate-workflow gap: multiple undercharging edits in one visit)
+# --------------------------------------------------------------------------
+
+
+def apply_booking_corrections(*, booking, actor, ops):
+    """Batch sibling of `correct_booking_category`/`add_booking_item` above.
+
+    Those two functions are each single-item and each independently flip
+    a `Pending` booking to `AwaitingPayment` the moment their own change is
+    an undercharge -- fine for a lone correction, but it means a Cashier
+    who needs to bump *two* categories' headcounts in the same visit (both
+    undercharges) can't: the first PATCH reopens payment and the second
+    then 409s against the `Pending`-only guard, because the booking isn't
+    Pending any more. `CategoryCorrectionPanel` (frontend) used to detect
+    this ahead of time and refuse to submit ("Too many reopening
+    changes...") rather than let the second call fail server-side.
+
+    This function is the real fix: it takes the *whole* batch of edits/
+    adds the Cashier queued up and applies them as ONE atomic operation
+    against the booking, so there's only ever one combined delta and the
+    booking is reopened for payment (or refunded) at most once, no matter
+    how many of the individual line changes are themselves undercharges.
+
+    `ops` is a list of dicts, each shaped like one call to
+    `correct_booking_category` (edit) or `add_booking_item` (add):
+        {"item_id": UUID | None, "category_id": UUID | None, "quantity": int | None}
+    `item_id=None` means "add a new line" -- mirroring `add_booking_item`,
+    both `category_id` and `quantity` are then required. Otherwise it's an
+    edit of that existing `BookingItem` -- mirroring
+    `correct_booking_category`, `category_id`/`quantity` are each
+    individually optional but at least one must be given.
+
+    A category move (an edit whose `category_id` points at a category
+    another item on the booking currently holds) is applied in dependency
+    order within the batch -- once that other item's own edit in this same
+    batch has moved it off that category -- for the same
+    `booking_item_unique_category_per_booking` reason
+    `correct_booking_category`'s own docstring explains; a genuine two-way
+    swap (A wants B's category, B wants A's, both in the same batch) has
+    no valid order and is rejected with a `Conflict`, same as the
+    frontend's own `buildCorrectionPlan` used to detect client-side.
+
+    Only on a `Pending` booking, same window as the two single-item
+    functions. Returns `(booking, delta)`, same contract as
+    `correct_booking_category`: positive is a combined undercharge
+    (reopens payment for the whole difference at once), negative is a
+    combined overcharge (one refund for the whole difference), zero means
+    the batch nets out to no change in total owed.
+    """
+    if booking.status != Booking.Status.PENDING:
+        raise Conflict("Only a Pending booking's category can be corrected.")
+
+    if not ops:
+        raise ValidationError({"ops": "At least one correction is required."})
+
+    edit_ops = [o for o in ops if o.get("item_id") is not None]
+    add_ops = [o for o in ops if o.get("item_id") is None]
+
+    item_ids = [o["item_id"] for o in edit_ops]
+    if len(set(item_ids)) != len(item_ids):
+        raise ValidationError({"itemId": "Each line item can only be corrected once per batch."})
+
+    for o in edit_ops:
+        if o.get("category_id") is None and o.get("quantity") is None:
+            raise ValidationError(
+                {"categoryId": "Provide categoryId, quantity, or both for each corrected item."}
+            )
+        if o.get("quantity") is not None and o["quantity"] < 1:
+            raise ValidationError({"quantity": "Must be at least 1."})
+
+    for o in add_ops:
+        if o.get("category_id") is None or o.get("quantity") is None:
+            raise ValidationError({"categoryId": "A new (walk-up) line needs both categoryId and quantity."})
+        if o["quantity"] < 1:
+            raise ValidationError({"quantity": "Must be at least 1."})
+
+    with transaction.atomic():
+        # Lock this booking's items for the duration -- same reasoning as
+        # any other read-then-write correction, just now covering several
+        # rows at once instead of one.
+        items_by_id = {
+            str(item.id): item for item in booking.items.select_for_update()
+        }
+        missing = [str(o["item_id"]) for o in edit_ops if str(o["item_id"]) not in items_by_id]
+        if missing:
+            raise ValidationError({"itemId": "Not one of this booking's line items."})
+
+        # Category currently (pre-batch) held by each item -- the
+        # dependency map a category-move's ordering is resolved against,
+        # exactly like `originalOwnerByCategory` in the frontend panel.
+        owner_by_category = {str(item.category_id): str(item.id) for item in items_by_id.values()}
+
+        resolved = []
+        for o in edit_ops:
+            item = items_by_id[str(o["item_id"])]
+            category = item.category
+            category_changed = o.get("category_id") is not None
+            if category_changed:
+                try:
+                    category = Category.objects.get(id=o["category_id"], active=True)
+                except Category.DoesNotExist:
+                    raise ValidationError({"categoryId": "Not a known, active category."})
+                if category.id == item.category_id:
+                    raise ValidationError({"categoryId": "This is already the item's category."})
+
+            new_quantity = item.quantity if o.get("quantity") is None else o["quantity"]
+            if o.get("quantity") is not None and not category_changed and new_quantity == item.quantity:
+                raise ValidationError({"quantity": "This is already the item's quantity."})
+
+            resolved.append(
+                {
+                    "item": item,
+                    "category": category,
+                    "category_changed": category_changed,
+                    "quantity": new_quantity,
+                }
+            )
+
+        # Order the edits (Kahn's algorithm) so a category-move only ever
+        # runs once whatever item currently owns that category has itself
+        # already been moved off it -- see this function's own docstring.
+        ordered = []
+        done_ids = set()
+        remaining = resolved
+        while remaining:
+            ready, blocked = [], []
+            for r in remaining:
+                blocker_id = owner_by_category.get(str(r["category"].id)) if r["category_changed"] else None
+                if not blocker_id or blocker_id == str(r["item"].id) or blocker_id in done_ids:
+                    ready.append(r)
+                else:
+                    blocked.append(r)
+            if not ready:
+                raise Conflict(
+                    "Two of the queued changes need to swap categories directly with each "
+                    "other -- that can't be applied in one batch. Apply one on its own, let "
+                    "it save, then apply the other."
+                )
+            ordered.extend(ready)
+            done_ids.update(str(r["item"].id) for r in ready)
+            remaining = blocked
+
+        # Final category each existing item will hold once the edits
+        # above are applied -- what add_ops below are validated against,
+        # same "no duplicate category on the booking" rule
+        # `add_booking_item` enforces, just accounting for this batch's
+        # own edits rather than only the booking's pre-batch state.
+        final_category_ids = {str(r["item"].category_id if not r["category_changed"] else r["category"].id) for r in ordered}
+        for item_id, item in items_by_id.items():
+            if item_id not in {str(r["item"].id) for r in ordered}:
+                final_category_ids.add(str(item.category_id))
+
+        resolved_adds = []
+        for o in add_ops:
+            try:
+                category = Category.objects.get(id=o["category_id"], active=True)
+            except Category.DoesNotExist:
+                raise ValidationError({"categoryId": "Not a known, active category."})
+            if str(category.id) in final_category_ids:
+                raise ValidationError(
+                    {"categoryId": "This booking already has a line for that category -- correct its quantity instead."}
+                )
+            final_category_ids.add(str(category.id))
+            resolved_adds.append({"category": category, "quantity": o["quantity"]})
+
+        old_total = booking.total_amount_etb
+        old_booked_quantity = booking.booked_quantity
+        running_total = old_total
+        running_booked_quantity = old_booked_quantity
+        op_audit_entries = []
+
+        for r in ordered:
+            item = r["item"]
+            old_subtotal = item.subtotal_etb
+            old_quantity = item.quantity
+            old_category_id = item.category_id
+            new_unit_price = r["category"].price_etb
+            new_subtotal = new_unit_price * r["quantity"]
+
+            item.category = r["category"]
+            item.category_name_en = r["category"].name_en
+            item.category_name_am = r["category"].name_am
+            item.unit_price_etb = new_unit_price
+            item.quantity = r["quantity"]
+            item.subtotal_etb = new_subtotal
+            item.save(
+                update_fields=[
+                    "category",
+                    "category_name_en",
+                    "category_name_am",
+                    "unit_price_etb",
+                    "quantity",
+                    "subtotal_etb",
+                    "updated_at",
+                ]
+            )
+
+            running_total = running_total - old_subtotal + new_subtotal
+            running_booked_quantity = running_booked_quantity - old_quantity + r["quantity"]
+            op_audit_entries.append(
+                {
+                    "item_id": str(item.id),
+                    "old_category_id": str(old_category_id),
+                    "new_category_id": str(r["category"].id),
+                    "old_quantity": old_quantity,
+                    "new_quantity": r["quantity"],
+                    "old_item_subtotal_etb": str(old_subtotal),
+                    "new_item_subtotal_etb": str(new_subtotal),
+                }
+            )
+
+        for a in resolved_adds:
+            subtotal = a["category"].price_etb * a["quantity"]
+            new_item = BookingItem.objects.create(
+                booking=booking,
+                category=a["category"],
+                category_name_en=a["category"].name_en,
+                category_name_am=a["category"].name_am,
+                unit_price_etb=a["category"].price_etb,
+                quantity=a["quantity"],
+                subtotal_etb=subtotal,
+            )
+            running_total = running_total + subtotal
+            running_booked_quantity = running_booked_quantity + a["quantity"]
+            op_audit_entries.append(
+                {
+                    "item_id": str(new_item.id),
+                    "old_category_id": None,
+                    "new_category_id": str(a["category"].id),
+                    "old_quantity": 0,
+                    "new_quantity": a["quantity"],
+                    "old_item_subtotal_etb": "0",
+                    "new_item_subtotal_etb": str(subtotal),
+                }
+            )
+
+        new_total = running_total
+        new_booked_quantity = running_booked_quantity
+        delta = new_total - old_total
+
+        booking.total_amount_etb = new_total
+        booking.booked_quantity = new_booked_quantity
+        booking.category_corrected_at = timezone.now()
+        booking.category_corrected_by_user_id = actor
+
+        update_fields = [
+            "total_amount_etb",
+            "booked_quantity",
+            "category_corrected_at",
+            "category_corrected_by_user_id",
+            "updated_at",
+        ]
+        if delta > 0:
+            # One combined reopen for however many of the batch's own
+            # edits/adds were individually undercharges -- this is the
+            # whole point of this function over calling
+            # correct_booking_category/add_booking_item in a loop.
+            booking.status = Booking.Status.AWAITING_PAYMENT
+            update_fields.append("status")
+
+        booking.save(update_fields=update_fields)
+
+        write_audit_log(
+            actor_id=actor.id,
+            action="booking.corrections_applied",
+            target_type="booking",
+            target_id=booking.id,
+            metadata={
+                "ops": op_audit_entries,
+                "old_total_amount_etb": str(old_total),
+                "new_total_amount_etb": str(new_total),
+                "old_booked_quantity": old_booked_quantity,
+                "new_booked_quantity": new_booked_quantity,
+                "delta_etb": str(delta),
+            },
+        )
+
+    return booking, delta
+
+
 def add_booking_item(*, booking, actor, category_id, quantity):
     """Implements the Cashier-only `POST /bookings/{id}/items` (walk-up
     addendum to the ID-verification correction flow above).
