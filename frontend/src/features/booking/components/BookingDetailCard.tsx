@@ -141,15 +141,23 @@ export function BookingDetailCard({
           </>
         )}
 
-        {booking.receiptUrl && onViewReceipt && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onViewReceipt}
-          >
-            <FileDown className="w-4 h-4" /> {t('download_receipt')}
-          </Button>
-        )}
+        {/* Rendered once at payment time and never regenerated (backend
+            ADR-009), so once the booking is Cancelled or Refunded the
+            stored PDF is permanently stale -- it would still claim
+            "Pending". Hide the download rather than hand out a
+            misleading receipt. */}
+        {booking.receiptUrl &&
+          onViewReceipt &&
+          booking.status !== 'cancelled' &&
+          booking.status !== 'refunded' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onViewReceipt}
+            >
+              <FileDown className="w-4 h-4" /> {t('download_receipt')}
+            </Button>
+          )}
       </div>
     </Card>
   );

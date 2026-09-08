@@ -70,13 +70,27 @@ export default function MyBookingsPage() {
     return null; // Will redirect
   }
 
+  // A cancellation (FR-BOOK-006) always carries an automatic refund, and
+  // the backend moves the booking's status straight from `cancelled` to
+  // `refunded` as soon as that refund completes -- by the time this page
+  // loads, a visitor's cancelled booking has almost always already
+  // finished that transition. Treating `cancelled` and `refunded` as one
+  // bucket here keeps the "Cancelled" card (and its filter) from
+  // undercounting -- otherwise it reads 0 even right after a visitor
+  // cancels something.
+  const isCancelledOrRefunded = (status: string) => status === 'cancelled' || status === 'refunded';
+
   const totalBookings = bookings.length;
   const upcomingBookings = bookings.filter(b => b.status === 'pending').length;
   const completedBookings = bookings.filter(b => b.status === 'visited').length;
-  const cancelledBookings = bookings.filter(b => b.status === 'cancelled').length;
+  const cancelledBookings = bookings.filter(b => isCancelledOrRefunded(b.status)).length;
 
   const visibleBookings =
-    statusFilter === 'all' ? bookings : bookings.filter((b) => b.status === statusFilter);
+    statusFilter === 'all'
+      ? bookings
+      : statusFilter === 'cancelled'
+        ? bookings.filter((b) => isCancelledOrRefunded(b.status))
+        : bookings.filter((b) => b.status === statusFilter);
 
   // Clicking the card that's already selected clears the filter back to
   // Total, rather than leaving no way to get back to the full list short
@@ -122,7 +136,7 @@ export default function MyBookingsPage() {
             selected={statusFilter === 'visited'}
           />
           <StatCard
-            label={t('cancelled') || 'Cancelled'}
+            label={t('refunded') || 'Refunded'}
             value={cancelledBookings}
             color="red"
             onClick={() => toggleFilter('cancelled')}

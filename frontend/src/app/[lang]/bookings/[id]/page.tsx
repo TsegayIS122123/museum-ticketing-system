@@ -256,23 +256,32 @@ export default function BookingDetailPage() {
             </div>
           </div>
 
-          {booking.receiptUrl && (
-            <div className="mt-4 pt-4 border-t border-stone-100">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  downloadReceipt(
-                    `/bookings/${booking.id}/receipt/download`,
-                    booking.receiptUrl!,
-                    `receipt-${booking.reference}.pdf`
-                  )
-                }
-              >
-                <FileDown className="w-4 h-4" /> {t('download_receipt')}
-              </Button>
-            </div>
-          )}
+          {/* The stored receipt PDF is rendered once, at payment time, and
+              never regenerated (backend ADR-009) -- it always shows the
+              booking's status as it was right after payment (Pending).
+              Once the booking is later Cancelled or Refunded, that PDF is
+              permanently stale, so the download is hidden rather than
+              handing out a receipt that misleadingly still says
+              "Pending". */}
+          {booking.receiptUrl &&
+            booking.status !== 'cancelled' &&
+            booking.status !== 'refunded' && (
+              <div className="mt-4 pt-4 border-t border-stone-100">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    downloadReceipt(
+                      `/bookings/${booking.id}/receipt/download`,
+                      booking.receiptUrl!,
+                      `receipt-${booking.reference}.pdf`
+                    )
+                  }
+                >
+                  <FileDown className="w-4 h-4" /> {t('download_receipt')}
+                </Button>
+              </div>
+            )}
         </Card>
 
         {/* Pay Now */}
