@@ -93,6 +93,33 @@ def _split_name(full_name):
 # joined with a comma (which Chapa's own error message shows is rejected).
 _CHAPA_DESCRIPTION_ALLOWED = re.compile(r"[^A-Za-z0-9\-_. ]")
 
+# Chapa hard-caps `customization.description` at 50 characters (a 400
+# names this field explicitly if exceeded). The itemized join below has
+# no ceiling of its own -- a booking with several categories, or just one
+# category with a long free-text name, easily clears 50 chars, so this
+# has to be enforced here regardless of the charset sanitization above.
+_CHAPA_DESCRIPTION_MAX_LENGTH = 50
+
+# Chapa's `phone_number` field wants the Ethiopian *local* format --
+# exactly 10 digits, leading 0 (e.g. "0912345678"). `Account.phone` is a
+# free-text field (the verify form's own placeholder is
+# "+251 912 345 678") and is never normalized on save, so whatever the
+# visitor typed -- "+251 912 345 678", "251912345678", "0912345678", with
+# any spacing/dashes -- has to be reduced to that shape here, right before
+# the one call that actually talks to Chapa, or Chapa's validation 400s on
+# the punctuation/country-code and the booking never gets a checkout URL.
+_NON_DIGITS = re.compile(r"\D")
+
+
+def _normalize_chapa_phone(phone):
+    digits = _NON_DIGITS.sub("", phone or "")
+    if digits.startswith("251"):
+        digits = digits[3:]
+    digits = digits.lstrip("0")
+    if not digits:
+        return ""
+    return f"0{digits}"
+
 
 def _build_chapa_description(booking):
     """Itemized across every category on this booking (e.g. "Adult x1 -
@@ -100,12 +127,23 @@ def _build_chapa_description(booking):
     category, so a single `category_name_en x booked_quantity` line would
     misdescribe a mixed-category checkout. Joined with " - " (not a comma)
     and stripped of anything outside Chapa's allowed charset, since
-    category names are free text we don't fully control."""
+    category names are free text we don't fully control. Finally clamped
+    to Chapa's 50-character ceiling on this field -- trimmed at the last
+    complete " - "-separated item that still fits, falling back to a hard
+    cut only if even the first item alone overflows on its own."""
     items_desc = " - ".join(
         f"{item.category_name_en} x{item.quantity}" for item in booking.items.all()
     )
     cleaned = _CHAPA_DESCRIPTION_ALLOWED.sub("", items_desc).strip()
-    return cleaned or "Museum Ticket"
+    if not cleaned:
+        return "Museum Ticket"
+    if len(cleaned) <= _CHAPA_DESCRIPTION_MAX_LENGTH:
+        return cleaned
+    truncated = cleaned[:_CHAPA_DESCRIPTION_MAX_LENGTH]
+    last_sep = truncated.rfind(" - ")
+    if last_sep > 0:
+        return truncated[:last_sep].strip()
+    return truncated.strip()
 
 
 def _initialize_chapa_checkout(*, tx_ref, booking, amount):
@@ -130,7 +168,7 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
         "email": booking.visitor.email,
         "first_name": first_name,
         "last_name": last_name,
-        "phone_number": booking.visitor.phone or "",
+        "phone_number": _normalize_chapa_phone(booking.visitor.phone),
         "tx_ref": tx_ref,
         "callback_url": (
             f"{settings.PUBLIC_API_BASE_URL.rstrip('/')}/api/v1/payments/webhooks/chapa/"
@@ -141,6 +179,7 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
             "description": _build_chapa_description(booking),
         },
     }
+    response = None
     try:
         response = requests.post(
             f"{CHAPA_BASE_URL}/transaction/initialize",
@@ -148,6 +187,18 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
             headers={"Authorization": f"Bearer {settings.CHAPA_SECRET_KEY}"},
             timeout=CHAPA_TIMEOUT_SECONDS,
         )
+        # Chapa's 400 body names the exact rejected field/reason (e.g.
+        # "Invalid phone_number", "amount must be greater than 0") -- that
+        # detail is the only way to tell a validation 400 apart from a
+        # network/outage failure, and it was being thrown away by
+        # `raise_for_status()` before this could ever be logged. Log it
+        # here, before `raise_for_status()` turns it into a bare
+        # HTTPError with no body attached.
+        if not response.ok:
+            logger.error(
+                "Chapa rejected checkout init for booking %s: status=%s body=%s",
+                booking.id, response.status_code, response.text,
+            )
         response.raise_for_status()
         data = response.json()
     except (requests.RequestException, ValueError) as exc:

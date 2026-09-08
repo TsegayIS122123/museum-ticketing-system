@@ -14,6 +14,7 @@ from unittest import mock
 import re
 
 import pytest
+import requests
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -216,6 +217,56 @@ def test_build_chapa_description_falls_back_when_fully_stripped():
     assert description == "Museum Ticket"
 
 
+def test_build_chapa_description_truncates_to_chapa_50_char_limit():
+    """Chapa's own 400 for this field is
+    '"customization.description must not exceed 50 characters"' -- a
+    booking with several categories, or one long category name, can
+    exceed that on its own, so the built description must never be
+    handed to Chapa untrimmed regardless of how many items or how long
+    their names are."""
+    visitor = _make_visitor()
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+        booked_quantity=4,
+        total_amount_etb=Decimal("400.00"),
+        status=Booking.Status.AWAITING_PAYMENT,
+    )
+    categories = [
+        ("Adult", 1),
+        ("Student", 2),
+        ("Senior Citizen Discount Rate", 3),
+        ("Child Under Five Years Old", 1),
+    ]
+    for name, quantity in categories:
+        category = Category.objects.create(
+            name_en=name, name_am=name, price_etb=Decimal("100.00")
+        )
+        BookingItem.objects.create(
+            booking=booking, category=category, category_name_en=category.name_en,
+            category_name_am=category.name_am, unit_price_etb=category.price_etb,
+            quantity=quantity, subtotal_etb=category.price_etb * quantity,
+        )
+
+    description = services._build_chapa_description(booking)
+
+    assert len(description) <= services._CHAPA_DESCRIPTION_MAX_LENGTH
+    # Trimmed at a complete item boundary, not mid-item.
+    assert description == "Adult x1 - Student x2"
+
+
+def test_build_chapa_description_hard_truncates_single_overlong_item():
+    booking = _make_booking(quantity=1)
+    item = booking.items.first()
+    item.category_name_en = "International Researcher Visa-Holder Long Category Name"
+    item.save(update_fields=["category_name_en"])
+
+    description = services._build_chapa_description(booking)
+
+    assert len(description) == services._CHAPA_DESCRIPTION_MAX_LENGTH
+
+
 @mock.patch("apps.payments.services.requests.post")
 def test_initialize_chapa_checkout_sends_sanitized_description(mock_post, settings):
     settings.PUBLIC_API_BASE_URL = "https://api.example.com"
@@ -257,6 +308,82 @@ def test_initialize_chapa_checkout_sends_sanitized_description(mock_post, settin
 
     sent_description = mock_post.call_args.kwargs["json"]["customization"]["description"]
     assert "," not in sent_description
+
+
+# --------------------------------------------------------------------------
+# _normalize_chapa_phone -- Chapa's `phone_number` field wants Ethiopian
+# local format (10 digits, leading 0); `Account.phone` is free text (the
+# verify form's own placeholder is "+251 912 345 678") and is stored
+# exactly as typed, so whatever shape it arrives in has to be reduced to
+# Chapa's before it's sent, or Chapa 400s on the punctuation/country code.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("+251 912 345 678", "0912345678"),
+        ("251912345678", "0912345678"),
+        ("0912345678", "0912345678"),
+        ("912345678", "0912345678"),
+        ("+251-91-100-0000", "0911000000"),
+        ("", ""),
+        (None, ""),
+    ],
+)
+def test_normalize_chapa_phone(raw, expected):
+    assert services._normalize_chapa_phone(raw) == expected
+
+
+@mock.patch("apps.payments.services.requests.post")
+def test_initialize_chapa_checkout_sends_normalized_phone(mock_post, settings):
+    settings.PUBLIC_API_BASE_URL = "https://api.example.com"
+    settings.PUBLIC_WEB_BASE_URL = "https://web.example.com"
+    settings.CHAPA_SECRET_KEY = "test-secret"
+    mock_post.return_value = mock.Mock(
+        ok=True,
+        json=lambda: {"status": "success", "data": {"checkout_url": FAKE_CHECKOUT_URL}},
+    )
+    # Mirrors the verify form's own placeholder shape -- the exact string a
+    # real visitor is nudged into typing.
+    visitor = _make_visitor()
+    visitor.phone = "+251 912 345 678"
+    visitor.save(update_fields=["phone"])
+    booking = _make_booking(visitor=visitor)
+
+    services._initialize_chapa_checkout(
+        tx_ref="museum-test-ref", booking=booking, amount=Decimal("200.00")
+    )
+
+    sent_phone = mock_post.call_args.kwargs["json"]["phone_number"]
+    assert sent_phone == "0912345678"
+
+
+@mock.patch("apps.payments.services.requests.post")
+def test_initialize_chapa_checkout_logs_response_body_on_400(mock_post, settings, caplog):
+    """A validation 400 names the exact rejected field in its body -- that
+    detail must reach the logs (not just a bare "failed" line), or every
+    Chapa rejection is undebuggable without live access to Chapa itself.
+    """
+    settings.PUBLIC_API_BASE_URL = "https://api.example.com"
+    settings.PUBLIC_WEB_BASE_URL = "https://web.example.com"
+    settings.CHAPA_SECRET_KEY = "test-secret"
+    mock_response = mock.Mock(ok=False, status_code=400, text='{"message": "amount must be greater than 0"}')
+    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+        response=mock_response
+    )
+    mock_post.return_value = mock_response
+    booking = _make_booking()
+
+    with caplog.at_level("ERROR"):
+        with pytest.raises(services.PaymentGatewayError):
+            services._initialize_chapa_checkout(
+                tx_ref="museum-test-ref", booking=booking, amount=Decimal("0.00")
+            )
+
+    assert any(
+        "amount must be greater than 0" in record.getMessage() for record in caplog.records
+    )
 
 
 # --------------------------------------------------------------------------
