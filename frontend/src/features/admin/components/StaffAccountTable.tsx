@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Table } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { RoleBadge } from '@/components/ui/RoleBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import type { StaffAccountResponse } from '../api';
 
@@ -27,19 +28,6 @@ export function StaffAccountTable({
   onRefresh,
 }: StaffAccountTableProps) {
   const { t } = useTranslation();
-
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'cashier':
-        return <StatusBadge status="pending" />;
-      case 'museum_manager':
-        return <StatusBadge status="awaiting_payment" />;
-      case 'platform_admin':
-        return <StatusBadge status="visited" />;
-      default:
-        return <StatusBadge status="pending" />;
-    }
-  };
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—';
@@ -90,9 +78,11 @@ export function StaffAccountTable({
         {t('created') || 'Created'}: {formatDate(account.created_at)}
       </div>
     </div>,
-    <div key="role">{getRoleBadge(account.role)}</div>,
+    <div key="role">
+      <RoleBadge role={account.role} />
+    </div>,
     <div key="status">
-      <StatusBadge status={account.active ? 'pending' : 'cancelled'} />
+      <StatusBadge status={account.active ? 'active' : 'inactive'} />
     </div>,
     <div key="actions" className="flex flex-wrap gap-2">
       <Button

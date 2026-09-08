@@ -392,7 +392,8 @@ export function AttendanceEntryForm({
           <CategoryCorrectionPanel
             booking={booking}
             onCancel={() => setShowCorrection(false)}
-            onCorrected={(updated) => {
+            onCorrected={(updated, partialError) => {
+              const previousTotal = Number(booking.totalAmountEtb);
               setBooking(updated);
               // A correction can change an item's category/quantity (or
               // even remove/replace it) -- re-seed the per-category
@@ -402,21 +403,40 @@ export function AttendanceEntryForm({
                 Object.fromEntries(updated.items.map((item) => [item.id, item.quantity]))
               );
               setShowCorrection(false);
-              setToast(
-                updated.status === 'awaiting_payment'
-                  ? {
-                      message:
-                        t('correction_needs_payment') ||
-                        "Category corrected. The visitor now owes the difference online before they can be checked in -- they'll see a Pay Now button on their own booking page.",
-                      type: 'success',
-                    }
-                  : {
-                      message:
-                        t('correction_refund_issued') ||
-                        'Category corrected. The overcharge is being refunded automatically.',
-                      type: 'success',
-                    }
-              );
+              if (partialError) {
+                // The panel already stopped after whatever succeeded --
+                // `updated` reflects that partial progress. Tell the
+                // Cashier plainly rather than showing a success toast for
+                // a batch that didn't fully go through.
+                setToast({ message: partialError, type: 'error' });
+                return;
+              }
+              // The panel can now apply several changes at once, so the
+              // net effect on the total (not just the final status) is
+              // what determines the right message -- a batch that nets to
+              // no change in price (e.g. a pure category swap between two
+              // equally-priced categories) shouldn't claim a refund.
+              const totalDelta = Number(updated.totalAmountEtb) - previousTotal;
+              if (updated.status === 'awaiting_payment') {
+                setToast({
+                  message:
+                    t('correction_needs_payment') ||
+                    "Category corrected. The visitor now owes the difference online before they can be checked in -- they'll see a Pay Now button on their own booking page.",
+                  type: 'success',
+                });
+              } else if (totalDelta < 0) {
+                setToast({
+                  message:
+                    t('correction_refund_issued') ||
+                    'Category corrected. The overcharge is being refunded automatically.',
+                  type: 'success',
+                });
+              } else {
+                setToast({
+                  message: t('correction_applied') || 'Category correction applied.',
+                  type: 'success',
+                });
+              }
             }}
           />
         )}
