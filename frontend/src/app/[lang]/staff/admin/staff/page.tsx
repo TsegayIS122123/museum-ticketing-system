@@ -18,6 +18,9 @@ export default function StaffManagementPage() {
   const [staff, setStaff] = useState<StaffAccountResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  // Which of the three report cards above the table is currently
+  // filtering it -- 'all' is the Total card (or nothing clicked yet).
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -126,6 +129,15 @@ export default function StaffManagementPage() {
   const activeCount = staff.filter((s) => s.active).length;
   const inactiveCount = staff.filter((s) => !s.active).length;
 
+  const visibleStaff =
+    statusFilter === 'all'
+      ? staff
+      : staff.filter((s) => (statusFilter === 'active' ? s.active : !s.active));
+
+  const toggleFilter = (next: 'all' | 'active' | 'inactive') => {
+    setStatusFilter((current) => (current === next ? 'all' : next));
+  };
+
   return (
     <PageContainer>
       {toast && (
@@ -167,23 +179,29 @@ export default function StaffManagementPage() {
           label={t('total_staff') || 'Total Staff'}
           value={staff.length}
           sub={t('all_accounts') || 'All accounts'}
+          onClick={() => toggleFilter('all')}
+          selected={statusFilter === 'all'}
         />
         <StatCard
           label={t('active') || 'Active'}
           value={activeCount}
           sub={t('currently_active') || 'Currently active'}
           color="green"
+          onClick={() => toggleFilter('active')}
+          selected={statusFilter === 'active'}
         />
         <StatCard
           label={t('inactive') || 'Inactive'}
           value={inactiveCount}
           sub={t('deactivated') || 'Deactivated'}
           color="red"
+          onClick={() => toggleFilter('inactive')}
+          selected={statusFilter === 'inactive'}
         />
       </div>
 
       <StaffAccountTable
-        staff={staff}
+        staff={visibleStaff}
         isLoading={isLoading}
         onEdit={handleEdit}
         onDeactivate={handleDeactivate}

@@ -19,6 +19,13 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  // Which of the four report cards is currently filtering the list below
+  // -- 'all' means the Total card is selected (or nothing's been clicked
+  // yet), the other three map onto the same booking statuses each card
+  // already counts.
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'visited' | 'cancelled'>(
+    'all'
+  );
 
   const loadBookings = async () => {
     setIsLoading(true);
@@ -68,6 +75,16 @@ export default function MyBookingsPage() {
   const completedBookings = bookings.filter(b => b.status === 'visited').length;
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled').length;
 
+  const visibleBookings =
+    statusFilter === 'all' ? bookings : bookings.filter((b) => b.status === statusFilter);
+
+  // Clicking the card that's already selected clears the filter back to
+  // Total, rather than leaving no way to get back to the full list short
+  // of a refresh.
+  const toggleFilter = (next: 'all' | 'pending' | 'visited' | 'cancelled') => {
+    setStatusFilter((current) => (current === next ? 'all' : next));
+  };
+
   return (
     <div className="min-h-screen flex flex-col" data-surface="visitor">
       <PublicHeader />
@@ -87,27 +104,35 @@ export default function MyBookingsPage() {
           <StatCard
             label={t('total') || 'Total'}
             value={totalBookings}
+            onClick={() => toggleFilter('all')}
+            selected={statusFilter === 'all'}
           />
           <StatCard
             label={t('upcoming') || 'Upcoming'}
             value={upcomingBookings}
             color="primary"
+            onClick={() => toggleFilter('pending')}
+            selected={statusFilter === 'pending'}
           />
           <StatCard
             label={t('completed') || 'Completed'}
             value={completedBookings}
             color="green"
+            onClick={() => toggleFilter('visited')}
+            selected={statusFilter === 'visited'}
           />
           <StatCard
             label={t('cancelled') || 'Cancelled'}
             value={cancelledBookings}
             color="red"
+            onClick={() => toggleFilter('cancelled')}
+            selected={statusFilter === 'cancelled'}
           />
         </div>
 
-        {/* Bookings List */}
+        {/* Bookings List -- filtered to whichever card above is selected */}
         <BookingList
-          bookings={bookings}
+          bookings={visibleBookings}
           isLoading={isLoading}
           onRefresh={loadBookings}
         />
