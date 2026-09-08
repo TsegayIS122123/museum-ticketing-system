@@ -39,12 +39,26 @@ export default function BookPage() {
   // phone that were never sent anywhere -- see the BookingSummary note
   // below) before finding out at the final confirm click that she
   // wasn't logged in.
+  //
+  // Email verification is gated here too, not just phone/OTP -- this
+  // used to only surface as create_booking's 400 at the payment step
+  // ("Both your email and phone must be verified before you can book
+  // online."), so a visitor could get all the way through the wizard
+  // before learning she still had a step left. Sending her to /verify
+  // up front (it recognizes an authenticated-but-unverified session and
+  // shows the "confirm your email" panel directly, see
+  // VisitorVerifyForm) surfaces that requirement before she's invested
+  // any time in picking tickets and a date.
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated) {
       router.push(`/${locale}/verify?redirect=/book`);
+      return;
     }
-  }, [isAuthenticated, authLoading, locale, router]);
+    if (user && !user.email_verified_at) {
+      router.push(`/${locale}/verify?redirect=/book`);
+    }
+  }, [isAuthenticated, authLoading, user, locale, router]);
 
   const steps = [
     t('tickets') || 'Tickets',
@@ -165,7 +179,7 @@ export default function BookPage() {
     }
   };
 
-  if (authLoading || !isAuthenticated) {
+  if (authLoading || !isAuthenticated || (user && !user.email_verified_at)) {
     return (
       <div className="min-h-screen flex flex-col" data-surface="visitor">
         <PublicHeader />

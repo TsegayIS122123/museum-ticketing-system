@@ -770,6 +770,10 @@ export interface components {
             readonly language_preference: components["schemas"]["LanguagePreferenceEnum"];
             readonly active: boolean;
             /** Format: date-time */
+            readonly email_verified_at: string | null;
+            /** Format: date-time */
+            readonly phone_verified_at: string | null;
+            /** Format: date-time */
             readonly created_at: string;
         };
         /**

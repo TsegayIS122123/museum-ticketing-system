@@ -35,6 +35,12 @@ interface User {
   role: 'visitor' | 'cashier' | 'museum_manager' | 'platform_admin';
   language_preference: 'en' | 'am';
   active: boolean;
+  // Both null until proven -- a Visitor's `verify` flow (OTP) sets
+  // phone_verified_at immediately, but email_verified_at only flips once
+  // the emailed magic link is opened (features/account/api.ts's
+  // confirmEmailVerification). Staff accounts never set either.
+  email_verified_at: string | null;
+  phone_verified_at: string | null;
   created_at: string;
 }
 

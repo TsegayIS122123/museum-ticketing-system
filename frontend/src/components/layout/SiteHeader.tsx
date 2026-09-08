@@ -58,12 +58,20 @@ export function SiteHeader() {
 
   const profilePath = `/${locale}/settings/account`;
 
+  // "Visitor verification" is how a signed-out visitor logs in (email +
+  // phone -> OTP) -- it has nothing left to offer someone who's already
+  // authenticated, and showing "Verify" to an already-verified visitor
+  // reads as a broken nav item ("verify" *what*, exactly?). So it only
+  // ever appears here for a signed-out visitor; once logged in, this
+  // link simply drops out of both the desktop nav and the mobile panel.
   const navLinks = isStaffArea
     ? []
     : [
         { href: `/${locale}/book`, label: t('footer_book_a_visit') || 'Book a visit' },
         { href: `/${locale}/bookings`, label: t('footer_manage_bookings') || 'Manage bookings' },
-        { href: `/${locale}/verify`, label: t('footer_visitor_verification') || 'Visitor verification' },
+        ...(isAuthenticated
+          ? []
+          : [{ href: `/${locale}/verify`, label: t('footer_visitor_verification') || 'Visitor verification' }]),
       ];
 
   const displayName = user ? (user.full_name || user.email) : '';

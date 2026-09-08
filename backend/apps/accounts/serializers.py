@@ -59,7 +59,13 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 class AccountSerializer(serializers.ModelSerializer):
     """`UserProfile` (Document 04) -- Visitor and Staff share one shape; a
-    Visitor's password-adjacent fields are simply never populated."""
+    Visitor's password-adjacent fields are simply never populated.
+
+    `email_verified_at`/`phone_verified_at` are exposed (read-only) so the
+    frontend can gate a Visitor's flow -- e.g. requiring email verification
+    right after OTP confirmation (FR-ACC-003) -- without having to guess at
+    verification state or discover it only when a later action (like
+    `create_booking`) rejects it."""
 
     class Meta:
         model = Account
@@ -71,6 +77,8 @@ class AccountSerializer(serializers.ModelSerializer):
             "role",
             "language_preference",
             "active",
+            "email_verified_at",
+            "phone_verified_at",
             "created_at",
         ]
         read_only_fields = fields
