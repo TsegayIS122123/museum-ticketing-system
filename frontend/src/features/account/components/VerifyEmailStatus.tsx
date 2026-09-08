@@ -51,9 +51,7 @@ export function VerifyEmailStatus() {
 
   return (
     <Card className="max-w-md mx-auto text-center">
-      <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-        <span className="text-white font-bold text-xl">SM</span>
-      </div>
+      
 
       {status === 'verifying' && (
         <>

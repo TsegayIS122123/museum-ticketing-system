@@ -43,9 +43,6 @@ export default function NewGroupVisitPage() {
           <h1 className="text-3xl font-serif font-semibold text-stone-900">
             {t('group_visit_request') || 'Group / School Visit Request'}
           </h1>
-          <p className="text-stone-500 mt-1">
-            {t('group_visit_description') || 'Submit a request for a group or school visit. A museum manager will review and approve your request.'}
-          </p>
         </div>
 
         <GroupVisitRequestForm />

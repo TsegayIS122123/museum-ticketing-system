@@ -25,7 +25,7 @@ export function LanguageToggle() {
           type="button"
           onClick={() => switchLanguage(lang)}
           className={cn(
-            'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+            'px-3 py-1.5 text-xs font-medium leading-none rounded-md transition-colors',
             currentLang === lang
               ? 'bg-brand-primary text-white'
               : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50'

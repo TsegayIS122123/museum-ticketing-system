@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { QuantityInput } from '@/components/ui/QuantityInput';
 import { Toast } from '@/components/ui/Toast';
+import { AvailabilityDatePicker } from '@/features/booking/components/AvailabilityDatePicker';
 import { submitGroupBooking } from '../api';
 import { groupVisitRequestSchema, type GroupVisitRequestInput } from '../schemas';
 import { getCategories } from '@/features/catalog/api';
@@ -159,8 +160,6 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
     }
   };
 
-  const today = new Date().toISOString().split('T')[0];
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {toast && (
@@ -234,18 +233,23 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
             <label className="text-sm font-medium text-stone-700">
               {t('visit_date') || 'Visit Date'} *
             </label>
-            <input
-              type="date"
-              value={visitDate}
-              onChange={(e) => {
-                setVisitDate(e.target.value);
-                clearError('visitDate');
-              }}
-              min={today}
-              className={`w-full mt-1 px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 ${
-                errors.visitDate ? 'border-red-400' : 'border-stone-300'
-              }`}
-            />
+            {/* Same AvailabilityDatePicker used by the individual booking
+                flow (features/booking/components/AvailabilityDatePicker)
+                instead of a bare input[type=date] -- this is the only
+                calendar in the app that's aware of the dates the Museum
+                Manager has closed to booking (GET /availability), so a
+                group/school visit now sees the same closed-date
+                grid-cells the individual flow does, rather than being
+                able to pick a date that would later 409. */}
+            <div className="mt-1">
+              <AvailabilityDatePicker
+                value={visitDate}
+                onChange={(date) => {
+                  setVisitDate(date);
+                  clearError('visitDate');
+                }}
+              />
+            </div>
             {errors.visitDate && (
               <span className="text-xs text-red-500 mt-1">{errors.visitDate}</span>
             )}

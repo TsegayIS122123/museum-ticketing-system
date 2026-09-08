@@ -9,6 +9,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isStaff } from '@/lib/auth/roles';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
+import { cn } from '@/lib/utils/cn';
 
 export function SiteHeader() {
   const { t, locale } = useTranslation();
@@ -34,8 +35,9 @@ export function SiteHeader() {
     (pathname?.includes('/settings/account') && !!user && isStaff(user.role));
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   // Primary nav + language toggle (and, when signed in, the profile menu)
-  // don't fit next to the logo below `md` -- everything collapses into
-  // this single toggle-able panel instead of wrapping or overflowing.
+  // don't reliably fit next to the logo below `lg` -- everything
+  // collapses into this single toggle-able panel instead of wrapping,
+  // overflowing, or squeezing the museum name into a truncated stub.
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Lock background scroll while the mobile overlay is open, same
@@ -66,26 +68,52 @@ export function SiteHeader() {
 
   const displayName = user ? (user.full_name || user.email) : '';
 
+  // Normalize a nav href for comparison against the current pathname so
+  // the active link still matches once locale/trailing slashes are
+  // accounted for.
+  const isActiveLink = (href: string) =>
+    pathname === href || pathname?.startsWith(`${href}/`);
+
   return (
     <header className="relative z-50 border-b border-brand-primary/15 bg-white">
-      <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
-        <Link href={`/${locale}`} className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
+      <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
+        <Link href={`/${locale}`} className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Image src="/aau-logo.png" alt={t('aau_logo_alt') || 'Addis Ababa University'} width={40} height={40} priority className="shrink-0" />
           <span className="truncate font-serif font-semibold text-base text-brand-primary sm:text-lg lg:text-xl">{t('museum_name')}</span>
         </Link>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        {/* The expanded row (nav links + language toggle + profile menu)
+            only fits comfortably once there's real room for it -- below
+            that it collapses into the hamburger panel instead of
+            squeezing itself (and the brand name on the left) into too
+            little space. That's the `lg` breakpoint here, not `md`:
+            at md (768px) this row still crowded out the museum name,
+            forcing it to truncate on common tablet-width windows. */}
+        <div className="flex shrink-0 items-center gap-2 lg:gap-6">
           {navLinks.length > 0 && (
-            <nav aria-label={t('primary_navigation') || 'Primary'} className="hidden items-center gap-4 text-sm font-semibold text-brand-primary md:flex">
-              {navLinks.map((link) => (
-                <Link key={link.href} href={link.href} className="hover:underline">
-                  {link.label}
-                </Link>
-              ))}
+            <nav aria-label={t('primary_navigation') || 'Primary'} className="hidden items-center gap-5 text-sm font-semibold leading-none text-brand-primary lg:flex">
+              {navLinks.map((link) => {
+                const active = isActiveLink(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'rounded-md px-1 py-1 leading-none transition-colors hover:text-brand-primary',
+                      active
+                        ? 'text-brand-primary underline decoration-2 underline-offset-8'
+                        : 'text-brand-primary/70 hover:underline'
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
 
-          <div className="hidden sm:block">
+          <div className="hidden sm:flex sm:items-center">
             <LanguageToggle />
           </div>
 
@@ -94,7 +122,7 @@ export function SiteHeader() {
               them here is redundant, so this global header drops the
               profile trigger entirely on /staff/* routes. */}
           {isAuthenticated && user && !isStaffArea && (
-            <div className="relative hidden md:block">
+            <div className="relative hidden lg:block">
               <button
                 type="button"
                 onClick={() => setIsProfileOpen((open) => !open)}
@@ -133,7 +161,7 @@ export function SiteHeader() {
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-primary-nav"
               aria-label={isMobileMenuOpen ? t('close_menu') || 'Close menu' : t('open_menu') || 'Open menu'}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-brand-primary hover:bg-brand-primary/10 md:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-brand-primary hover:bg-brand-primary/10 lg:hidden"
             >
               {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -146,7 +174,7 @@ export function SiteHeader() {
         // flow), so opening it no longer pushes the rest of the page
         // down. The backdrop blurs/dims everything below the header,
         // same modal pattern as VisitorSidebar's old mobile drawer.
-        <div className="fixed inset-x-0 top-16 bottom-0 z-40 md:hidden">
+        <div className="fixed inset-x-0 top-16 bottom-0 z-40 lg:hidden">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -157,16 +185,23 @@ export function SiteHeader() {
           >
             {navLinks.length > 0 && (
               <nav aria-label={t('primary_navigation') || 'Primary'} className="flex flex-col gap-1 text-sm font-semibold text-brand-primary">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="rounded-lg px-2 py-2 hover:bg-brand-primary/5"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {navLinks.map((link) => {
+                  const active = isActiveLink(link.href);
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      aria-current={active ? 'page' : undefined}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={cn(
+                        'rounded-lg px-2 py-2',
+                        active ? 'bg-brand-primary/10 text-brand-primary' : 'hover:bg-brand-primary/5'
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
               </nav>
             )}
 
