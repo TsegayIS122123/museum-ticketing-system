@@ -154,6 +154,39 @@ def test_dashboard_revenue_is_completed_payments_minus_completed_refunds():
     assert dashboard["revenue_total_etb"] == Decimal("150.00")
 
 
+def test_dashboard_revenue_excludes_pending_bookings():
+    """Revenue is recognized at check-in, not at payment -- a Pending
+    booking has been paid for but nobody has actually shown up yet, so
+    it must not inflate revenue (see module docstring's "Revenue"
+    entry). This is the behavior a merely-`status__in=_REPORTABLE_STATUSES`
+    queryset would get wrong: that set includes Pending."""
+    category = _make_category(price=Decimal("100.00"))
+    booking = _make_booking(category=category, status=Booking.Status.PENDING)
+    _make_completed_payment(booking=booking, amount=Decimal("100.00"))
+
+    dashboard = services.get_dashboard()
+    assert dashboard["revenue_total_etb"] == Decimal("0")
+
+
+def test_dashboard_revenue_excludes_cancelled_and_refunded_bookings():
+    """A booking that was cancelled/refunded before ever being checked
+    in never becomes revenue under check-in-based recognition -- unlike
+    a Visited booking's own partial-shortfall refund (covered above),
+    there's no "net off what was actually earned" question here: nobody
+    visited, so nothing was earned."""
+    category = _make_category(price=Decimal("100.00"))
+    cancelled = _make_booking(category=category, status=Booking.Status.CANCELLED)
+    _make_completed_payment(booking=cancelled, amount=Decimal("100.00"))
+    refunded = _make_booking(category=category, status=Booking.Status.REFUNDED)
+    refunded_payment = _make_completed_payment(booking=refunded, amount=Decimal("100.00"))
+    _make_completed_refund(
+        booking=refunded, payment=refunded_payment, amount=Decimal("95.00")
+    )
+
+    dashboard = services.get_dashboard()
+    assert dashboard["revenue_total_etb"] == Decimal("0")
+
+
 def test_dashboard_ignores_non_completed_payments_and_refunds():
     category = _make_category(price=Decimal("100.00"))
     booking = _make_booking(category=category, status=Booking.Status.PENDING)
@@ -304,6 +337,18 @@ def test_report_summary_scopes_to_visit_date_not_created_at():
     assert summary["revenue_by_category"] == {"Adult": Decimal("100.00")}
 
 
+def test_report_summary_revenue_excludes_pending_bookings():
+    """Same rule as the dashboard (see
+    test_dashboard_revenue_excludes_pending_bookings): a booking paid
+    for today's visit but not yet checked in isn't revenue yet."""
+    category = _make_category(price=Decimal("100.00"))
+    pending = _make_booking(category=category, status=Booking.Status.PENDING)
+    _make_completed_payment(booking=pending)
+
+    summary = services.get_report_summary(period="daily")
+    assert summary["revenue_by_category"] == {}
+
+
 def test_report_summary_revenue_by_category_nets_refunds_per_category():
     adult = _make_category(name_en="Adult", price=Decimal("100.00"))
     student = _make_category(name_en="Student", price=Decimal("50.00"))
@@ -359,6 +404,11 @@ def test_report_summary_visitor_counts_by_group_buckets_individuals_together():
         "Bole Secondary": 10,
         "Individual": 3,
     }
+    # 4 distinct bookings total 38 visitors between them -- booking_count
+    # must stay a row count, not collapse into the same total as
+    # visitor_counts_by_group above (see services.get_report_summary's
+    # own comment on why the two are kept separate).
+    assert summary["booking_count"] == 4
 
 
 def test_report_summary_echoes_period_and_resolved_range():
@@ -368,5 +418,6 @@ def test_report_summary_echoes_period_and_resolved_range():
     assert summary["period"] == "monthly"
     assert summary["from"] == date(2025, 1, 1)
     assert summary["to"] == date(2025, 1, 31)
+    assert summary["booking_count"] == 0
     assert summary["revenue_by_category"] == {}
     assert summary["visitor_counts_by_group"] == {}

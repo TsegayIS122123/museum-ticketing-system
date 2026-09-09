@@ -54,6 +54,7 @@ class ReportSummarySerializer(serializers.Serializer):
     # `source` that matches the bound field name.
     from_ = serializers.DateField()
     to = serializers.DateField()
+    bookingCount = serializers.IntegerField(source="booking_count")
     revenueByCategory = serializers.DictField(
         source="revenue_by_category",
         child=serializers.DecimalField(max_digits=12, decimal_places=2),

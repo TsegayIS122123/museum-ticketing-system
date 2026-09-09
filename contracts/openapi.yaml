@@ -2251,6 +2251,8 @@ components:
         to:
           type: string
           format: date
+        bookingCount:
+          type: integer
         revenueByCategory:
           type: object
           additionalProperties:
@@ -2265,6 +2267,7 @@ components:
           type: string
           format: date
       required:
+      - bookingCount
       - from
       - period
       - revenueByCategory

@@ -128,5 +128,6 @@ def test_summary_returns_period_and_range_for_museum_manager():
     assert response.data["period"] == "monthly"
     assert response.data["from"] == "2025-01-01"
     assert response.data["to"] == "2025-01-31"
+    assert response.data["bookingCount"] == 0
     assert response.data["revenueByCategory"] == {}
     assert response.data["visitorCountsByGroup"] == {}

@@ -18,13 +18,29 @@ Shared vocabulary used by both functions below:
   excluded: that's a pre-checkout state a booking may never emerge from
   (an abandoned checkout), so it was never a completed "digital booking"
   for reporting purposes -- counting it would overstate both revenue
-  potential and visitor interest.
-- "Revenue" is net money actually collected: completed `Payment` amounts
-  minus completed `Refund` amounts (`Refund.amount_etb` is already the
-  net figure returned to the Visitor, per `apps.refunds.models.Refund`'s
-  own docstring) -- mirrors the "net figure (revenue minus refunds)"
-  framing Document 02 Sec 2.7 uses for the Finance-facing transfer
-  receipt, applied here to the Manager-facing dashboard/report instead.
+  potential and visitor interest. This is the set used for headcounts
+  (`visitor_counts_by_group`/`visitor_counts_by_category`), the group-
+  vs-individual split, `booking_count`, and the status mix -- a Manager
+  planning tomorrow needs to see Pending (paid, arriving later) bookings
+  in those numbers, not just who's already walked in.
+- "Revenue" (`_visited_bookings_queryset`, `_net_revenue_by_category`,
+  `_net_revenue_total`) is recognized at check-in, not at payment: only
+  `Visited` bookings count. A `Pending` booking has been paid for, but
+  paid-and-not-yet-arrived is still a liability, not revenue earned, until
+  the visitor actually shows up -- a booking for next month that happens
+  to be paid today shouldn't inflate today's revenue figure, and a no-
+  show that's later cancelled/refunded (`Cancelled`/`Refunded`) never
+  becomes revenue at all under this rule, matching what actually happened
+  (nobody visited). Net of completed `Refund` amounts either way
+  (`Refund.amount_etb` is already the net figure returned to the
+  Visitor, per `apps.refunds.models.Refund`'s own docstring) -- this
+  still matters for a `Visited` booking, since a partial-shortfall
+  refund (paid-but-unattended tickets on an otherwise-attended booking,
+  `apps.refunds.services.request_partial_shortfall_refund`) reduces what
+  was actually earned without moving the booking off `Visited` -- mirrors
+  the "net figure (revenue minus refunds)" framing Document 02 Sec 2.7
+  uses for the Finance-facing transfer receipt, applied here to the
+  Manager-facing dashboard/report instead.
 """
 
 import calendar
@@ -59,10 +75,20 @@ _INDIVIDUAL_GROUP_KEY = "Individual"
 
 
 def _reportable_bookings_queryset():
-    """Every booking FR-REPORT-001/002 count towards revenue, visitor
-    counts, or the status mix -- see module docstring for why
-    AwaitingPayment bookings are excluded."""
+    """Every booking FR-REPORT-001/002 count towards visitor counts,
+    the group/individual split, `booking_count`, or the status mix --
+    see module docstring for why AwaitingPayment bookings are excluded,
+    and `_visited_bookings_queryset` below for why revenue does NOT use
+    this queryset."""
     return Booking.objects.filter(status__in=_REPORTABLE_STATUSES)
+
+
+def _visited_bookings_queryset():
+    """The queryset revenue is computed over -- see module docstring's
+    "Revenue" entry for why this is narrower than
+    `_reportable_bookings_queryset` (Pending/Cancelled/Refunded all
+    mean "not revenue yet", not just "AwaitingPayment does")."""
+    return Booking.objects.filter(status=Booking.Status.VISITED)
 
 
 def _net_revenue_by_category(*, bookings_queryset):
@@ -175,7 +201,14 @@ def get_dashboard():
     }
 
     return {
-        "revenue_total_etb": _net_revenue_total(bookings_queryset=bookings),
+        # Deliberately NOT `bookings` -- see `_visited_bookings_queryset`.
+        # A Pending (paid, not yet arrived) booking must still show up in
+        # `status_mix`/`visitor_counts_by_category`/`group_vs_individual_split`
+        # below (all still computed off the full `bookings` queryset), just
+        # not counted as revenue yet.
+        "revenue_total_etb": _net_revenue_total(
+            bookings_queryset=_visited_bookings_queryset()
+        ),
         "visitor_counts_by_category": visitor_counts_by_category,
         "group_vs_individual_split": group_vs_individual_split,
         "status_mix": status_mix,
@@ -277,7 +310,14 @@ def get_report_summary(*, period, date_from=None, date_to=None):
         visit_date__gte=start, visit_date__lte=end
     )
 
-    revenue_by_category = _net_revenue_by_category(bookings_queryset=bookings)
+    # Revenue is scoped to Visited bookings only, same date range --
+    # NOT `bookings` above, which still includes Pending (paid, not yet
+    # arrived). See `_visited_bookings_queryset` / module docstring.
+    revenue_by_category = _net_revenue_by_category(
+        bookings_queryset=_visited_bookings_queryset().filter(
+            visit_date__gte=start, visit_date__lte=end
+        )
+    )
 
     group_key = Case(
         When(booking_type=Booking.BookingType.GROUP, then=F("group_name")),
@@ -295,6 +335,14 @@ def get_report_summary(*, period, date_from=None, date_to=None):
         "period": period,
         "from": start,
         "to": end,
+        # Distinct `Booking` rows in the period -- deliberately separate
+        # from `visitor_counts_by_group` below, which sums
+        # `booked_quantity` (ticket/headcount, not booking count): one
+        # booking for a family of four is 1 booking but 4 visitors, and
+        # conflating the two is exactly what made the Manager dashboard's
+        # "bookings today" figure read as a visitor count instead
+        # (frontend/.../staff/dashboard/page.tsx).
+        "booking_count": bookings.count(),
         "revenue_by_category": revenue_by_category,
         "visitor_counts_by_group": visitor_counts_by_group,
     }

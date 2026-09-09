@@ -1279,6 +1279,7 @@ export interface components {
             period: components["schemas"]["PeriodEnum"];
             /** Format: date */
             to: string;
+            bookingCount: number;
             revenueByCategory: {
                 [key: string]: string;
             };

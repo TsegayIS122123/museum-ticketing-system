@@ -68,11 +68,25 @@ export default function StaffDashboardPage() {
         0
       )
     : 0;
-  const transactionsToday = todaySummary
+  // `bookingCount` (distinct Booking rows) and the sum of
+  // `visitorCountsByGroup` (ticket/headcount) are two different numbers
+  // that used to be conflated here -- one Booking for a family of four
+  // is 1 booking but 4 visitors. Keeping them separate is what makes
+  // "3 bookings today" and "Visitors Today: 4" both trustworthy at a
+  // glance instead of silently showing the same number under two labels.
+  const bookingsToday = todaySummary?.bookingCount ?? 0;
+  const visitorsToday = todaySummary
     ? Object.values(todaySummary.visitorCountsByGroup).reduce((sum, n) => sum + n, 0)
     : 0;
-  const visitorsToday = transactionsToday;
 
+  // dashboard (GET /reports/dashboard) is a live, unscoped snapshot by
+  // design (backend/apps/reporting/services.py's get_dashboard docstring)
+  // -- it is NOT limited to today, unlike revenueToday/bookingsToday/
+  // visitorsToday above (which come from GET /reports/summary?period=daily).
+  // "Checked In" below is labelled "(All Time)" for exactly this reason:
+  // without that label it reads as a fourth "today" figure sitting right
+  // next to three that actually are, which is what made this dashboard
+  // confusing to eyeball in the first place.
   const statusMix = dashboard?.statusMix;
   const totalBookings = statusMix
     ? statusMix.pending + statusMix.visited + statusMix.cancelled + statusMix.refunded
@@ -106,29 +120,45 @@ export default function StaffDashboardPage() {
           ) : error ? (
             <div className="mb-8 text-red-600">{error}</div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <StatCard
-                label={t('todays_revenue') || "Today's Revenue"}
-                value={`ETB ${revenueToday}`}
-                sub={`${transactionsToday} ${t('bookings_today') || 'bookings today'}`}
-                color="green"
-              />
-              <StatCard
-                label={t('visitors_today') || 'Visitors Today'}
-                value={visitorsToday}
-                sub={t('booked_quantity_today') || 'Booked quantity today'}
-                color="primary"
-              />
-              <StatCard
-                label={t('checked_in') || 'Checked In'}
-                value={checkedIn}
-                sub={
-                  totalBookings > 0
-                    ? `${checkedInPct}% ${t('of_all_bookings') || 'of all bookings'}`
-                    : t('no_bookings_yet') || 'No bookings yet'
-                }
-                color="blue"
-              />
+            <div className="mb-8">
+              {/* One line up front so the four cards below don't need to
+                  be reverse-engineered: revenue only counts checked-in
+                  visitors (recognized at check-in, not at payment --
+                  see backend/apps/reporting/services.py's module
+                  docstring), while "Visitors Today"/"bookings today"
+                  cover everyone booked for today's visit date, arrived
+                  or not -- so revenue can legitimately be lower than
+                  what those two numbers alone would suggest. "Checked
+                  In" isn't scoped to today at all, hence its own label
+                  saying so. */}
+              <p className="text-xs text-stone-400 mb-3">
+                {t('dashboard_stats_note') ||
+                  "Revenue only counts visitors who've checked in. Bookings and visitors cover everyone booked for today, arrived or not. Checked-in reflects all-time attendance."}
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard
+                  label={t('todays_revenue') || "Today's Revenue"}
+                  value={`ETB ${revenueToday}`}
+                  sub={t('todays_revenue_sub') || 'From visitors checked in today'}
+                  color="green"
+                />
+                <StatCard
+                  label={t('visitors_today') || 'Visitors Today'}
+                  value={visitorsToday}
+                  sub={`${bookingsToday} ${t('bookings_today') || 'bookings today'}`}
+                  color="primary"
+                />
+                <StatCard
+                  label={t('checked_in_all_time') || 'Checked In (All Time)'}
+                  value={checkedIn}
+                  sub={
+                    totalBookings > 0
+                      ? `${checkedInPct}% ${t('of_all_bookings') || 'of all bookings'}`
+                      : t('no_bookings_yet') || 'No bookings yet'
+                  }
+                  color="blue"
+                />
+              </div>
             </div>
           )}
         </>

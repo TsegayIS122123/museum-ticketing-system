@@ -119,10 +119,15 @@ export default function ReportsPage() {
         <div className="p-8 text-center text-red-600">{error}</div>
       ) : (
         <>
+          <p className="text-xs text-stone-400 mb-3">
+            {t('reports_stats_note') ||
+              "Total Visitors counts everyone booked for this period, arrived or not. Total Revenue only counts checked-in visitors."}
+          </p>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <StatCard
               label={t('total_visitors') || 'Total Visitors'}
               value={totalVisitors}
+              sub={`${summary?.bookingCount ?? 0} ${t('bookings_in_period') || 'bookings in this period'}`}
               color="green"
             />
             <StatCard
@@ -134,16 +139,17 @@ export default function ReportsPage() {
             <StatCard
               label={t('total_revenue_overall') || 'Total Revenue (overall)'}
               value={`ETB ${dashboard?.revenueTotalEtb ?? 0}`}
+              sub={t('all_time') || 'All time'}
               color="blue"
             />
             <StatCard
-              label={t('cancellations')}
+              label={t('cancellations_all_time') || 'Cancelled, refund pending (All Time)'}
               value={dashboard?.statusMix.cancelled ?? 0}
               sub={t('cancellations_sub')}
               color="red"
             />
             <StatCard
-              label={t('refunded')}
+              label={t('refunded_all_time') || 'Refunded (All Time)'}
               value={dashboard?.statusMix.refunded ?? 0}
               sub={t('refunded_sub')}
               color="secondary"
