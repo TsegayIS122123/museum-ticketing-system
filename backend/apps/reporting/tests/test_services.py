@@ -15,12 +15,11 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import Account
-from apps.bookings.models import Booking, BookingItem, DateAvailability
+from apps.bookings.models import Booking, BookingItem
 from apps.catalog.models import Category
 from apps.payments.models import Payment
 from apps.refunds.models import Refund
 from apps.reporting import services
-from apps.settlement.models import CashierReconciliation
 
 pytestmark = pytest.mark.django_db
 
