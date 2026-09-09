@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
 import { DigitalTicket } from '@/components/ui/DigitalTicket';
 import { CancelRescheduleControls } from '@/features/booking/components/CancelRescheduleControls';
+import { EditAwaitingPaymentBooking } from '@/features/booking/components/EditAwaitingPaymentBooking';
 import { getBooking, type BookingResponse } from '@/features/booking/api';
 import { requestPartialRefund, getRefunds } from '@/features/refunds/api';
 import { ApiError } from '@/lib/api/errors';
@@ -303,7 +304,7 @@ export default function BookingDetailPage() {
                 {booking.checkoutUrl ? (
                   <Button
                     size="sm"
-                    className="mt-3 bg-brand-primary hover:bg-primary-700"
+                    className="mt-3 bg-brand-primary hover:bg-primary-700 "
                     onClick={() => window.open(booking.checkoutUrl!, '_blank')}
                   >
                     {t('pay_now') || 'Pay Now'}
@@ -314,6 +315,13 @@ export default function BookingDetailPage() {
                       "We couldn't open checkout for this booking. Please contact support or try booking again."}
                   </p>
                 )}
+
+                {/* Full CRUD on an unpaid booking -- nothing has been
+                    charged yet, so unlike a paid (Pending) booking's
+                    cancel/reschedule-only controls further down, this
+                    lets the visitor edit her ticket mix/date freely, or
+                    delete the booking outright, right up until she pays. */}
+                <EditAwaitingPaymentBooking booking={booking} onActionComplete={loadBooking} />
               </div>
             </div>
           </Card>
@@ -385,7 +393,7 @@ export default function BookingDetailPage() {
             {t('manage_booking') || 'Manage Booking'}
           </div>
           <p className="text-sm text-stone-500 mb-4">
-            {t('manage_booking_description') || 'Cancel or reschedule your booking. Free cancellation up to 48 hours before your visit.'}
+            {t('manage_booking_description') || 'Cancel or reschedule your booking free of charge, any time before your visit.'}
           </p>
           <CancelRescheduleControls
             bookingId={booking.id}

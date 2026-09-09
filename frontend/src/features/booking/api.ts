@@ -42,9 +42,41 @@ export async function getMyBookings(params?: {
   return response;
 }
 
-// POST /bookings/{id}/cancel/ (FR-BOOK-005/006).
+// POST /bookings/{id}/cancel/ (FR-BOOK-005/006 for a Pending booking;
+// also the delete half of editing a still-unpaid AwaitingPayment one --
+// see BookingCancelView's own docstring for why it's the same endpoint
+// either way).
 export async function cancelBooking(id: string): Promise<Booking> {
   return apiClient.post<Booking>(`/bookings/${id}/cancel/`);
+}
+
+// One {categoryId, quantity} entry of an UpdateBookingInput's `items`
+// list -- same shape the booking wizard's own BookingItemInput uses.
+export interface UpdateBookingItemInput {
+  categoryId: string;
+  quantity: number;
+}
+
+// PATCH /bookings/{id}/ -- the owning visitor only, and only while the
+// booking is still `awaiting_payment` (services.
+// update_awaiting_payment_booking enforces this on the backend). Lets a
+// visitor fix her ticket mix and/or visit date before paying, instead of
+// cancelling and starting the wizard over. Both fields are optional, but
+// at least one is required.
+//
+// Hand-authored request type, not sourced from `components['schemas']`
+// like CreateBookingInput above -- this endpoint doesn't exist in the
+// currently-checked-in generated OpenAPI contract yet. Re-run
+// `frontend/scripts/generate-types.sh` (after `backend/scripts/
+// export_contract.sh`) once the backend's contract export picks up
+// `BookingUpdateRequest`, then this can switch over the same way.
+export interface UpdateBookingInput {
+  items?: UpdateBookingItemInput[];
+  visitDate?: string;
+}
+
+export async function updateBooking(id: string, input: UpdateBookingInput): Promise<Booking> {
+  return apiClient.patch<Booking>(`/bookings/${id}/`, input);
 }
 
 // POST /bookings/{id}/reschedule/ -- at most once (FR-BOOK-007).

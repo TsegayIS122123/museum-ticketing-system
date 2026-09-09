@@ -283,6 +283,30 @@ def create_checkout_session(*, booking, amount=None):
     return payment
 
 
+def invalidate_open_checkout_sessions(*, booking):
+    """Marks any still-`initiated` `Payment` row against `booking` as
+    `failed`, so `create_checkout_session`'s own idempotency guard (see
+    its docstring above) won't hand back a checkout session that was
+    opened against a total the booking no longer has.
+
+    Called by `apps.bookings.views.BookingDetailView.patch` right before
+    it opens a fresh session for a Visitor-edited booking's new total
+    (`apps.bookings.services.update_awaiting_payment_booking`) -- without
+    this, a Visitor who edits her ticket quantities after already opening
+    the Chapa checkout page would still be charged the pre-edit amount.
+    A no-op if there's no open session yet (e.g. she edits before ever
+    clicking "Pay Now").
+
+    Deliberately marks the row `failed` rather than deleting it: `Payment`
+    rows are an audit trail (Document 05 Sec 3.4), and `failed` is exactly
+    what an abandoned checkout attempt already means elsewhere in this
+    module (a retried session after Chapa itself failed).
+    """
+    Payment.objects.filter(booking=booking, status=Payment.Status.INITIATED).update(
+        status=Payment.Status.FAILED
+    )
+
+
 # --------------------------------------------------------------------------
 # Webhook signature verification (NFR-SEC-001)
 # --------------------------------------------------------------------------

@@ -859,6 +859,130 @@ def _require_own_pending_booking(*, booking, visitor):
         raise Conflict("This booking is no longer Pending and can't be changed by you.")
 
 
+def _require_own_awaiting_payment_booking(*, booking, visitor):
+    if booking.visitor_id != visitor.id:
+        # Same deliberate 403-not-404 as `_require_own_pending_booking`
+        # above -- the booking exists, this Visitor just doesn't own it.
+        raise PermissionDenied("This booking does not belong to you.")
+    if booking.status != Booking.Status.AWAITING_PAYMENT:
+        raise Conflict("This booking is no longer awaiting payment and can't be edited by you.")
+
+
+def update_awaiting_payment_booking(*, booking, visitor, items=None, visit_date=None):
+    """Lets the owning Visitor edit their own not-yet-paid booking --
+    ticket mix, visit date, or both -- before paying for it, instead of
+    having to cancel and rebook from scratch over a mistake made in the
+    checkout wizard.
+
+    Only reachable while the booking is still `AwaitingPayment` -- the
+    same "hasn't been acted on yet" idea `_require_own_pending_booking`
+    already enforces for a `Pending` booking's cancel/reschedule, just
+    one status earlier. Nothing has been paid for yet at this point, so
+    there is no refund/payment-record consideration in this module at
+    all -- that only starts to matter once `apps.payments` re-opens
+    checkout for the (possibly changed) total, which is the view layer's
+    job, exactly like `create_booking`/`cancel_booking` above never call
+    into `apps.payments`/`apps.refunds` themselves (Design Spec Sec 3.2).
+
+    `items` is a full replacement of the booking's line items, in the
+    same `[{"category_id": ..., "quantity": ...}]` shape `create_booking`
+    takes -- simpler and safer than a partial per-item PATCH here, since
+    nothing has been paid for yet and there's no per-item history (gate
+    receipts, attendance) to preserve the way the Cashier-only correction
+    flow (`correct_booking_category`/`apply_booking_corrections`) has to.
+    `visit_date`, if given, is re-checked against `DateAvailability`
+    exactly like `create_booking` does, since a date open when the
+    booking was first created may have since been closed.
+
+    Both `items` and `visit_date` are optional -- a Visitor may only be
+    fixing one of the two -- but at least one must be given.
+    """
+    _require_own_awaiting_payment_booking(booking=booking, visitor=visitor)
+
+    if items is None and visit_date is None:
+        raise ValidationError(
+            {"items": "Provide items, visitDate, or both -- at least one is required."}
+        )
+
+    old_total_amount_etb = booking.total_amount_etb
+    old_booked_quantity = booking.booked_quantity
+    old_visit_date = booking.visit_date
+
+    update_fields = ["updated_at"]
+
+    if visit_date is not None and visit_date != booking.visit_date:
+        if not is_date_open_for_booking(visit_date):
+            raise Conflict("This date is closed to online booking.")
+        booking.visit_date = visit_date
+        update_fields.append("visit_date")
+
+    if items is not None:
+        resolved_items = _resolve_items(items)
+        # Full replace -- nothing has been paid for yet, so unlike
+        # `apply_booking_corrections` there's no reason to diff against
+        # the existing rows item-by-item.
+        booking.items.all().delete()
+        BookingItem.objects.bulk_create(
+            BookingItem(
+                booking=booking,
+                category=item["category"],
+                category_name_en=item["category"].name_en,
+                category_name_am=item["category"].name_am,
+                unit_price_etb=item["category"].price_etb,
+                quantity=item["quantity"],
+                subtotal_etb=item["category"].price_etb * item["quantity"],
+            )
+            for item in resolved_items
+        )
+        booking.total_amount_etb = sum(
+            item["category"].price_etb * item["quantity"] for item in resolved_items
+        )
+        booking.booked_quantity = sum(item["quantity"] for item in resolved_items)
+        update_fields += ["total_amount_etb", "booked_quantity"]
+
+    booking.save(update_fields=update_fields)
+
+    write_audit_log(
+        actor_id=visitor.id,
+        action="booking.updated_before_payment",
+        target_type="booking",
+        target_id=booking.id,
+        metadata={
+            "old_total_amount_etb": str(old_total_amount_etb),
+            "new_total_amount_etb": str(booking.total_amount_etb),
+            "old_booked_quantity": old_booked_quantity,
+            "new_booked_quantity": booking.booked_quantity,
+            "old_visit_date": old_visit_date.isoformat(),
+            "new_visit_date": booking.visit_date.isoformat(),
+        },
+    )
+    return booking
+
+
+def cancel_awaiting_payment_booking(*, booking, visitor):
+    """Sibling of `cancel_booking` below, for a booking that's still
+    `AwaitingPayment` rather than `Pending`. FR-BOOK-006's "full,
+    automatic refund" only makes sense once money has actually been
+    collected -- a Visitor deleting a booking she never paid for is just
+    a plain status change, with no `apps.refunds` call anywhere on this
+    path (contrast `BookingCancelView`, which always triggers one,
+    because it only ever reaches a `Pending` -- i.e. already paid --
+    booking)."""
+    _require_own_awaiting_payment_booking(booking=booking, visitor=visitor)
+
+    booking.status = Booking.Status.CANCELLED
+    booking.save(update_fields=["status", "updated_at"])
+
+    write_audit_log(
+        actor_id=visitor.id,
+        action="booking.cancelled_before_payment",
+        target_type="booking",
+        target_id=booking.id,
+        metadata={},
+    )
+    return booking
+
+
 def cancel_booking(*, booking, visitor):
     """Implements FR-BOOK-005/006. Only transitions status here -- the
     "full, automatic refund" itself (FR-BOOK-006) is `apps.refunds`'

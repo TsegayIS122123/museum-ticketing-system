@@ -235,6 +235,48 @@ class BookingCreateSerializer(serializers.Serializer):
         }
 
 
+class BookingUpdateItemSerializer(serializers.Serializer):
+    """One `{categoryId, quantity}` entry of a `BookingUpdateRequest`'s
+    `items` list -- same shape as `BookingCreateItemSerializer`, kept as
+    a separate class since the two requests' fields are otherwise
+    unrelated (this one has no `bookingType`/group fields at all)."""
+
+    categoryId = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
+class BookingUpdateSerializer(serializers.Serializer):
+    """`BookingUpdateRequest` -- Visitor-only edit of their own still-
+    unpaid (`AwaitingPayment`) booking (see
+    `services.update_awaiting_payment_booking`). Both `items` and
+    `visitDate` are optional here, unlike `BookingCreateSerializer`: a
+    Visitor may only be fixing one of the two. There is no
+    `bookingType`/`groupName`/`groupTin` here -- Document 02 has no
+    notion of changing what *kind* of booking this is after the fact,
+    only its ticket mix and date."""
+
+    visitDate = serializers.DateField(required=False)
+    items = BookingUpdateItemSerializer(many=True, required=False, min_length=1)
+
+    def validate(self, attrs):
+        if "items" not in attrs and "visitDate" not in attrs:
+            raise serializers.ValidationError(
+                {"items": "Provide items, visitDate, or both -- at least one is required."}
+            )
+        return attrs
+
+    def to_service_kwargs(self):
+        kwargs = {}
+        if "items" in self.validated_data:
+            kwargs["items"] = [
+                {"category_id": item["categoryId"], "quantity": item["quantity"]}
+                for item in self.validated_data["items"]
+            ]
+        if "visitDate" in self.validated_data:
+            kwargs["visit_date"] = self.validated_data["visitDate"]
+        return kwargs
+
+
 class BookingRescheduleSerializer(serializers.Serializer):
     """`BookingRescheduleRequest` -- FR-BOOK-007."""
 

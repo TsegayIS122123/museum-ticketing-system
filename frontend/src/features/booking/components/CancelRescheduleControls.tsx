@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toast } from '@/components/ui/Toast';
 import { cancelBooking, rescheduleBooking } from '@/features/booking/api';
+import { AvailabilityDatePicker } from '@/features/booking/components/AvailabilityDatePicker';
 
 interface CancelRescheduleControlsProps {
   bookingId: string;
@@ -99,9 +100,6 @@ export function CancelRescheduleControls({
     });
   };
 
-  // Get min date (today)
-  const today = new Date().toISOString().split('T')[0];
-
   if (!canCancel && !canReschedule) {
     return (
       <div className="text-sm text-stone-400">
@@ -163,6 +161,7 @@ export function CancelRescheduleControls({
         open={isRescheduleModalOpen}
         onClose={() => setIsRescheduleModalOpen(false)}
         title={t('reschedule_booking') || 'Reschedule Booking'}
+        className="max-w-lg"
       >
         <div className="space-y-4">
           <div className="bg-stone-50 rounded-lg p-3 text-sm">
@@ -174,13 +173,20 @@ export function CancelRescheduleControls({
             <label className="text-sm font-medium text-stone-700">
               {t('new_date') || 'New Date'}
             </label>
-            <input
-              type="date"
-              value={newVisitDate}
-              onChange={(e) => setNewVisitDate(e.target.value)}
-              min={today}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500"
-            />
+            {/* Same AvailabilityDatePicker the booking wizard and
+                group-visit form use (features/booking/components/
+                AvailabilityDatePicker), not a bare input[type=date] --
+                it's the one that actually reflects which dates the
+                Museum Manager has closed to online booking (FR-BOOK-008),
+                so a visitor rescheduling here sees the same closed/open
+                calendar she'd see picking a date from scratch, instead
+                of being able to pick a closed date here and only finding
+                out it's rejected once she submits (services.
+                reschedule_booking's own 409, "This date is closed to
+                online booking."). */}
+            <div className="mt-1">
+              <AvailabilityDatePicker value={newVisitDate} onChange={setNewVisitDate} />
+            </div>
             <p className="text-xs text-stone-400 mt-1">
               {t('reschedule_note') || 'You can only reschedule once. Please choose a new available date.'}
             </p>

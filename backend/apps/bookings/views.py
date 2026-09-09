@@ -26,6 +26,7 @@ from .serializers import (
     BookingCreateSerializer,
     BookingRescheduleSerializer,
     BookingSerializer,
+    BookingUpdateSerializer,
     DateAvailabilitySerializer,
     DateAvailabilityUpdateSerializer,
 )
@@ -131,7 +132,14 @@ class BookingListCreateView(generics.GenericAPIView):
 
 
 class BookingDetailView(generics.RetrieveAPIView):
-    """GET /bookings/{id} -- the owning Visitor or any Staff member."""
+    """GET /bookings/{id} -- the owning Visitor or any Staff member.
+
+    Also handles PATCH /bookings/{id} -- the owning Visitor only, editing
+    their own booking's ticket mix and/or visit date while it's still
+    `AwaitingPayment` (see `BookingUpdateSerializer`/`services.
+    update_awaiting_payment_booking`). Kept on the same resource/URL as
+    the GET above rather than a separate endpoint, since it's the same
+    `Booking` -- just a different HTTP method and a narrower audience."""
 
     permission_classes = [permissions.IsAuthenticated]
     # select_related("visitor") -- BookingSerializer now reads
@@ -143,6 +151,11 @@ class BookingDetailView(generics.RetrieveAPIView):
     queryset = Booking.objects.select_related("visitor").prefetch_related("items")
     lookup_field = "id"
     serializer_class = BookingSerializer
+
+    def get_permissions(self):
+        if self.request.method == "PATCH":
+            return [IsVisitor()]
+        return [permission() for permission in self.permission_classes]
 
     @extend_schema(operation_id="getBooking")
     def get(self, request, *args, **kwargs):
@@ -156,6 +169,42 @@ class BookingDetailView(generics.RetrieveAPIView):
         if not (is_owner or is_staff):
             self.permission_denied(self.request)
         return booking
+
+    @extend_schema(
+        operation_id="updateBooking", request=BookingUpdateSerializer, responses=BookingSerializer
+    )
+    def patch(self, request, *args, **kwargs):
+        # Fetched directly, not via self.get_object() -- that method's
+        # owner-or-staff check above is deliberately broader (any Staff
+        # member can view) than what an edit needs (owning Visitor only,
+        # and only while still AwaitingPayment), and
+        # services.update_awaiting_payment_booking already enforces both
+        # of those itself, the same way BookingCancelView/
+        # BookingRescheduleView below fetch by id alone and let the
+        # service raise.
+        booking = get_object_or_404(Booking, id=kwargs["id"])
+        serializer = BookingUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        booking = services.update_awaiting_payment_booking(
+            booking=booking, visitor=request.user, **serializer.to_service_kwargs()
+        )
+
+        # The booking's total may have just changed. Any checkout session
+        # already open against it (from BookingListCreateView.post at
+        # creation time) was opened against the *old* total, and
+        # create_checkout_session's own idempotency guard would otherwise
+        # hand that stale session straight back rather than reflecting
+        # the edit -- so the stale one is invalidated first. Local
+        # imports: apps.payments depends on apps.bookings, not the
+        # reverse (Design Spec Sec 3.2) -- this view layer is what
+        # composes both, never bookings/services.py itself (see
+        # BookingListCreateView.post's identical rationale).
+        from apps.payments.services import create_checkout_session, invalidate_open_checkout_sessions
+
+        invalidate_open_checkout_sessions(booking=booking)
+        create_checkout_session(booking=booking)
+
+        return Response(BookingSerializer(booking).data)
 
 
 class BookingReceiptDownloadView(APIView):
@@ -207,13 +256,28 @@ class BookingReceiptDownloadView(APIView):
 
 
 class BookingCancelView(APIView):
-    """POST /bookings/{id}/cancel -- FR-BOOK-005/006."""
+    """POST /bookings/{id}/cancel -- FR-BOOK-005/006 for a `Pending`
+    (i.e. already paid) booking.
+
+    Also reachable against a still-unpaid `AwaitingPayment` booking, as
+    the delete half of the Visitor's own pre-payment editing capability
+    alongside `BookingDetailView.patch` above -- deliberately the same
+    endpoint rather than a separate one, since "cancel" is the right verb
+    either way; only the consequence (refund, or not) differs."""
 
     permission_classes = [IsVisitor]
 
     @extend_schema(request=None, responses=BookingSerializer)
     def post(self, request, id):
         booking = get_object_or_404(Booking, id=id)
+
+        if booking.status == Booking.Status.AWAITING_PAYMENT:
+            # Nothing has been paid for yet -- a plain status change,
+            # with no apps.refunds call anywhere on this path (see
+            # services.cancel_awaiting_payment_booking's own docstring).
+            booking = services.cancel_awaiting_payment_booking(booking=booking, visitor=request.user)
+            return Response(BookingSerializer(booking).data)
+
         booking = services.cancel_booking(booking=booking, visitor=request.user)
         # FR-BOOK-006: cancelling a Pending booking triggers a full,
         # automatic refund. Local import: apps.refunds depends on

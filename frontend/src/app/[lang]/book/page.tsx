@@ -101,9 +101,17 @@ export default function BookPage() {
         type: 'success',
       });
 
-      // Redirect to bookings page after short delay
+      // Redirect straight to this booking's own detail page after a
+      // short delay -- not the bookings list. It's freshly created as
+      // `awaiting_payment` (see services.create_booking), so this is
+      // exactly where the visitor needs to land to pay: the detail page
+      // is what surfaces the "Pay Now" checkout link (see the
+      // `booking.status === 'awaiting_payment'` block on
+      // bookings/[id]/page.tsx). Sending her to the list instead used to
+      // make her pick her own just-created booking back out of
+      // potentially many, by reference, before she could even pay.
       setTimeout(() => {
-        router.push(`/${locale}/bookings`);
+        router.push(`/${locale}/bookings/${booking.id}`);
       }, 2000);
     } catch (error: any) {
       setToast({
