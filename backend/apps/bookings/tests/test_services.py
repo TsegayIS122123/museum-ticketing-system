@@ -760,6 +760,54 @@ def test_cancel_rejected_for_a_different_visitor():
 
 
 # --------------------------------------------------------------------------
+# cancel_awaiting_payment_booking -- the delete half of a Visitor's own
+# pre-payment editing capability (BookingCancelView's own docstring).
+# Sibling of cancel_booking above, but for a booking that never got past
+# AwaitingPayment: no money was ever collected, so unlike cancel_booking
+# there is no refund to trigger -- see the function's own docstring for
+# why that's a deliberately separate code path rather than a shared one.
+# --------------------------------------------------------------------------
+
+
+def _make_awaiting_payment_booking(visitor=None):
+    visitor = visitor or _make_visitor()
+    category = _make_category()
+    booking = services.create_booking(
+        visitor=visitor,
+        items=[{"category_id": category.id, "quantity": 1}],
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.INDIVIDUAL,
+    )
+    return booking, visitor
+
+
+def test_cancel_awaiting_payment_booking_succeeds():
+    booking, visitor = _make_awaiting_payment_booking()
+
+    booking = services.cancel_awaiting_payment_booking(booking=booking, visitor=visitor)
+
+    assert booking.status == Booking.Status.CANCELLED
+    assert AuditLogEntry.objects.filter(action="booking.cancelled_before_payment").exists()
+
+
+def test_cancel_awaiting_payment_booking_rejected_once_no_longer_awaiting_payment():
+    booking, visitor = _make_awaiting_payment_booking()
+    booking.status = Booking.Status.PENDING
+    booking.save(update_fields=["status"])
+
+    with pytest.raises(Conflict):
+        services.cancel_awaiting_payment_booking(booking=booking, visitor=visitor)
+
+
+def test_cancel_awaiting_payment_booking_rejected_for_a_different_visitor():
+    booking, _owner = _make_awaiting_payment_booking()
+    someone_else = _make_visitor(email="someone-else@example.com")
+
+    with pytest.raises(PermissionDenied):
+        services.cancel_awaiting_payment_booking(booking=booking, visitor=someone_else)
+
+
+# --------------------------------------------------------------------------
 # reschedule_booking (FR-BOOK-007)
 # --------------------------------------------------------------------------
 

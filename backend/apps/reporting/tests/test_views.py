@@ -131,3 +131,85 @@ def test_summary_returns_period_and_range_for_museum_manager():
     assert response.data["bookingCount"] == 0
     assert response.data["revenueByCategory"] == {}
     assert response.data["visitorCountsByGroup"] == {}
+
+
+# --------------------------------------------------------------------------
+# GET /reports/cashier-balances -- Museum Manager/Platform Admin only
+# --------------------------------------------------------------------------
+
+
+def test_cashier_balances_requires_authentication():
+    response = APIClient().get("/api/v1/reports/cashier-balances/")
+    assert response.status_code == 401
+
+
+def test_cashier_balances_rejects_cashier():
+    cashier = _make_staff(Account.Role.CASHIER, email="cashier@example.com")
+    response = _authed_client(cashier).get("/api/v1/reports/cashier-balances/")
+    assert response.status_code == 403
+
+
+def test_cashier_balances_allows_museum_manager():
+    manager = _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
+    response = _authed_client(manager).get("/api/v1/reports/cashier-balances/")
+    assert response.status_code == 200
+    assert response.data == {
+        "cashiers": [],
+        "totalOutstandingEtb": "0.00",
+        "totalReconciledEtb": "0.00",
+        "totalRevenueEtb": "0.00",
+    }
+
+
+# --------------------------------------------------------------------------
+# GET /reports/booking-timeline -- Museum Manager/Platform Admin only
+# --------------------------------------------------------------------------
+
+
+def test_booking_timeline_requires_authentication():
+    response = APIClient().get("/api/v1/reports/booking-timeline/")
+    assert response.status_code == 401
+
+
+def test_booking_timeline_rejects_cashier():
+    cashier = _make_staff(Account.Role.CASHIER, email="cashier@example.com")
+    response = _authed_client(cashier).get("/api/v1/reports/booking-timeline/")
+    assert response.status_code == 403
+
+
+def test_booking_timeline_defaults_to_a_two_week_window():
+    manager = _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
+    response = _authed_client(manager).get("/api/v1/reports/booking-timeline/")
+    assert response.status_code == 200
+    assert len(response.data["days"]) == 14
+
+
+def test_booking_timeline_rejects_from_without_to():
+    manager = _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
+    response = _authed_client(manager).get(
+        "/api/v1/reports/booking-timeline/?from=2025-01-01"
+    )
+    assert response.status_code == 400
+
+
+def test_booking_timeline_rejects_a_range_over_the_cap():
+    manager = _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
+    response = _authed_client(manager).get(
+        "/api/v1/reports/booking-timeline/?from=2025-01-01&to=2025-12-31"
+    )
+    assert response.status_code == 400
+
+
+def test_booking_timeline_returns_every_day_open_by_default():
+    manager = _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
+    response = _authed_client(manager).get(
+        "/api/v1/reports/booking-timeline/?from=2025-03-01&to=2025-03-03"
+    )
+    assert response.status_code == 200
+    assert [day["date"] for day in response.data["days"]] == [
+        "2025-03-01",
+        "2025-03-02",
+        "2025-03-03",
+    ]
+    assert all(day["isOpenForBooking"] for day in response.data["days"])
+    assert all(day["expectedHeadcount"] == 0 for day in response.data["days"])

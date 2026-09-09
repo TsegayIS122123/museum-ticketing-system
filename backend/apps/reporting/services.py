@@ -50,11 +50,14 @@ from decimal import Decimal
 from django.conf import settings
 from django.db.models import Case, Count, F, Sum, TextField, Value, When
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from apps.bookings.models import Booking, BookingItem
+from apps.accounts.models import Account
+from apps.bookings.models import Booking, BookingItem, DateAvailability
 from apps.payments.models import Payment
 from apps.refunds.models import Refund
+from apps.settlement.models import CashierReconciliation
 
 # The four FR-REPORT-001 statuses -- see module docstring.
 _REPORTABLE_STATUSES = [
@@ -67,6 +70,22 @@ _REPORTABLE_STATUSES = [
 _VALID_PERIODS = {"daily", "weekly", "monthly", "yearly"}
 
 _INDIVIDUAL_GROUP_KEY = "Individual"
+
+# The five statuses FR-REPORT-004's timeline buckets per visit_date --
+# unlike `_REPORTABLE_STATUSES` above, `AwaitingPayment` IS included here
+# on purpose: see `get_booking_timeline`'s docstring for why a Manager
+# deciding whether to close a crowded date needs to see abandoned
+# checkouts too, not just completed ones.
+_TIMELINE_STATUSES = [
+    Booking.Status.AWAITING_PAYMENT,
+    Booking.Status.PENDING,
+    Booking.Status.VISITED,
+    Booking.Status.CANCELLED,
+    Booking.Status.REFUNDED,
+]
+
+_DEFAULT_TIMELINE_DAYS = 14
+_MAX_TIMELINE_DAYS = 92
 
 
 # --------------------------------------------------------------------------
@@ -269,7 +288,24 @@ def resolve_period_range(*, period, date_from=None, date_to=None):
             raise ValidationError({"from": "Must not be after `to`."})
         return date_from, date_to
 
-    today = date.today()
+    # `timezone.localdate()`, NOT the naive `date.today()` -- the latter
+    # reads the *host process's* clock (UTC on most deployment targets),
+    # while `TIME_ZONE` (config/settings/base.py) is "Africa/Addis_Ababa"
+    # (UTC+3). For the first three hours of every Addis Ababa calendar
+    # day, `date.today()` on a UTC-clocked host still reports the
+    # *previous* day -- so a Visitor who books and a Cashier who checks
+    # them in at, say, 1am Addis Ababa time both correctly stamp
+    # `visit_date`/`checked_in_at` against "today" in the museum's own
+    # timezone, but this function's old `date.today()` would then look
+    # for "today" one calendar day too early and never find that
+    # booking -- exactly the bug report behind this fix: a Visitor paid,
+    # a Cashier checked them in, and the Manager's dashboard still showed
+    # ETB 0 for "today's revenue" (GET /reports/summary?period=daily,
+    # frontend/.../staff/dashboard/page.tsx's `revenueToday`).
+    # `apps.bookings.tasks` already gets this right via
+    # `timezone.localdate()`; this was the one place in the reporting
+    # path that didn't.
+    today = timezone.localdate()
 
     if period == "daily":
         return today, today
@@ -346,3 +382,230 @@ def get_report_summary(*, period, date_from=None, date_to=None):
         "revenue_by_category": revenue_by_category,
         "visitor_counts_by_group": visitor_counts_by_group,
     }
+
+
+# --------------------------------------------------------------------------
+# 4. Cashier balances (FR-REPORT-003 -- GET /reports/cashier-balances)
+# --------------------------------------------------------------------------
+#
+# Document 05 Sec 7 scoped FR-REPORT-001 - FR-REPORT-003 as reporting's
+# full remit ("Derived from `booking`, `payment`, `cashier_reconciliation`")
+# and `reporting/models.py`'s own docstring names "per-cashier settlement
+# position" as in-scope -- but only 001/002 ever got a view. This is 003:
+# a Manager-facing rollup of every Cashier's current outstanding balance
+# (`apps.settlement.services.get_outstanding_balance` already computes
+# this, but only ever for the one Cashier making the request against
+# `GET /settlement/my-balance/` -- there is no cross-cashier view there,
+# by design, per that module's own docstring). Reused here read-only,
+# for every Cashier at once, which is exactly the "read, never write"
+# boundary Design Spec Sec 3.1 draws for this app.
+
+
+def get_cashier_balances():
+    """Implements `GET /reports/cashier-balances`. For every Cashier
+    account, her current outstanding balance -- money already collected
+    (a `Visited` booking she personally checked in) but not yet swept
+    into a completed Chapa Transfer to the university's bank account
+    (`apps.settlement.models.CashierReconciliation`) -- computed with the
+    exact same rule `apps.settlement.services.get_outstanding_balance`
+    uses for a Cashier's own "my balance" screen: her unreconciled
+    `Visited` bookings' `total_amount_etb`, minus her unreconciled
+    completed refunds against those same bookings.
+
+    This is the reconciliation check FR-REPORT-003 exists for: summed
+    across every Cashier, `total_outstanding_etb` (still sitting in
+    Chapa's pooled balance) plus `total_reconciled_etb` (every completed
+    `CashierReconciliation.amount_etb` -- money already transferred out)
+    should equal `get_dashboard()["revenue_total_etb"]` (`total_revenue_etb`
+    below, computed independently off `Payment`/`Refund` rather than off
+    `Booking`/`CashierReconciliation`, so the two numbers cross-check each
+    other rather than trivially agreeing by construction). A mismatch
+    between `total_revenue_etb` and `total_outstanding_etb +
+    total_reconciled_etb` means a booking's recorded `Payment` didn't
+    equal its `total_amount_etb` -- worth a Manager's attention -- rather
+    than something this endpoint should silently paper over.
+    """
+    cashiers = list(
+        Account.objects.filter(role=Account.Role.CASHIER).order_by("full_name")
+    )
+    cashier_ids = [cashier.id for cashier in cashiers]
+
+    # One query for every cashier's unreconciled `Visited` bookings --
+    # mirrors `apps.settlement.services._outstanding_bookings_queryset`,
+    # generalized from "one cashier" to "every cashier, grouped".
+    booked_rows = (
+        Booking.objects.filter(
+            checked_in_by_user_id__in=cashier_ids,
+            status=Booking.Status.VISITED,
+            reconciliation__isnull=True,
+        )
+        .values_list("checked_in_by_user_id")
+        .annotate(total=Sum("total_amount_etb"), count=Count("id"))
+    )
+    booked_totals = {row[0]: row[1] for row in booked_rows}
+    booked_counts = {row[0]: row[2] for row in booked_rows}
+
+    # Mirrors `apps.settlement.services._undeducted_refunds_queryset`,
+    # likewise generalized across every cashier at once.
+    refunded_rows = (
+        Refund.objects.filter(
+            booking__checked_in_by_user_id__in=cashier_ids,
+            status=Refund.Status.COMPLETED,
+            deducted_in_transfer_id__isnull=True,
+        )
+        .values_list("booking__checked_in_by_user_id")
+        .annotate(total=Sum("amount_etb"))
+    )
+    refunded_totals = {row[0]: row[1] for row in refunded_rows}
+
+    balances = []
+    total_outstanding = Decimal("0")
+    for cashier in cashiers:
+        booked = booked_totals.get(cashier.id, Decimal("0"))
+        refunded = refunded_totals.get(cashier.id, Decimal("0"))
+        outstanding = booked - refunded
+        total_outstanding += outstanding
+        balances.append(
+            {
+                "cashier_id": cashier.id,
+                "cashier_name": cashier.full_name,
+                "outstanding_balance_etb": outstanding,
+                "unreconciled_booking_count": booked_counts.get(cashier.id, 0),
+            }
+        )
+
+    total_reconciled = CashierReconciliation.objects.filter(
+        status=CashierReconciliation.Status.COMPLETED
+    ).aggregate(total=Coalesce(Sum("amount_etb"), Decimal("0")))["total"]
+
+    # Independently derived from `Payment`/`Refund` (see `_net_revenue_total`)
+    # rather than from `total_outstanding + total_reconciled` -- see this
+    # function's docstring on why the two are meant to be compared, not
+    # unified into one code path.
+    total_revenue = _net_revenue_total(bookings_queryset=_visited_bookings_queryset())
+
+    return {
+        "cashiers": balances,
+        "total_outstanding_etb": total_outstanding,
+        "total_reconciled_etb": total_reconciled,
+        "total_revenue_etb": total_revenue,
+    }
+
+
+# --------------------------------------------------------------------------
+# 5. Booking timeline (new -- GET /reports/booking-timeline)
+# --------------------------------------------------------------------------
+
+
+def get_booking_timeline(*, date_from=None, date_to=None):
+    """Implements `GET /reports/booking-timeline`. A day-by-day breakdown
+    (by `Booking.visit_date`, same field `get_report_summary` scopes by)
+    of how many bookings/visitors fall into each status on each date in
+    range -- the view `get_report_summary`/`get_dashboard` don't cover:
+    both give a Manager a single number for a single period, never "day 3
+    of this range looks a lot busier than day 4".
+
+    Unlike every other function in this module, `AwaitingPayment` bookings
+    ARE included (`_TIMELINE_STATUSES`, not `_REPORTABLE_STATUSES`) --
+    this view exists so a Manager can decide whether to close a date in
+    Availability (`apps.bookings.models.DateAvailability`,
+    `PUT /availability/{date}/`) before it fills up, and an abandoned
+    checkout still occupied a visitor's mental "I tried to book that day"
+    slot even though it will never become revenue; excluding it here
+    would hide exactly the kind of demand signal (many failed/abandoned
+    checkouts on one date) a Manager might want to see alongside
+    confirmed bookings.
+
+    Every date in `[date_from, date_to]` is represented in the result --
+    including ones with zero bookings -- so the frontend can render a
+    continuous calendar/chart without gap-filling itself. Defaults to the
+    next `_DEFAULT_TIMELINE_DAYS` days starting today (the museum's local
+    "today", `timezone.localdate()` -- see `resolve_period_range`'s own
+    fix for why that matters) when no range is given, since the primary
+    use case (deciding whether to close an upcoming date) looks forward,
+    not back; an explicit `from`/`to` pair still works for a historical
+    look, capped at `_MAX_TIMELINE_DAYS` so this can't be used to force
+    an unbounded per-day scan.
+    """
+    if bool(date_from) != bool(date_to):
+        raise ValidationError(
+            {"from": "Provide both `from` and `to`, or neither."}
+        )
+
+    if date_from and date_to:
+        if date_from > date_to:
+            raise ValidationError({"from": "Must not be after `to`."})
+        start, end = date_from, date_to
+    else:
+        start = timezone.localdate()
+        end = start + timedelta(days=_DEFAULT_TIMELINE_DAYS - 1)
+
+    if (end - start).days + 1 > _MAX_TIMELINE_DAYS:
+        raise ValidationError(
+            {"to": f"Range must not exceed {_MAX_TIMELINE_DAYS} days."}
+        )
+
+    rows = (
+        Booking.objects.filter(
+            visit_date__gte=start, visit_date__lte=end, status__in=_TIMELINE_STATUSES
+        )
+        .values("visit_date", "status")
+        .annotate(booking_count=Count("id"), headcount=Coalesce(Sum("booked_quantity"), 0))
+    )
+    by_date = {}
+    for row in rows:
+        by_date.setdefault(row["visit_date"], {})[row["status"]] = row
+
+    # Only dates the Manager has explicitly closed -- see
+    # `DateAvailability`'s own docstring: a date with no row is open by
+    # default, resolved here rather than assumed by the caller, same as
+    # `apps.bookings.services` does for the booking flow itself.
+    closed_dates = set(
+        DateAvailability.objects.filter(
+            visit_date__gte=start,
+            visit_date__lte=end,
+            is_open_for_booking=False,
+        ).values_list("visit_date", flat=True)
+    )
+
+    def _headcount(day_rows, status):
+        return day_rows.get(status, {}).get("headcount", 0)
+
+    def _count(day_rows, status):
+        return day_rows.get(status, {}).get("booking_count", 0)
+
+    days = []
+    current = start
+    while current <= end:
+        day_rows = by_date.get(current, {})
+        pending_headcount = _headcount(day_rows, Booking.Status.PENDING)
+        visited_headcount = _headcount(day_rows, Booking.Status.VISITED)
+        days.append(
+            {
+                "visit_date": current,
+                "is_open_for_booking": current not in closed_dates,
+                "awaiting_payment_count": _count(day_rows, Booking.Status.AWAITING_PAYMENT),
+                "pending_count": _count(day_rows, Booking.Status.PENDING),
+                "visited_count": _count(day_rows, Booking.Status.VISITED),
+                "cancelled_count": _count(day_rows, Booking.Status.CANCELLED),
+                "refunded_count": _count(day_rows, Booking.Status.REFUNDED),
+                "awaiting_payment_headcount": _headcount(
+                    day_rows, Booking.Status.AWAITING_PAYMENT
+                ),
+                "pending_headcount": pending_headcount,
+                "visited_headcount": visited_headcount,
+                # "How many people are actually still expected/arrived on
+                # this date" -- Pending (paid, not yet arrived) plus
+                # Visited (already arrived), the same two statuses
+                # `get_dashboard`'s module docstring treats as "reportable
+                # and not yet resolved away" -- deliberately excludes
+                # AwaitingPayment (never completed checkout) and
+                # Cancelled/Refunded (no longer coming), which is exactly
+                # the number a Manager weighs against real capacity when
+                # deciding whether to close this date.
+                "expected_headcount": pending_headcount + visited_headcount,
+            }
+        )
+        current += timedelta(days=1)
+
+    return {"from": start, "to": end, "days": days}

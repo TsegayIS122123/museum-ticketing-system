@@ -66,6 +66,16 @@ export type BookingListResponse = Omit<components['schemas']['PaginatedBookingLi
 // `components["schemas"]["ReportSummary"]` is used directly.
 export type ReportSummary = components['schemas']['ReportSummary'];
 
+// GET /reports/cashier-balances (FR-REPORT-003) and GET
+// /reports/booking-timeline -- both plain `serializers.Serializer`
+// classes with `from`/`to` declared directly as field names via
+// `get_fields()` (same trick ReportSummarySerializer uses above), so
+// there's no `from_` mismatch to work around here either. Re-exported
+// directly, same as ReportSummary.
+export type CashierBalances = components['schemas']['CashierBalances'];
+export type BookingTimeline = components['schemas']['BookingTimeline'];
+export type BookingTimelineDay = components['schemas']['BookingTimelineDay'];
+
 // ---------------------------------------------------------------------
 // POST /auth/refresh/ takes no request body at all -- the refresh token
 // travels as the httpOnly cookie apps.accounts.cookies sets on

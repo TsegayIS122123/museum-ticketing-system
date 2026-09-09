@@ -13,7 +13,12 @@ from rest_framework.views import APIView
 from apps.core.permissions import IsMuseumManagerOrPlatformAdmin
 
 from . import services
-from .serializers import DashboardSerializer, ReportSummarySerializer
+from .serializers import (
+    BookingTimelineSerializer,
+    CashierBalancesSerializer,
+    DashboardSerializer,
+    ReportSummarySerializer,
+)
 
 
 def _parse_optional_date(request, param):
@@ -61,3 +66,34 @@ class ReportSummaryView(APIView):
             period=period, date_from=date_from, date_to=date_to
         )
         return Response(ReportSummarySerializer(summary).data)
+
+
+class CashierBalancesView(APIView):
+    """GET /reports/cashier-balances -- Museum Manager/Platform Admin only
+    (FR-REPORT-003). Every Cashier's current outstanding balance, so a
+    Manager can check it against total revenue -- see
+    `services.get_cashier_balances`."""
+
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
+
+    @extend_schema(operation_id="getCashierBalances", responses=CashierBalancesSerializer)
+    def get(self, request):
+        balances = services.get_cashier_balances()
+        return Response(CashierBalancesSerializer(balances).data)
+
+
+class BookingTimelineView(APIView):
+    """GET /reports/booking-timeline -- Museum Manager/Platform Admin only.
+    A day-by-day awaiting/pending/visited/cancelled/refunded breakdown a
+    Manager can use to spot a crowded upcoming date and close it in
+    Availability -- see `services.get_booking_timeline`."""
+
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
+
+    @extend_schema(operation_id="getBookingTimeline", responses=BookingTimelineSerializer)
+    def get(self, request):
+        date_from = _parse_optional_date(request, "from")
+        date_to = _parse_optional_date(request, "to")
+
+        timeline = services.get_booking_timeline(date_from=date_from, date_to=date_to)
+        return Response(BookingTimelineSerializer(timeline).data)

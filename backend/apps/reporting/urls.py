@@ -16,4 +16,14 @@ app_name = "reporting"
 urlpatterns = [
     path("dashboard/", views.DashboardView.as_view(), name="dashboard"),
     path("summary/", views.ReportSummaryView.as_view(), name="summary"),
+    path(
+        "cashier-balances/",
+        views.CashierBalancesView.as_view(),
+        name="cashier-balances",
+    ),
+    path(
+        "booking-timeline/",
+        views.BookingTimelineView.as_view(),
+        name="booking-timeline",
+    ),
 ]

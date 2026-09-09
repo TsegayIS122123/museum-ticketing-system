@@ -18,6 +18,7 @@ from apps.accounts.models import Account
 from apps.bookings.models import Booking
 from apps.catalog.models import Category
 from apps.payments.models import Payment
+from apps.refunds.models import Refund
 
 pytestmark = pytest.mark.django_db
 
@@ -299,7 +300,16 @@ def test_group_booking_goes_straight_to_awaiting_payment():
 # --------------------------------------------------------------------------
 
 
-def test_cancel_rejected_while_awaiting_payment():
+def test_cancel_of_awaiting_payment_booking_succeeds_without_a_refund():
+    """`BookingCancelView` deliberately also accepts a still-unpaid
+    `AwaitingPayment` booking -- the delete half of a Visitor's own
+    pre-payment editing capability (see the view's own docstring and
+    `services.cancel_awaiting_payment_booking`). This used to assert the
+    opposite (409) from before that capability existed; updated here to
+    match the endpoint's actual, intentional contract instead of a stale
+    expectation. No `Refund` is created either way: nothing was ever
+    collected for a booking that never left `AwaitingPayment`.
+    """
     category = _make_category()
     visitor_client = _authed_client(_make_visitor())
     created = visitor_client.post(
@@ -308,7 +318,22 @@ def test_cancel_rejected_while_awaiting_payment():
 
     response = visitor_client.post(f"/api/v1/bookings/{created['id']}/cancel/")
 
-    assert response.status_code == 409
+    assert response.status_code == 200
+    assert response.data["status"] == "cancelled"
+    assert not Refund.objects.filter(booking_id=created["id"]).exists()
+
+
+def test_cancel_of_awaiting_payment_booking_rejected_for_a_different_visitor():
+    category = _make_category()
+    owner_client = _authed_client(_make_visitor())
+    created = owner_client.post(
+        "/api/v1/bookings/", _create_booking_payload(category), format="json"
+    ).data
+
+    someone_else_client = _authed_client(_make_visitor(email="someone-else@example.com"))
+    response = someone_else_client.post(f"/api/v1/bookings/{created['id']}/cancel/")
+
+    assert response.status_code == 403
 
 
 def test_cancel_succeeds_once_pending():

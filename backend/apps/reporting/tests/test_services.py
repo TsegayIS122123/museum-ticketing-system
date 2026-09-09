@@ -4,8 +4,10 @@ per the coverage target in NFR-MAINT-001. Prefer these over HTTP-level
 tests for business-rule coverage.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from datetime import timezone as dt_timezone
 from decimal import Decimal
+from unittest import mock
 
 import pytest
 from django.test import override_settings
@@ -13,15 +15,25 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import Account
-from apps.bookings.models import Booking, BookingItem
+from apps.bookings.models import Booking, BookingItem, DateAvailability
 from apps.catalog.models import Category
 from apps.payments.models import Payment
 from apps.refunds.models import Refund
 from apps.reporting import services
+from apps.settlement.models import CashierReconciliation
 
 pytestmark = pytest.mark.django_db
 
-TODAY = date.today()
+# `timezone.localdate()`, NOT `date.today()` -- this suite runs in
+# whatever timezone the test host's clock is set to (typically UTC in
+# CI), while `TIME_ZONE` (config/settings/base.py) is "Africa/Addis_Ababa"
+# (UTC+3). Using the museum's own local date here, same as
+# `services.resolve_period_range` now does, is what makes
+# `test_resolve_period_range_daily_defaults_to_today` (below) correct
+# regardless of what time in UTC the suite happens to run at -- see that
+# fix's own comment in services.py for the bug this exact mismatch caused
+# in production.
+TODAY = timezone.localdate()
 
 
 # --------------------------------------------------------------------------
@@ -310,6 +322,23 @@ def test_resolve_period_range_yearly_follows_fiscal_calendar_after_boundary():
 
 
 @override_settings(FISCAL_YEAR_START_MONTH=7, FISCAL_YEAR_START_DAY=1)
+def test_resolve_period_range_daily_uses_museum_local_date_not_host_clock():
+    """Regression test for the reported bug: a Visitor paid, a Cashier
+    checked her in, and the Manager's "today's revenue" still read ETB 0.
+    `TIME_ZONE` is "Africa/Addis_Ababa" (UTC+3) -- 2025-06-10 22:00 UTC is
+    already 2025-06-11 01:00 in Addis Ababa. A host-clock-based
+    `date.today()` would resolve "today" to 2025-06-10 here (one day
+    behind the museum's actual today), missing every booking whose
+    `visit_date`/check-in genuinely happened on the 11th. Patching
+    `django.utils.timezone.now` (not `services.resolve_period_range`
+    directly) exercises exactly what `timezone.localdate()` depends on.
+    """
+    utc_moment = datetime(2025, 6, 10, 22, 0, tzinfo=dt_timezone.utc)
+    with mock.patch("django.utils.timezone.now", return_value=utc_moment):
+        start, end = services.resolve_period_range(period="daily")
+    assert (start, end) == (date(2025, 6, 11), date(2025, 6, 11))
+
+
 def test_resolve_period_range_yearly_follows_fiscal_calendar_before_boundary():
     start, end = services._fiscal_year_bounds(on_date=date(2026, 3, 15))
     assert (start, end) == (date(2025, 7, 1), date(2026, 6, 30))

@@ -924,6 +924,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedRefundList'
           description: ''
+  /api/v1/reports/booking-timeline/:
+    get:
+      operationId: getBookingTimeline
+      description: |-
+        GET /reports/booking-timeline -- Museum Manager/Platform Admin only.
+        A day-by-day awaiting/pending/visited/cancelled/refunded breakdown a
+        Manager can use to spot a crowded upcoming date and close it in
+        Availability -- see `services.get_booking_timeline`.
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingTimeline'
+          description: ''
+  /api/v1/reports/cashier-balances/:
+    get:
+      operationId: getCashierBalances
+      description: |-
+        GET /reports/cashier-balances -- Museum Manager/Platform Admin only
+        (FR-REPORT-003). Every Cashier's current outstanding balance, so a
+        Manager can check it against total revenue -- see
+        `services.get_cashier_balances`.
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashierBalances'
+          description: ''
   /api/v1/reports/dashboard/:
     get:
       operationId: getDashboard
@@ -1491,6 +1529,68 @@ components:
         * `visited` - Visited
         * `cancelled` - Cancelled
         * `refunded` - Refunded
+    BookingTimeline:
+      type: object
+      description: |-
+        `GET /reports/booking-timeline` response shape. Mirrors
+        `ReportSummarySerializer`'s `from`/`get_fields` trick above -- same
+        Python-keyword problem, same fix.
+      properties:
+        to:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingTimelineDay'
+        from:
+          type: string
+          format: date
+      required:
+      - days
+      - from
+      - to
+    BookingTimelineDay:
+      type: object
+      description: |-
+        One day of `GET /reports/booking-timeline`'s `days` list -- see
+        `services.get_booking_timeline`.
+      properties:
+        date:
+          type: string
+          format: date
+        isOpenForBooking:
+          type: boolean
+        awaitingPaymentCount:
+          type: integer
+        pendingCount:
+          type: integer
+        visitedCount:
+          type: integer
+        cancelledCount:
+          type: integer
+        refundedCount:
+          type: integer
+        awaitingPaymentHeadcount:
+          type: integer
+        pendingHeadcount:
+          type: integer
+        visitedHeadcount:
+          type: integer
+        expectedHeadcount:
+          type: integer
+      required:
+      - awaitingPaymentCount
+      - awaitingPaymentHeadcount
+      - cancelledCount
+      - date
+      - expectedHeadcount
+      - isOpenForBooking
+      - pendingCount
+      - pendingHeadcount
+      - refundedCount
+      - visitedCount
+      - visitedHeadcount
     BookingTypeEnum:
       enum:
       - individual
@@ -1499,6 +1599,57 @@ components:
       description: |-
         * `individual` - Individual
         * `group` - Group
+    CashierBalance:
+      type: object
+      description: |-
+        One row of `GET /reports/cashier-balances`'s `cashiers` list --
+        see `services.get_cashier_balances`.
+      properties:
+        cashierId:
+          type: string
+          format: uuid
+        cashierName:
+          type: string
+        outstandingBalanceEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        unreconciledBookingCount:
+          type: integer
+      required:
+      - cashierId
+      - cashierName
+      - outstandingBalanceEtb
+      - unreconciledBookingCount
+    CashierBalances:
+      type: object
+      description: |-
+        `GET /reports/cashier-balances` response shape (FR-REPORT-003).
+        `totalOutstandingEtb + totalReconciledEtb` is meant to be checked
+        against `totalRevenueEtb` -- see `services.get_cashier_balances`'s
+        docstring for what a mismatch would mean.
+      properties:
+        cashiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CashierBalance'
+        totalOutstandingEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        totalReconciledEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        totalRevenueEtb:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - cashiers
+      - totalOutstandingEtb
+      - totalReconciledEtb
+      - totalRevenueEtb
     CashierReconciliation:
       type: object
       description: |-

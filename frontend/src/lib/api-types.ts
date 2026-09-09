@@ -576,6 +576,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/booking-timeline/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /reports/booking-timeline -- Museum Manager/Platform Admin only.
+         *     A day-by-day awaiting/pending/visited/cancelled/refunded breakdown a
+         *     Manager can use to spot a crowded upcoming date and close it in
+         *     Availability -- see `services.get_booking_timeline`.
+         */
+        get: operations["getBookingTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/cashier-balances/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /reports/cashier-balances -- Museum Manager/Platform Admin only
+         *     (FR-REPORT-003). Every Cashier's current outstanding balance, so a
+         *     Manager can check it against total revenue -- see
+         *     `services.get_cashier_balances`.
+         */
+        get: operations["getCashierBalances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/dashboard/": {
         parameters: {
             query?: never;
@@ -906,11 +950,68 @@ export interface components {
          */
         BookingStatusEnum: "awaiting_payment" | "pending" | "visited" | "cancelled" | "refunded";
         /**
+         * @description `GET /reports/booking-timeline` response shape. Mirrors
+         *     `ReportSummarySerializer`'s `from`/`get_fields` trick above -- same
+         *     Python-keyword problem, same fix.
+         */
+        BookingTimeline: {
+            /** Format: date */
+            to: string;
+            days: components["schemas"]["BookingTimelineDay"][];
+            /** Format: date */
+            from: string;
+        };
+        /**
+         * @description One day of `GET /reports/booking-timeline`'s `days` list -- see
+         *     `services.get_booking_timeline`.
+         */
+        BookingTimelineDay: {
+            /** Format: date */
+            date: string;
+            isOpenForBooking: boolean;
+            awaitingPaymentCount: number;
+            pendingCount: number;
+            visitedCount: number;
+            cancelledCount: number;
+            refundedCount: number;
+            awaitingPaymentHeadcount: number;
+            pendingHeadcount: number;
+            visitedHeadcount: number;
+            expectedHeadcount: number;
+        };
+        /**
          * @description * `individual` - Individual
          *     * `group` - Group
          * @enum {string}
          */
         BookingTypeEnum: "individual" | "group";
+        /**
+         * @description One row of `GET /reports/cashier-balances`'s `cashiers` list --
+         *     see `services.get_cashier_balances`.
+         */
+        CashierBalance: {
+            /** Format: uuid */
+            cashierId: string;
+            cashierName: string;
+            /** Format: decimal */
+            outstandingBalanceEtb: string;
+            unreconciledBookingCount: number;
+        };
+        /**
+         * @description `GET /reports/cashier-balances` response shape (FR-REPORT-003).
+         *     `totalOutstandingEtb + totalReconciledEtb` is meant to be checked
+         *     against `totalRevenueEtb` -- see `services.get_cashier_balances`'s
+         *     docstring for what a mismatch would mean.
+         */
+        CashierBalances: {
+            cashiers: components["schemas"]["CashierBalance"][];
+            /** Format: decimal */
+            totalOutstandingEtb: string;
+            /** Format: decimal */
+            totalReconciledEtb: string;
+            /** Format: decimal */
+            totalRevenueEtb: string;
+        };
         /**
          * @description `CashierReconciliation` (per-cashier settlement transfer). Read-only
          *     -- every mutation goes through `services.initiate_reconciliation` /
@@ -2104,6 +2205,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedRefundList"];
+                };
+            };
+        };
+    };
+    getBookingTimeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingTimeline"];
+                };
+            };
+        };
+    };
+    getCashierBalances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashierBalances"];
                 };
             };
         };

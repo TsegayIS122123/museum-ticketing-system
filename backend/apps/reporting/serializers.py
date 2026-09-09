@@ -81,3 +81,69 @@ class ReportSummarySerializer(serializers.Serializer):
         fields = super().get_fields()
         fields["from"] = fields.pop("from_")
         return fields
+
+
+class CashierBalanceSerializer(serializers.Serializer):
+    """One row of `GET /reports/cashier-balances`'s `cashiers` list --
+    see `services.get_cashier_balances`."""
+
+    cashierId = serializers.UUIDField(source="cashier_id")
+    cashierName = serializers.CharField(source="cashier_name")
+    outstandingBalanceEtb = serializers.DecimalField(
+        source="outstanding_balance_etb", max_digits=12, decimal_places=2
+    )
+    unreconciledBookingCount = serializers.IntegerField(
+        source="unreconciled_booking_count"
+    )
+
+
+class CashierBalancesSerializer(serializers.Serializer):
+    """`GET /reports/cashier-balances` response shape (FR-REPORT-003).
+    `totalOutstandingEtb + totalReconciledEtb` is meant to be checked
+    against `totalRevenueEtb` -- see `services.get_cashier_balances`'s
+    docstring for what a mismatch would mean."""
+
+    cashiers = CashierBalanceSerializer(many=True)
+    totalOutstandingEtb = serializers.DecimalField(
+        source="total_outstanding_etb", max_digits=12, decimal_places=2
+    )
+    totalReconciledEtb = serializers.DecimalField(
+        source="total_reconciled_etb", max_digits=12, decimal_places=2
+    )
+    totalRevenueEtb = serializers.DecimalField(
+        source="total_revenue_etb", max_digits=12, decimal_places=2
+    )
+
+
+class BookingTimelineDaySerializer(serializers.Serializer):
+    """One day of `GET /reports/booking-timeline`'s `days` list -- see
+    `services.get_booking_timeline`."""
+
+    date = serializers.DateField(source="visit_date")
+    isOpenForBooking = serializers.BooleanField(source="is_open_for_booking")
+    awaitingPaymentCount = serializers.IntegerField(source="awaiting_payment_count")
+    pendingCount = serializers.IntegerField(source="pending_count")
+    visitedCount = serializers.IntegerField(source="visited_count")
+    cancelledCount = serializers.IntegerField(source="cancelled_count")
+    refundedCount = serializers.IntegerField(source="refunded_count")
+    awaitingPaymentHeadcount = serializers.IntegerField(
+        source="awaiting_payment_headcount"
+    )
+    pendingHeadcount = serializers.IntegerField(source="pending_headcount")
+    visitedHeadcount = serializers.IntegerField(source="visited_headcount")
+    expectedHeadcount = serializers.IntegerField(source="expected_headcount")
+
+
+class BookingTimelineSerializer(serializers.Serializer):
+    """`GET /reports/booking-timeline` response shape. Mirrors
+    `ReportSummarySerializer`'s `from`/`get_fields` trick above -- same
+    Python-keyword problem, same fix."""
+
+    from_ = serializers.DateField()
+    to = serializers.DateField()
+    days = BookingTimelineDaySerializer(many=True)
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["from"] = fields.pop("from_")
+        return fields
