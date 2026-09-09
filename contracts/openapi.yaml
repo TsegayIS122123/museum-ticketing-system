@@ -461,7 +461,15 @@ paths:
   /api/v1/bookings/{id}/:
     get:
       operationId: getBooking
-      description: GET /bookings/{id} -- the owning Visitor or any Staff member.
+      description: |-
+        GET /bookings/{id} -- the owning Visitor or any Staff member.
+
+        Also handles PATCH /bookings/{id} -- the owning Visitor only, editing
+        their own booking's ticket mix and/or visit date while it's still
+        `AwaitingPayment` (see `BookingUpdateSerializer`/`services.
+        update_awaiting_payment_booking`). Kept on the same resource/URL as
+        the GET above rather than a separate endpoint, since it's the same
+        `Booking` -- just a different HTTP method and a narrower audience.
       parameters:
       - in: path
         name: id
@@ -480,10 +488,58 @@ paths:
               schema:
                 $ref: '#/components/schemas/Booking'
           description: ''
+    patch:
+      operationId: updateBooking
+      description: |-
+        GET /bookings/{id} -- the owning Visitor or any Staff member.
+
+        Also handles PATCH /bookings/{id} -- the owning Visitor only, editing
+        their own booking's ticket mix and/or visit date while it's still
+        `AwaitingPayment` (see `BookingUpdateSerializer`/`services.
+        update_awaiting_payment_booking`). Kept on the same resource/URL as
+        the GET above rather than a separate endpoint, since it's the same
+        `Booking` -- just a different HTTP method and a narrower audience.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingUpdate'
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
   /api/v1/bookings/{id}/cancel/:
     post:
       operationId: v1_bookings_cancel_create
-      description: POST /bookings/{id}/cancel -- FR-BOOK-005/006.
+      description: |-
+        POST /bookings/{id}/cancel -- FR-BOOK-005/006 for a `Pending`
+        (i.e. already paid) booking.
+
+        Also reachable against a still-unpaid `AwaitingPayment` booking, as
+        the delete half of the Visitor's own pre-payment editing capability
+        alongside `BookingDetailView.patch` above -- deliberately the same
+        endpoint rather than a separate one, since "cancel" is the right verb
+        either way; only the consequence (refund, or not) differs.
       parameters:
       - in: path
         name: id
@@ -543,6 +599,53 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedBookingCategoryCorrection'
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/v1/bookings/{id}/category-corrections/batch/:
+    patch:
+      operationId: v1_bookings_category_corrections_batch_partial_update
+      description: |-
+        PATCH /bookings/{id}/category-corrections/batch -- Cashier only
+        (ID-verification addendum, batch extension).
+
+        Batch sibling of `BookingCategoryCorrectionView`/`BookingItemAddView`
+        above: accepts a list of the same per-item edit/add shapes those two
+        single-item endpoints take, and applies the whole list as one atomic
+        correction with a single combined delta. This is what actually fixes
+        the gate-workflow gap those two single-item endpoints have -- a
+        Cashier who needs to bump two categories' headcounts in the same
+        visit (both undercharges) previously couldn't, because the first
+        single-item PATCH flips the booking out of `Pending` and the second
+        then 409s. See `services.apply_booking_corrections`'s own docstring
+        for the full rationale, including how it orders category-moves within
+        the batch and rejects an unresolvable two-way swap.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingCategoryCorrectionBatch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingCategoryCorrectionBatch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBookingCategoryCorrectionBatch'
       security:
       - TokenVersionAuth: []
       responses:
@@ -635,6 +738,84 @@ paths:
               schema:
                 $ref: '#/components/schemas/Booking'
           description: ''
+  /api/v1/bookings/{id}/items/:
+    post:
+      operationId: v1_bookings_items_create
+      description: |-
+        POST /bookings/{id}/items -- Cashier only (walk-up addendum to the
+        ID-verification correction flow).
+
+        Adds a brand-new line for a category that wasn't on the booking at
+        all -- e.g. a group booked as 3 Students shows up with 2 Adults never
+        part of the original booking -- then reopens payment for the new
+        item's full price. See `services.add_booking_item`'s own docstring
+        for why this is a distinct operation from
+        `BookingCategoryCorrectionView`, which only ever edits an existing
+        line. Lives here for the same `apps.payments` composition/module-
+        boundary reasons as `BookingCategoryCorrectionView` above.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingItemAdd'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookingItemAdd'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BookingItemAdd'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+          description: ''
+  /api/v1/bookings/{id}/receipt/download/:
+    get:
+      operationId: v1_bookings_receipt_download_retrieve
+      description: |-
+        GET /bookings/{id}/receipt/download/ -- the owning Visitor or any
+        Staff member (same access rule as BookingDetailView).
+
+        `booking.receipt_url` (exposed as `receiptUrl` on BookingSerializer)
+        is a direct link straight to storage, used to *view* the PDF in a
+        new tab. It isn't a reliable target for a forced download initiated
+        from frontend JS: browser navigation to it works fine, but a
+        scripted `fetch()` of it can be blocked by CORS (storage is served
+        by the reverse proxy/object storage in staging/production, not this
+        Django app -- see config/urls.py) or by mixed-content restrictions
+        if that storage host isn't on HTTPS. Streaming the same bytes back
+        through this API host instead -- which the frontend already talks
+        to successfully for everything else -- sidesteps both, and
+        `as_attachment=True` makes the browser save it regardless of how
+        the response is loaded.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/v1/bookings/{id}/refund-requests/:
     post:
       operationId: requestPartialRefund
@@ -1067,6 +1248,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedCashierReconciliationList'
           description: ''
+  /api/v1/settlement/reconciliations/{id}/transfer-receipt/download/:
+    get:
+      operationId: v1_settlement_reconciliations_transfer_receipt_download_retrieve
+      description: |-
+        GET /settlement/reconciliations/{id}/transfer-receipt/download/ --
+        same ownership scoping as ReconciliationListView (a Cashier may only
+        download her own; Museum Manager/Platform Admin may download any).
+
+        See BookingReceiptDownloadView (apps.bookings.views) for why this
+        exists alongside `transfer_receipt_url`: that field points straight
+        at storage for *viewing* the PDF in a new tab, but isn't reliable
+        for a forced download triggered from frontend JS (CORS/mixed-content
+        depending on how storage is served). Streaming the same bytes back
+        through this API host, with `as_attachment=True`, sidesteps that.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/v1/settlement/webhook/chapa-transfer/:
     post:
       operationId: handleChapaTransferWebhook
@@ -1402,6 +1611,25 @@ components:
       - visitorId
       - visitorName
       - visitorPhone
+    BookingCorrectionOp:
+      type: object
+      description: |-
+        One line of a `BookingCategoryCorrectionBatchSerializer` -- same
+        field shape as `BookingCategoryCorrectionSerializer` (edit) or
+        `BookingItemAddSerializer` (add), disambiguated by whether `itemId` is
+        given. See `services.apply_booking_corrections`'s own docstring for
+        why a batch of these exists at all.
+      properties:
+        itemId:
+          type: string
+          format: uuid
+          nullable: true
+        categoryId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
     BookingCreate:
       type: object
       description: |-
@@ -1506,6 +1734,28 @@ components:
       - quantity
       - subtotalEtb
       - unitPriceEtb
+    BookingItemAdd:
+      type: object
+      description: |-
+        `BookingItemAddRequest` -- Cashier only (walk-up addendum to the
+        ID-verification correction flow). Adds a brand-new line for a
+        category that isn't already on the booking -- see
+        `services.add_booking_item`'s own docstring for why this is a
+        separate operation from `BookingCategoryCorrectionSerializer`, which
+        only ever edits an existing line.
+
+        Both fields are required, unlike the correction serializer above: an
+        added item has no existing category/quantity to leave unchanged.
+      properties:
+        categoryId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+      required:
+      - categoryId
+      - quantity
     BookingReschedule:
       type: object
       description: '`BookingRescheduleRequest` -- FR-BOOK-007.'
@@ -1599,6 +1849,23 @@ components:
       description: |-
         * `individual` - Individual
         * `group` - Group
+    BookingUpdateItem:
+      type: object
+      description: |-
+        One `{categoryId, quantity}` entry of a `BookingUpdateRequest`'s
+        `items` list -- same shape as `BookingCreateItemSerializer`, kept as
+        a separate class since the two requests' fields are otherwise
+        unrelated (this one has no `bookingType`/group fields at all).
+      properties:
+        categoryId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+      required:
+      - categoryId
+      - quantity
     CashierBalance:
       type: object
       description: |-
@@ -1856,8 +2123,8 @@ components:
         showed up) but never negative; the upper bound (must not exceed that
         item's own booked `quantity`, FR-TICKET-005) and "every item must be
         covered exactly once" are cross-field business rules against the
-        booking being checked in, not field-level constraints this
-        serializer can express on its own -- both checks live in services.
+        booking being checked in, not field-level constraints this serializer
+        can express on its own -- both checks live in services.
         check_in_booking.
       properties:
         itemId:
@@ -1884,7 +2151,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CheckInItem'
-          minItems: 1
       required:
       - items
     CheckInResponse:
@@ -2290,6 +2556,41 @@ components:
         quantity:
           type: integer
           minimum: 1
+    PatchedBookingCategoryCorrectionBatch:
+      type: object
+      description: |-
+        `BookingCategoryCorrectionBatchRequest` -- Cashier only
+        (ID-verification addendum, batch extension). Wraps a list of
+        `BookingCorrectionOpSerializer` lines and applies all of them as one
+        atomic correction with a single combined delta -- see
+        `services.apply_booking_corrections`'s own docstring for the full
+        rationale (in short: the single-item `category-correction`/`items`
+        endpoints can each only carry one undercharging change per Pending
+        booking before the next call 409s).
+      properties:
+        ops:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingCorrectionOp'
+    PatchedBookingUpdate:
+      type: object
+      description: |-
+        `BookingUpdateRequest` -- Visitor-only edit of their own still-
+        unpaid (`AwaitingPayment`) booking (see
+        `services.update_awaiting_payment_booking`). Both `items` and
+        `visitDate` are optional here, unlike `BookingCreateSerializer`: a
+        Visitor may only be fixing one of the two. There is no
+        `bookingType`/`groupName`/`groupTin` here -- Document 02 has no
+        notion of changing what *kind* of booking this is after the fact,
+        only its ticket mix and date.
+      properties:
+        visitDate:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingUpdateItem'
     PatchedIfmisVoucherUpdate:
       type: object
       description: |-
