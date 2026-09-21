@@ -3,7 +3,7 @@ info:
   title: Museum Ticketing & Booking Platform API
   version: 1.0.0
   description: Bilingual (EN/AM) online booking, payment, and gate check-in for the
-    Science Museum's digital ticketing track.
+    Zoological Natural History Museum's digital ticketing track.
 paths:
   /api/v1/admin/staff/:
     get:
@@ -184,7 +184,7 @@ paths:
                     access_token: mock-access-token
                     user:
                       id: 00000000-0000-0000-0000-000000000001
-                      email: manager@sciencemuseum.et
+                      email: manager@znhm.et
                       phone: null
                       full_name: Mock Museum Manager
                       role: museum_manager

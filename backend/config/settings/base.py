@@ -202,7 +202,8 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "Museum Ticketing & Booking Platform API",
     "DESCRIPTION": "Bilingual (EN/AM) online booking, payment, and gate "
-                    "check-in for the Science Museum's digital ticketing track.",
+                    "check-in for the Zoological Natural History Museum's "
+                    "digital ticketing track.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     # apps.platform_admin.serializers.StaffCreateSerializer/StaffUpdateSerializer

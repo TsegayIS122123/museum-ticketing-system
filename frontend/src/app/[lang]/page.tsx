@@ -38,6 +38,13 @@ export default async function LandingPage({ params }: LandingPageProps) {
             <h2 className="mt-2 text-4xl text-stone-900 sm:text-5xl font-bold tracking-tight">
               {t.landing_title}
             </h2>
+            {/* The museum belongs to Addis Ababa University, but AAU is no
+                longer part of the brand name (UAT round 1) -- it is out of
+                `museum_name`, `landing_title`, the footer and the tab title.
+                It survives here, once, as a subordinate credit under the
+                wordmark: small, muted, and typographically clearly not part
+                of the name above it. */}
+            <p className="mt-2 text-sm text-stone-500">{t.affiliation_line}</p>
             <p className="mt-4 text-lg text-stone-600 max-w-2xl mx-auto lg:mx-0">
               {t.landing_subtitle}
             </p>

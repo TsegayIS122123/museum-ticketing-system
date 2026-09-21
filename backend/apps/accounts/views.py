@@ -137,7 +137,7 @@ class StaffLoginView(APIView):
                     "access_token": "mock-access-token",
                     "user": {
                         "id": "00000000-0000-0000-0000-000000000001",
-                        "email": "manager@sciencemuseum.et",
+                        "email": "manager@znhm.et",
                         "phone": None,
                         "full_name": "Mock Museum Manager",
                         "role": "museum_manager",

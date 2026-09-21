@@ -8,7 +8,7 @@
 
 ## 1. Vision
 
-The **Museum Ticketing & Booking Platform** gives visitors to the Science Museum a digital way to book, pay for, and receive a ticket online — bilingually, in Amharic and English — as an option that sits **alongside** the museum's existing counter process, not a replacement for it.
+The **Museum Ticketing & Booking Platform** gives visitors to the Zoological Natural History Museum a digital way to book, pay for, and receive a ticket online — bilingually, in Amharic and English — as an option that sits **alongside** the museum's existing counter process, not a replacement for it.
 
 The product exists on a simple premise: the museum already runs a working ticketing operation — cashiers, categories, group bookings, government-receipted reconciliation — it just has no digital path for a visitor who would rather book ahead and pay by phone than queue in person with cash. The MVP's job is to add that path cleanly, without disturbing the manual process the museum, its cashiers, and its Finance Office already depend on.
 

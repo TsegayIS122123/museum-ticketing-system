@@ -1,7 +1,7 @@
 # Museum Ticketing & Booking Platform
 
 Bilingual (Amharic/English) online booking, payment, and gate check-in for
-the Science Museum's digital ticketing track — additive to the museum's
+the Zoological Natural History Museum's digital ticketing track — additive to the museum's
 existing counter process. See `docs/01-product-overview.md` for the full
 product context.
 

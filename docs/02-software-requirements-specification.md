@@ -2,7 +2,7 @@
 
 **Document type:** SRS
 **Project:** Museum Ticketing & Booking Platform (working title)
-**Source material:** Stakeholder interviews — Science Museum site visit (cashier/front-office),
+**Source material:** Stakeholder interviews — Zoological Natural History Museum site visit (cashier/front-office),
 plus follow-up interviews covering payment settlement, the Finance office's constraints, and
 policy decisions on refunds, notices, and capacity.
 

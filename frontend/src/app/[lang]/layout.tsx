@@ -4,8 +4,13 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import '../globals.css';
 
+// The browser tab title carries the museum's own wordmark only. Addis
+// Ababa University owns the museum, but is deliberately not part of the
+// brand name (UAT round 1) -- the affiliation is credited once on the
+// landing page instead, so it never reads as a compound institution name
+// here, in `museum_name`, or in `landing_title`.
 export const metadata: Metadata = {
-  title: 'Science Museum - Ticketing & Booking',
+  title: 'Zoological Natural History Museum - Ticketing & Booking',
   description: 'Book and manage your museum visit online.',
 };
 
