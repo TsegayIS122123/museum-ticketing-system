@@ -30,6 +30,7 @@ called from the view layer, not from this module (Sec 3.2).
 
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -51,19 +52,45 @@ MAX_AVAILABILITY_RANGE_DAYS = 366
 # --------------------------------------------------------------------------
 
 
+def is_recurring_closed_day(visit_date) -> bool:
+    """Weekly closure (UAT round 1): the museum is closed every Sunday,
+    unconditionally. This is a standing museum-hours rule, not something
+    the Museum Manager decides per date -- the configured weekday list
+    (`settings.RECURRING_CLOSED_WEEKDAYS`) is the single source of truth
+    for it, so every caller in this module goes through this helper
+    rather than re-deriving the rule from `DateAvailability` rows."""
+    return visit_date.weekday() in settings.RECURRING_CLOSED_WEEKDAYS
+
+
 def is_date_open_for_booking(visit_date) -> bool:
-    """A date with no row is open by default -- "the system does not
-    calculate or track overall museum capacity itself" (FR-BOOK-008); a
-    row only exists once the Museum Manager has explicitly acted on it."""
+    """A recurring closed day (Sunday) is *always* closed, whether or not
+    a `DateAvailability` row exists for it -- that row can only ever
+    represent a one-off Manager closure/re-open, never override the
+    weekly rule. Otherwise, a date with no row is open by default -- "the
+    system does not calculate or track overall museum capacity itself"
+    (FR-BOOK-008); a row only exists once the Museum Manager has
+    explicitly acted on it."""
+    if is_recurring_closed_day(visit_date):
+        return False
     row = DateAvailability.objects.filter(visit_date=visit_date).first()
     return row is None or row.is_open_for_booking
 
 
 def list_date_availability(*, date_from, date_to):
     """Implements `GET /availability` (FR-BOOK-008). Returns one entry per
-    calendar date in the inclusive range, materializing the "open by
-    default" rule for dates that have no row rather than only returning
-    dates the Museum Manager has explicitly touched."""
+    calendar date in the inclusive range, materializing two defaults
+    rather than only returning dates the Museum Manager has explicitly
+    touched:
+    - a date with no row is open by default;
+    - a Sunday is *always* closed (`is_recurring_closed_day`), even if a
+      `DateAvailability` row exists and says otherwise -- e.g. a row
+      persisted before this weekly-closure rule existed. The row's own
+      `is_open_for_booking` is never rewritten here (this is a read
+      path, and the override below is in-memory only, never saved).
+    `DateAvailabilitySerializer` derives `closedReason` from each
+    result's date/`is_open_for_booking`, telling a weekly closure apart
+    from a one-off Manager closure.
+    """
     if date_from > date_to:
         raise ValidationError({"to": "Must not be before 'from'."})
     if (date_to - date_from).days + 1 > MAX_AVAILABILITY_RANGE_DAYS:
@@ -82,11 +109,17 @@ def list_date_availability(*, date_from, date_to):
     current = date_from
     while current <= date_to:
         row = existing.get(current)
-        if row is not None:
-            results.append(row)
-        else:
-            # Materialized default -- open, never explicitly touched.
-            results.append(DateAvailability(visit_date=current, is_open_for_booking=True))
+        recurring_closed = is_recurring_closed_day(current)
+        if row is None:
+            # Materialized default: closed if a recurring closed day,
+            # otherwise open, never explicitly touched.
+            row = DateAvailability(visit_date=current, is_open_for_booking=not recurring_closed)
+        elif recurring_closed and row.is_open_for_booking:
+            # A persisted row disagrees with the weekly rule (e.g. it
+            # predates this feature). The rule always wins; this is an
+            # in-memory override for the response only, never saved.
+            row.is_open_for_booking = False
+        results.append(row)
         current += timedelta(days=1)
     return results
 
@@ -94,7 +127,21 @@ def list_date_availability(*, date_from, date_to):
 def set_date_availability(*, visit_date, is_open_for_booking, actor):
     """Implements the Museum-Manager-only `PUT /availability/{date}`
     (FR-BOOK-008). "Closing a date does not affect bookings already made
-    for it" -- this function never touches an existing `Booking` row."""
+    for it" -- this function never touches an existing `Booking` row.
+
+    A Sunday cannot be opened this way -- the weekly closure
+    (`is_recurring_closed_day`) is a standing museum-hours rule, not a
+    per-date Manager decision, so `isOpenForBooking: true` on a Sunday is
+    rejected outright rather than silently accepted and then overridden
+    by `is_date_open_for_booking`/`list_date_availability`. Closing a
+    Sunday (`is_open_for_booking=False`) is a no-op the rule already
+    guarantees, so it's allowed through rather than rejected -- rejecting
+    it would make the endpoint behave differently depending on which way
+    the Manager was already trying to leave the date.
+    """
+    if is_recurring_closed_day(visit_date) and is_open_for_booking:
+        raise Conflict("The museum is closed every Sunday and this cannot be overridden.")
+
     now = timezone.now()
     row, _created = DateAvailability.objects.get_or_create(visit_date=visit_date)
     row.is_open_for_booking = is_open_for_booking

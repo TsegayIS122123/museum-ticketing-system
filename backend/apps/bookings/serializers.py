@@ -10,16 +10,35 @@ from .models import Booking, BookingItem, DateAvailability
 
 class DateAvailabilitySerializer(serializers.ModelSerializer):
     """`DateAvailability` (Document 04). Read-only -- every mutation goes
-    through `DateAvailabilityUpdateSerializer` and services.py."""
+    through `DateAvailabilityUpdateSerializer` and services.py.
+
+    `closedReason` distinguishes the weekly Sunday closure from a
+    one-off Manager closure (UAT round 1) so the calendar can label them
+    differently. Computed here via `services.is_recurring_closed_day`
+    rather than read off a `closed_reason` attribute, so this serializer
+    works the same whether it's serializing `list_date_availability`'s
+    materialized results or a single freshly-saved row from
+    `set_date_availability`.
+    """
 
     date = serializers.DateField(source="visit_date")
     isOpenForBooking = serializers.BooleanField(source="is_open_for_booking")
     closedByUserId = serializers.UUIDField(source="closed_by_user_id_id", allow_null=True)
     closedAt = serializers.DateTimeField(source="closed_at", allow_null=True)
+    closedReason = serializers.SerializerMethodField()
 
     class Meta:
         model = DateAvailability
-        fields = ["date", "isOpenForBooking", "closedByUserId", "closedAt"]
+        fields = ["date", "isOpenForBooking", "closedByUserId", "closedAt", "closedReason"]
+
+    def get_closedReason(self, obj):
+        from . import services
+
+        if services.is_recurring_closed_day(obj.visit_date):
+            return "weekly_closure"
+        if not obj.is_open_for_booking:
+            return "manager_closed"
+        return None
 
 
 class DateAvailabilityUpdateSerializer(serializers.Serializer):

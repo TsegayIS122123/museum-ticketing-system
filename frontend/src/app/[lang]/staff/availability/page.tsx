@@ -19,6 +19,11 @@ type AvailabilityStatus = 'available' | 'closed';
 interface DateStatus {
   date: string;
   status: AvailabilityStatus;
+  // Set only for the recurring weekly closure (UAT round 1) -- every
+  // Sunday, always closed, and not something a Museum Manager can
+  // override through this page. `undefined` for an ordinary date,
+  // whether open or Manager-closed.
+  isWeeklyClosure?: boolean;
 }
 
 // Build the current month's dates, defaulting to "available" for any
@@ -61,9 +66,13 @@ export default function AvailabilityPage() {
       .then((records) => {
         if (cancelled) return;
         const byDate = new Map(records.map((r) => [r.date, r.isOpenForBooking]));
+        const weeklyClosed = new Set(
+          records.filter((r) => r.closedReason === 'weekly_closure').map((r) => r.date)
+        );
         const merged = buildMonthDates().map((date) => ({
           date,
           status: (byDate.get(date) ?? true ? 'available' : 'closed') as AvailabilityStatus,
+          isWeeklyClosure: weeklyClosed.has(date),
         }));
         setDates(merged);
       })
@@ -182,18 +191,22 @@ export default function AvailabilityPage() {
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1">
-              {dates.map(({ date, status }) => {
+              {dates.map(({ date, status, isWeeklyClosure }) => {
                 const isSelected = selectedDate === date;
                 const isPast = date < today;
+                const isLocked = isPast || isWeeklyClosure;
                 const cellStyle = isPast
                   ? 'bg-stone-50 text-stone-300 cursor-not-allowed'
+                  : isWeeklyClosure
+                  ? 'bg-stone-200 text-stone-500 cursor-not-allowed'
                   : getStatusColor(status);
 
                 return (
                   <button
                     key={date}
-                    onClick={() => !isPast && setSelectedDate(date)}
-                    disabled={isPast}
+                    onClick={() => !isLocked && setSelectedDate(date)}
+                    disabled={isLocked}
+                    title={isWeeklyClosure ? t('closed_every_sunday') || 'The museum is closed every Sunday' : undefined}
                     className={`
                       text-sm py-2.5 rounded-lg font-medium border-2 transition-all cursor-pointer
                       ${cellStyle}
@@ -216,6 +229,9 @@ export default function AvailabilityPage() {
                   {getStatusLabel(status)}
                 </span>
               ))}
+              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full border bg-stone-200 text-stone-500 border-stone-300">
+                {t('closed_every_sunday') || 'Closed every Sunday'}
+              </span>
             </div>
           </Card>
         </div>

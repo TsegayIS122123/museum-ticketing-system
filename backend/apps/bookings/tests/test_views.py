@@ -22,7 +22,18 @@ from apps.refunds.models import Refund
 
 pytestmark = pytest.mark.django_db
 
-TOMORROW = date.today() + timedelta(days=1)
+def _next_non_sunday(start):
+    """See the identical helper in test_services.py -- Sunday is now
+    unconditionally closed (UAT round 1), so a fixed tomorrow-offset would
+    make every test relying on it being bookable flaky one day in seven."""
+    current = start
+    while current.weekday() == 6:
+        current += timedelta(days=1)
+    return current
+
+
+TOMORROW = _next_non_sunday(date.today() + timedelta(days=1))
+NEXT_SUNDAY = date.today() + timedelta(days=(6 - date.today().weekday()) % 7 or 7)
 
 
 @pytest.fixture(autouse=True)
@@ -127,6 +138,28 @@ def test_set_availability_allowed_for_museum_manager():
 
     assert response.status_code == 200
     assert response.data["isOpenForBooking"] is False
+
+
+def test_list_availability_shows_sunday_closed_with_weekly_reason():
+    response = APIClient().get(
+        f"/api/v1/availability/?from={NEXT_SUNDAY.isoformat()}&to={NEXT_SUNDAY.isoformat()}"
+    )
+
+    assert response.status_code == 200
+    assert response.data[0]["isOpenForBooking"] is False
+    assert response.data[0]["closedReason"] == "weekly_closure"
+
+
+def test_manager_cannot_open_a_sunday_via_api():
+    client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
+
+    response = client.put(
+        f"/api/v1/availability/{NEXT_SUNDAY.isoformat()}/",
+        {"isOpenForBooking": True},
+        format="json",
+    )
+
+    assert response.status_code == 409
 
 
 # --------------------------------------------------------------------------

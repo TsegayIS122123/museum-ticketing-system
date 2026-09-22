@@ -32,6 +32,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
+  const [weeklyClosedDates, setWeeklyClosedDates] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -57,6 +58,11 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
           records.filter((r) => !r.isOpenForBooking).map((r) => r.date)
         );
         setClosedDates(closed);
+        setWeeklyClosedDates(
+          new Set(
+            records.filter((r) => r.closedReason === 'weekly_closure').map((r) => r.date)
+          )
+        );
       } catch {
         if (!cancelled) {
           setLoadError(t('failed_to_load_availability') || 'Could not load date availability.');
@@ -167,7 +173,9 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
                 isPast
                   ? undefined
                   : isClosed
-                  ? t('date_closed_for_booking') || 'Closed for booking'
+                  ? weeklyClosedDates.has(date)
+                    ? t('closed_every_sunday') || 'The museum is closed every Sunday'
+                    : t('date_closed_for_booking') || 'Closed for booking'
                   : undefined
               }
               className={`

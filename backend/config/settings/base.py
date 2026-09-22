@@ -148,6 +148,14 @@ USE_TZ = True
 FISCAL_YEAR_START_MONTH = env.int("FISCAL_YEAR_START_MONTH", default=7)
 FISCAL_YEAR_START_DAY = env.int("FISCAL_YEAR_START_DAY", default=1)
 
+# Weekly closure (UAT round 1): the museum is closed every Sunday, always,
+# regardless of `DateAvailability` -- this is a standing museum-hours rule,
+# not a Manager decision, so it lives here as configuration rather than a
+# magic number in `bookings/services.py`. `date.weekday()` numbering:
+# Monday=0 ... Sunday=6. A list (not a single int) so a future change in
+# opening days is one config edit, not a code change.
+RECURRING_CLOSED_WEEKDAYS = [6]
+
 # --------------------------------------------------------------------------
 # Static / media
 # --------------------------------------------------------------------------

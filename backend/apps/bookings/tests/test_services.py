@@ -45,7 +45,24 @@ def _make_category(name_en="Student", price_etb="50.00", active=True):
     )
 
 
-TOMORROW = date.today() + timedelta(days=1)
+def _next_non_sunday(start):
+    """`TOMORROW` below stands in for "some ordinary open date" across this
+    whole file. Sunday is now unconditionally closed (UAT round 1), so
+    pinning it to a fixed offset from `date.today()` would make every test
+    that relies on it being bookable flaky one day in seven. This walks
+    forward to the nearest date that isn't a Sunday instead."""
+    current = start
+    while current.weekday() == 6:
+        current += timedelta(days=1)
+    return current
+
+
+TOMORROW = _next_non_sunday(date.today() + timedelta(days=1))
+
+# A guaranteed Sunday in the near future, for the weekly-closure tests
+# below -- deliberately not derived from TOMORROW, which is defined to
+# avoid Sunday.
+NEXT_SUNDAY = date.today() + timedelta(days=(6 - date.today().weekday()) % 7 or 7)
 
 
 # --------------------------------------------------------------------------
@@ -117,6 +134,118 @@ def test_set_date_availability_never_touches_existing_bookings():
     booking.refresh_from_db()
 
     assert booking.status == Booking.Status.AWAITING_PAYMENT
+
+
+# --------------------------------------------------------------------------
+# Weekly Sunday closure (UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_is_recurring_closed_day_true_only_for_sunday():
+    assert services.is_recurring_closed_day(NEXT_SUNDAY) is True
+    assert services.is_recurring_closed_day(TOMORROW) is False
+
+
+def test_sunday_with_no_row_is_closed():
+    """Unlike every other weekday, a Sunday with no `DateAvailability` row
+    is still closed -- the "no row means open" default (FR-BOOK-008) never
+    applies to the weekly closure."""
+    assert services.is_date_open_for_booking(NEXT_SUNDAY) is False
+
+
+def test_sunday_row_saying_open_is_still_closed():
+    """A row that predates the weekly-closure rule (or was written by some
+    other path) can't override it -- the rule always wins."""
+    DateAvailability.objects.create(visit_date=NEXT_SUNDAY, is_open_for_booking=True)
+
+    assert services.is_date_open_for_booking(NEXT_SUNDAY) is False
+
+
+def test_manager_cannot_open_a_sunday():
+    manager = _make_manager()
+
+    with pytest.raises(Conflict):
+        services.set_date_availability(
+            visit_date=NEXT_SUNDAY, is_open_for_booking=True, actor=manager
+        )
+
+
+def test_manager_can_close_a_sunday_without_error():
+    """Closing a Sunday is a no-op the weekly rule already guarantees, so
+    it's allowed through rather than rejected."""
+    manager = _make_manager()
+
+    row = services.set_date_availability(
+        visit_date=NEXT_SUNDAY, is_open_for_booking=False, actor=manager
+    )
+
+    assert row.is_open_for_booking is False
+
+
+def test_list_date_availability_marks_sunday_closed_with_weekly_reason():
+    from apps.bookings.serializers import DateAvailabilitySerializer
+
+    [result] = services.list_date_availability(date_from=NEXT_SUNDAY, date_to=NEXT_SUNDAY)
+
+    assert result.is_open_for_booking is False
+    data = DateAvailabilitySerializer(result).data
+    assert data["closedReason"] == "weekly_closure"
+
+
+def test_list_date_availability_marks_sunday_closed_even_with_stale_open_row():
+    DateAvailability.objects.create(visit_date=NEXT_SUNDAY, is_open_for_booking=True)
+
+    [result] = services.list_date_availability(date_from=NEXT_SUNDAY, date_to=NEXT_SUNDAY)
+
+    assert result.is_open_for_booking is False
+
+
+def test_list_date_availability_manager_closed_reason_for_ordinary_date():
+    from apps.bookings.serializers import DateAvailabilitySerializer
+
+    DateAvailability.objects.create(visit_date=TOMORROW, is_open_for_booking=False)
+
+    [result] = services.list_date_availability(date_from=TOMORROW, date_to=TOMORROW)
+
+    data = DateAvailabilitySerializer(result).data
+    assert data["closedReason"] == "manager_closed"
+
+
+def test_list_date_availability_open_date_has_null_reason():
+    from apps.bookings.serializers import DateAvailabilitySerializer
+
+    [result] = services.list_date_availability(date_from=TOMORROW, date_to=TOMORROW)
+
+    data = DateAvailabilitySerializer(result).data
+    assert data["closedReason"] is None
+
+
+def test_create_booking_rejected_on_sunday():
+    visitor = _make_visitor()
+    category = _make_category()
+
+    with pytest.raises(Conflict):
+        services.create_booking(
+            visitor=visitor,
+            items=[{"category_id": category.id, "quantity": 1}],
+            visit_date=NEXT_SUNDAY,
+            booking_type=Booking.BookingType.INDIVIDUAL,
+        )
+
+
+def test_group_booking_rejected_on_sunday():
+    visitor = _make_visitor()
+    category = _make_category()
+
+    with pytest.raises(Conflict):
+        services.create_booking(
+            visitor=visitor,
+            items=[{"category_id": category.id, "quantity": 20}],
+            visit_date=NEXT_SUNDAY,
+            booking_type=Booking.BookingType.GROUP,
+            group_name="A School",
+            group_tin="0012345678",
+        )
 
 
 # --------------------------------------------------------------------------
@@ -843,6 +972,13 @@ def test_reschedule_rejected_onto_a_closed_date():
 
     with pytest.raises(Conflict):
         services.reschedule_booking(booking=booking, visitor=visitor, new_visit_date=closed_date)
+
+
+def test_reschedule_rejected_onto_a_sunday():
+    booking, visitor = _make_pending_booking()
+
+    with pytest.raises(Conflict):
+        services.reschedule_booking(booking=booking, visitor=visitor, new_visit_date=NEXT_SUNDAY)
 
 
 def test_reschedule_rejected_once_no_longer_pending():

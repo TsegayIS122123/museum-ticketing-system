@@ -1267,7 +1267,7 @@ components:
           $ref: '#/components/schemas/PaginationMeta'
     DateAvailability:
       type: object
-      description: FR-BOOK-008. The system never calculates capacity itself — this flag is entirely the Museum Manager's call.
+      description: FR-BOOK-008. The system never calculates capacity itself — this flag is entirely the Museum Manager's call. Every Sunday is closed by a standing weekly rule (UAT round 1) that overrides this flag regardless of what's persisted — see `closedReason`.
       properties:
         date:
           type: string
@@ -1282,6 +1282,13 @@ components:
           type: string
           format: date-time
           nullable: true
+        closedReason:
+          type: string
+          enum:
+          - weekly_closure
+          - manager_closed
+          nullable: true
+          description: "weekly_closure for every Sunday (not settable by the Manager); manager_closed for a one-off closure; null when open."
     DateAvailabilityUpdateRequest:
       type: object
       required:

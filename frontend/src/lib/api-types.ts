@@ -1207,6 +1207,15 @@ export interface components {
         /**
          * @description `DateAvailability` (Document 04). Read-only -- every mutation goes
          *     through `DateAvailabilityUpdateSerializer` and services.py.
+         *
+         *     `closedReason` distinguishes the weekly Sunday closure from a
+         *     one-off Manager closure (UAT round 1) so the calendar can label
+         *     them differently. Computed here via
+         *     `services.is_recurring_closed_day` rather than read off a
+         *     `closed_reason` attribute, so this serializer works the same
+         *     whether it's serializing `list_date_availability`'s materialized
+         *     results or a single freshly-saved row from
+         *     `set_date_availability`.
          */
         DateAvailability: {
             /** Format: date */
@@ -1216,6 +1225,8 @@ export interface components {
             closedByUserId: string | null;
             /** Format: date-time */
             closedAt: string | null;
+            /** @enum {string|null} */
+            closedReason: "weekly_closure" | "manager_closed" | null;
         };
         /** @description `DateAvailabilityUpdateRequest` -- Museum Manager only (FR-BOOK-008). */
         DateAvailabilityUpdate: {
