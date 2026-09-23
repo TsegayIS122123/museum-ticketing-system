@@ -562,23 +562,28 @@ paths:
     patch:
       operationId: v1_bookings_category_correction_partial_update
       description: |-
-        PATCH /bookings/{id}/category-correction -- Cashier only
-        (ID-verification addendum to Document 02 Sec 2.2).
+        PATCH /bookings/{id}/category-correction -- Museum Manager (or
+        Platform Admin) only (ID-verification addendum to Document 02 Sec
+        2.2; re-permissioned from the Cashier in UAT round 1 -- see
+        `services.correct_booking_category`'s own docstring for the policy
+        change).
 
         Corrects a booking item's category and/or quantity -- category, when
         the visitor's ID at the gate doesn't match what they booked under;
         quantity, when the actual headcount for that item doesn't match what
         was booked (either direction) -- then either reopens payment for the
         difference (undercharge) or issues a refund for the difference
-        (overcharge). Lives here, not in `apps.entrance` -- even though it's
-        a gate-side, Cashier-only action -- because this is where that
-        composition with `apps.payments`/`apps.refunds` already happens
-        (`BookingListCreateView.post`/`BookingCancelView` above); `entrance`
-        depends on `bookings` only, with no dependency of its own on
-        `refunds`/`payments` (`apps.entrance.services`' own module
-        docstring), so putting this endpoint there would violate that
-        boundary. See `services.correct_booking_category`'s own docstring for
-        the full rationale.
+        (overcharge). Reached from the Manager's flagged-booking queue
+        (`GET /bookings?flagged=true`) or on her own initiative. Lives here,
+        not in `apps.entrance` -- even though it's a gate-side action --
+        because this is where that composition with `apps.payments`/
+        `apps.refunds` already happens (`BookingListCreateView.post`/
+        `BookingCancelView` above); `entrance` depends on `bookings` only,
+        with no dependency of its own on `refunds`/`payments`
+        (`apps.entrance.services`' own module docstring), so putting this
+        endpoint there would violate that boundary. See
+        `services.correct_booking_category`'s own docstring for the full
+        rationale.
       parameters:
       - in: path
         name: id
@@ -612,15 +617,16 @@ paths:
     patch:
       operationId: v1_bookings_category_corrections_batch_partial_update
       description: |-
-        PATCH /bookings/{id}/category-corrections/batch -- Cashier only
-        (ID-verification addendum, batch extension).
+        PATCH /bookings/{id}/category-corrections/batch -- Museum Manager
+        (or Platform Admin) only (ID-verification addendum, batch extension;
+        re-permissioned from the Cashier in UAT round 1).
 
         Batch sibling of `BookingCategoryCorrectionView`/`BookingItemAddView`
         above: accepts a list of the same per-item edit/add shapes those two
         single-item endpoints take, and applies the whole list as one atomic
         correction with a single combined delta. This is what actually fixes
         the gate-workflow gap those two single-item endpoints have -- a
-        Cashier who needs to bump two categories' headcounts in the same
+        Manager who needs to bump two categories' headcounts in the same
         visit (both undercharges) previously couldn't, because the first
         single-item PATCH flips the booking out of `Pending` and the second
         then 409s. See `services.apply_booking_corrections`'s own docstring
@@ -662,6 +668,12 @@ paths:
         POST /bookings/{id}/check-in -- Cashier only
         (FR-TICKET-001 - FR-TICKET-003, FR-TICKET-005).
 
+        Takes no request body (UAT round 1): the Cashier no longer supplies a
+        per-item attended count here -- see `services.check_in_booking`'s own
+        docstring for why a mismatch can no longer reach this call at all.
+        409s if the booking is not `Pending`, or if it has an open mismatch
+        flag (`FlagMismatchView` below) still awaiting a Manager correction.
+
         Returns `CheckInResponseSerializer`, not the plain `BookingSerializer`
         -- the IFMIS-decision build prompt's Step 7: the response carries the
         extra fields the Cashier needs to key this transaction into IFMIS
@@ -679,18 +691,6 @@ paths:
         required: true
       tags:
       - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckInRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CheckInRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CheckInRequest'
-        required: true
       security:
       - TokenVersionAuth: []
       responses:
@@ -699,6 +699,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CheckInResponse'
+          description: ''
+  /api/v1/bookings/{id}/flag-mismatch/:
+    post:
+      operationId: flagBookingMismatch
+      description: |-
+        POST /bookings/{id}/flag-mismatch/ -- Cashier only (UAT round 1,
+        Document 02 Sec 2.5's policy update).
+
+        The other branch of the gate-side check-in decision, alongside
+        `CheckInView` above: called instead of check-in when the party at the
+        gate doesn't match what's booked. Puts the booking on the Museum
+        Manager's flagged-booking queue (`GET /bookings?flagged=true`) for
+        her to correct -- see `services.flag_booking_mismatch`'s own
+        docstring for why this never touches a quantity/category field
+        itself. 409s if the booking is not `Pending`.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlagMismatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FlagMismatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FlagMismatchRequest'
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
           description: ''
   /api/v1/bookings/{id}/ifmis-voucher/:
     patch:
@@ -742,8 +785,9 @@ paths:
     post:
       operationId: v1_bookings_items_create
       description: |-
-        POST /bookings/{id}/items -- Cashier only (walk-up addendum to the
-        ID-verification correction flow).
+        POST /bookings/{id}/items -- Museum Manager (or Platform Admin)
+        only (walk-up addendum to the ID-verification correction flow;
+        re-permissioned from the Cashier in UAT round 1).
 
         Adds a brand-new line for a category that wasn't on the booking at
         all -- e.g. a group booked as 3 Students shows up with 2 Adults never
@@ -1555,6 +1599,20 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        flaggedMismatchAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        flaggedMismatchByUserId:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        flaggedMismatchNote:
+          type: string
+          readOnly: true
+          nullable: true
         noticeSentAt:
           type: string
           format: date-time
@@ -1593,6 +1651,9 @@ components:
       - categoryCorrectedAt
       - checkoutUrl
       - createdAt
+      - flaggedMismatchAt
+      - flaggedMismatchByUserId
+      - flaggedMismatchNote
       - groupContactPhone
       - groupName
       - groupTin
@@ -1737,8 +1798,9 @@ components:
     BookingItemAdd:
       type: object
       description: |-
-        `BookingItemAddRequest` -- Cashier only (walk-up addendum to the
-        ID-verification correction flow). Adds a brand-new line for a
+        `BookingItemAddRequest` -- Museum Manager only (walk-up addendum
+        to the ID-verification correction flow, re-permissioned from the
+        Cashier in UAT round 1). Adds a brand-new line for a
         category that isn't already on the booking -- see
         `services.add_booking_item`'s own docstring for why this is a
         separate operation from `BookingCategoryCorrectionSerializer`, which
@@ -2114,45 +2176,6 @@ components:
       required:
       - status
       - tx_ref
-    CheckInItem:
-      type: object
-      description: |-
-        One `{itemId, attendedQuantity}` entry of a `CheckInRequest`'s
-        `items` list -- one per `BookingItem`/category on the booking being
-        checked in. `attendedQuantity` may be 0 (nobody in that category
-        showed up) but never negative; the upper bound (must not exceed that
-        item's own booked `quantity`, FR-TICKET-005) and "every item must be
-        covered exactly once" are cross-field business rules against the
-        booking being checked in, not field-level constraints this serializer
-        can express on its own -- both checks live in services.
-        check_in_booking.
-      properties:
-        itemId:
-          type: string
-          format: uuid
-        attendedQuantity:
-          type: integer
-          minimum: 0
-      required:
-      - attendedQuantity
-      - itemId
-    CheckInRequest:
-      type: object
-      description: |-
-        `CheckInRequest` (Document 04) -- FR-TICKET-001. Per-category, not
-        a single combined headcount: a booking can mix categories
-        (`BookingItem`), and recording only one blended total throws away
-        exactly the information `apps.refunds.services.
-        compute_refundable_amount` needs to refund a later no-show at that
-        category's own price rather than a blended average across every
-        category on the booking (FR-REFUND-002).
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/CheckInItem'
-      required:
-      - items
     CheckInResponse:
       type: object
       description: |-
@@ -2234,6 +2257,20 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        flaggedMismatchAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        flaggedMismatchByUserId:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        flaggedMismatchNote:
+          type: string
+          readOnly: true
+          nullable: true
         noticeSentAt:
           type: string
           format: date-time
@@ -2291,6 +2328,9 @@ components:
       - categoryCorrectedAt
       - checkoutUrl
       - createdAt
+      - flaggedMismatchAt
+      - flaggedMismatchByUserId
+      - flaggedMismatchNote
       - groupContactPhone
       - groupName
       - groupTin
@@ -2388,6 +2428,19 @@ components:
           type: string
       required:
       - detail
+    FlagMismatchRequest:
+      type: object
+      description: |-
+        `FlagMismatchRequest` -- Cashier only (UAT round 1). Optional
+        free-text `note` for the Museum Manager's benefit (e.g. "booked 3
+        Students, only 2 showed") -- no quantity or category is submitted
+        here at all; see `services.flag_booking_mismatch`'s own docstring
+        for why this is a signal, not a correction.
+      properties:
+        note:
+          type: string
+          nullable: true
+          maxLength: 1000
     ForgotPassword:
       type: object
       description: '`ForgotPasswordRequest` -- Staff only (FR-ACC-006).'
@@ -2549,15 +2602,16 @@ components:
     PatchedBookingCategoryCorrection:
       type: object
       description: |-
-        `BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
-        addendum to Document 02 Sec 2.2). `itemId` identifies which of the
+        `BookingCategoryCorrectionRequest` -- Museum Manager only
+        (ID-verification addendum to Document 02 Sec 2.2, re-permissioned
+        from the Cashier in UAT round 1). `itemId` identifies which of the
         booking's `BookingItem` line items to correct -- see
         `services.correct_booking_category`'s own docstring for why a
         mixed-category booking needs this instead of assuming there's only
         ever one category to correct.
 
         `categoryId`/`quantity` are each optional at this field-shape layer
-        -- a Cashier may be fixing just the category (bad ID), just the
+        -- the Manager may be fixing just the category (bad ID), just the
         headcount for that item (e.g. 3 tickets bought under it but only 2
         people showed up), or both together. Requiring at least one of them
         is a cross-field rule, not a per-field one, so it's enforced in
@@ -2575,8 +2629,9 @@ components:
     PatchedBookingCategoryCorrectionBatch:
       type: object
       description: |-
-        `BookingCategoryCorrectionBatchRequest` -- Cashier only
-        (ID-verification addendum, batch extension). Wraps a list of
+        `BookingCategoryCorrectionBatchRequest` -- Museum Manager only
+        (ID-verification addendum, batch extension; re-permissioned from
+        the Cashier in UAT round 1). Wraps a list of
         `BookingCorrectionOpSerializer` lines and applies all of them as one
         atomic correction with a single combined delta -- see
         `services.apply_booking_corrections`'s own docstring for the full

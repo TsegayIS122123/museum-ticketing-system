@@ -10,20 +10,23 @@ Per Design Spec Sec 3.2, `entrance` depends on `bookings` only -- there is
 no dependency the other way, and no dependency on `refunds`/`settlement`.
 Everything below reads/writes `apps.bookings.models.Booking` fields that
 are declared there (that model's own docstring: "populated by
-apps.entrance") but never writes to `refunds`/`settlement` state itself --
-FR-TICKET-002's "refund-eligible" outcome is communicated back to the
-caller as data (see `check_in_booking`'s return / the shortfall flagged in
-the audit metadata), and it is `apps.refunds`' job (once it exists) to act
-on a Visitor's subsequent refund request against a `Visited` booking with
-`attended_quantity < booked_quantity`. This module never calls into
-`apps.refunds` or `apps.payments` directly (Sec 3.2's dependency
-direction) -- payment is out of scope here entirely.
+apps.entrance") but never writes to `refunds`/`settlement` state itself.
+UAT round 1 moved headcount/category correction out of this module
+entirely and into `apps.bookings.services` (Museum-Manager-only,
+before check-in rather than after) -- see `check_in_booking`'s own
+docstring for the full policy change. This module now has two gate-side
+actions, both Cashier-only: check a matching booking in
+(`check_in_booking`), or flag a mismatched one for the Manager
+(`flag_booking_mismatch`) -- never fix a mismatch here itself. This
+module still never calls into `apps.refunds` or `apps.payments` directly
+(Sec 3.2's dependency direction) -- payment is out of scope here
+entirely.
 
 Authorization (Cashier-only) is the view layer's job (permission classes),
 mirroring `bookings/services.py`'s own division of labor -- this module
 assumes the caller has already been authorized. What this module *does*
-check is booking state (only a `Pending` booking is checkable-in) and the
-headcount invariant (FR-TICKET-005).
+check is booking state (only a `Pending` booking is checkable-in/
+flaggable) and, for check-in, that no mismatch flag is still open.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -74,90 +77,72 @@ def lookup_booking_by_reference(*, reference):
 
 
 @transaction.atomic
-def check_in_booking(*, booking, attended_items, actor):
+def check_in_booking(*, booking, actor):
     """Implements `POST /bookings/{id}/check-in`.
 
-    `attended_items` is a list of `{"item_id": <BookingItem.id>,
-    "attended_quantity": <int>}` -- one entry per `BookingItem` on this
-    booking, per category. This is per-category, not a single blended
-    headcount, precisely *because* `apps.refunds.services.
-    compute_refundable_amount` needs to know which category a
-    subsequent shortfall belonged to (FR-REFUND-002): recording only one
-    combined total (the old shape) throws that information away at the
-    moment it's actually available -- the Cashier, standing at the gate,
-    knows exactly which ticket-holders didn't show up.
+    UAT round 1 moved headcount/category correction from the Cashier to
+    the Museum Manager, and moved it from *after* check-in to *before*
+    it (Document 02 Sec 2.5's policy update): the Cashier's own job at
+    the gate is now narrow -- count the party against what's booked,
+    then either check in (matches) or call `flag_booking_mismatch`
+    below (doesn't) -- she has no means to fix a mismatch herself any
+    more. By the time this function is reachable at all, the booking's
+    numbers are already correct: either they matched from the start, or
+    a Manager has already corrected them (`apps.bookings.services.
+    correct_booking_category`/`apply_booking_corrections`/
+    `add_booking_item`) and any resulting top-up/refund has settled.
+
+    This is why there is no `attended_items` input any more, and no
+    per-category reconciliation to validate: every `BookingItem`'s
+    `attended_quantity` is simply set to its own `quantity`, because a
+    mismatch physically cannot reach this call. The previous version of
+    this function took a Cashier-supplied per-item attended count
+    precisely because *she* was the one reconciling headcount at the
+    gate ("the Cashier, standing at the gate, knows exactly which
+    ticket-holders didn't show up") -- that rationale belongs to the
+    Manager's pre-check-in correction step now, not to this function,
+    which just records the (already-correct) numbers.
 
     - FR-TICKET-001: records the actual number of visitors who showed up,
-      per category.
-    - FR-TICKET-002: the booking becomes `Visited`; if the booking-level
-      total is less than `booked_quantity` the shortfall is flagged as
-      refund-eligible in the response, but is never auto-refunded here --
-      that requires the Visitor/group leader to ask (`apps.refunds`).
-    - FR-TICKET-003: only a `Pending` booking is checkable-in -- once this
-      succeeds the booking is no longer `Pending` and the Visitor can no
-      longer cancel/reschedule it themselves (enforced independently by
-      `bookings.services._require_own_pending_booking`).
-    - FR-TICKET-005: no item's attended quantity may exceed that item's
-      own booked quantity -- the excess is rejected outright, not clamped
-      or partially admitted. Also enforced at the DB level by
-      `BookingItem`'s `booking_item_attended_within_quantity`
-      CheckConstraint (and, for the booking-level total,  `Booking`'s own
-      `booking_attended_within_booked`), so this is belt-and-braces, not
-      the only guard.
+      per category -- always equal to what was booked now, by
+      construction (see above).
+    - FR-TICKET-002: the booking becomes `Visited`.
+    - FR-TICKET-003: only a `Pending` booking is checkable-in -- once
+      this succeeds the booking is no longer `Pending` and the Visitor
+      can no longer cancel/reschedule it themselves.
+    - A booking with an open mismatch flag (`flagged_mismatch_at` set by
+      `flag_booking_mismatch` below, not yet cleared by a Manager
+      correction) is rejected with `Conflict` -- exactly the "does not
+      proceed until the Manager has fixed it" rule this whole round is
+      about.
+    - FR-TICKET-005 (no item's attended quantity may exceed its own
+      booked quantity) is still true here, unconditionally, since
+      attended is always set equal to booked -- the guard itself now
+      lives entirely in the Manager's correction functions, the only
+      places a quantity can still change; the DB-level CheckConstraints
+      (`booking_item_attended_within_quantity`,
+      `booking_attended_within_booked`) remain as belt-and-braces.
 
-    `Booking.attended_quantity` is still written, as the denormalized sum
-    across every item -- every existing consumer that only ever needed
-    the booking-level total (headcount displays, the "is this booking
-    checked in" flag, `apps.refunds`' no-shortfall-eligible check) keeps
-    working unchanged; it's simply derived from the per-item counts now
-    instead of being the only number captured.
+    `Booking.attended_quantity` is still written, as the denormalized
+    sum across every item, for every existing consumer that only ever
+    needed the booking-level total (headcount displays, the "is this
+    booking checked in" flag).
     """
     if booking.status != Booking.Status.PENDING:
         raise Conflict("This booking is not in a checkable-in state.")
 
-    items_by_id = {str(item.id): item for item in booking.items.all()}
-
-    provided_ids = [str(entry["item_id"]) for entry in attended_items]
-    if set(provided_ids) != set(items_by_id.keys()) or len(provided_ids) != len(
-        set(provided_ids)
-    ):
-        # Every category on this booking must be accounted for exactly
-        # once -- a missing item would silently leave its
-        # `attended_quantity` NULL (indistinguishable from "not checked
-        # in yet"), and a duplicate/unknown item id is simply malformed
-        # input. This is a 400, not a 409: the request itself is
-        # malformed, not merely conflicting with current state.
-        raise ValidationError(
-            {"items": "Must include exactly one entry for each of this booking's items."}
+    if booking.flagged_mismatch_at is not None:
+        raise Conflict(
+            "This booking has been flagged for a headcount/category mismatch and is "
+            "awaiting a Museum Manager correction before it can be checked in."
         )
 
-    for entry in attended_items:
-        item = items_by_id[str(entry["item_id"])]
-        attended = entry["attended_quantity"]
-        if attended < 0:
-            raise ValidationError({"items": "attendedQuantity must not be negative."})
-        if attended > item.quantity:
-            # FR-TICKET-005: extra visitors are not admitted under this
-            # category -- they must book/pay separately, exactly as any
-            # other new visitor would.
-            raise ValidationError(
-                {
-                    "items": (
-                        f"attendedQuantity for {item.category_name_en} exceeds the "
-                        "quantity booked for that category. Excess visitors must "
-                        "book separately, online or at the manual counter."
-                    )
-                }
-            )
+    items = list(booking.items.all())
+    for item in items:
+        item.attended_quantity = item.quantity
+    BookingItem.objects.bulk_update(items, ["attended_quantity"])
 
-    total_attended = 0
-    for entry in attended_items:
-        item = items_by_id[str(entry["item_id"])]
-        item.attended_quantity = entry["attended_quantity"]
-        total_attended += entry["attended_quantity"]
-    BookingItem.objects.bulk_update(items_by_id.values(), ["attended_quantity"])
-
-    booking.attended_quantity = total_attended
+    booking.attended_quantity = booking.booked_quantity
     booking.status = Booking.Status.VISITED
     booking.checked_in_at = timezone.now()
     booking.checked_in_by_user_id = actor
@@ -171,7 +156,6 @@ def check_in_booking(*, booking, attended_items, actor):
         ]
     )
 
-    shortfall = booking.booked_quantity - total_attended
     write_audit_log(
         actor_id=actor.id,
         action="booking.checked_in",
@@ -179,12 +163,53 @@ def check_in_booking(*, booking, attended_items, actor):
         target_id=booking.id,
         metadata={
             "booked_quantity": booking.booked_quantity,
-            "attended_quantity": total_attended,
-            "attended_items": {
-                str(entry["item_id"]): entry["attended_quantity"] for entry in attended_items
-            },
-            "refund_eligible": shortfall > 0,
+            "attended_quantity": booking.attended_quantity,
         },
+    )
+    return booking
+
+
+def flag_booking_mismatch(*, booking, actor, note=None):
+    """Implements the Cashier-only `POST /bookings/{id}/flag-mismatch/`
+    (UAT round 1 -- Document 02 Sec 2.5's policy update).
+
+    The other branch of the gate-side check-in decision, alongside
+    `check_in_booking` above: when the party at the gate doesn't match
+    what's booked, the Cashier has no means to fix it herself any more --
+    this is the signal she sends instead, putting the booking on the
+    Museum Manager's queue (`apps.bookings.services.
+    list_bookings_for_staff`'s `flagged=True` filter) for the Manager to
+    correct via `correct_booking_category`/`apply_booking_corrections`/
+    `add_booking_item`.
+
+    Deliberately leaves `status` (still `Pending`), and every quantity/
+    category field, completely untouched -- this is a signal, not a
+    correction: `note` is optional free-text context for the Manager
+    (e.g. "booked 3 Students, only 2 showed"), never a source of truth
+    for any number. Only ever on a `Pending` booking -- the same
+    before-check-in window every correction function requires.
+    """
+    if booking.status != Booking.Status.PENDING:
+        raise Conflict("Only a Pending booking can be flagged for a mismatch.")
+
+    booking.flagged_mismatch_at = timezone.now()
+    booking.flagged_mismatch_by_user_id = actor
+    booking.flagged_mismatch_note = note or None
+    booking.save(
+        update_fields=[
+            "flagged_mismatch_at",
+            "flagged_mismatch_by_user_id",
+            "flagged_mismatch_note",
+            "updated_at",
+        ]
+    )
+
+    write_audit_log(
+        actor_id=actor.id,
+        action="booking.flagged_mismatch",
+        target_type="booking",
+        target_id=booking.id,
+        metadata={"note": note} if note else {},
     )
     return booking
 

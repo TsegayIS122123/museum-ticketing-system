@@ -679,28 +679,16 @@ paths:
       tags:
       - Entrance
       operationId: checkInBooking
-      summary: Record actual attendance at the gate (FR-TICKET-001–003, Cashier only)
+      summary: Check in a matching booking at the gate (FR-TICKET-001–003, Cashier only). UAT round 1 — no request body; a mismatch is flagged instead (POST .../flag-mismatch), never corrected here.
       parameters:
       - $ref: '#/components/parameters/BookingId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckInRequest'
       responses:
         '200':
-          description: OK — attendedQuantity less than bookedQuantity marks the shortfall as refund-eligible, but does not auto-refund it (FR-TICKET-002)
+          description: OK — attendedQuantity is always set equal to bookedQuantity (UAT round 1 moved correction to the Museum Manager, before check-in)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Booking'
-        '400':
-          description: attendedQuantity exceeds bookedQuantity — the excess must book separately (FR-TICKET-005)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1362,7 +1350,7 @@ components:
         attendedQuantity:
           type: integer
           nullable: true
-          description: Set by the Cashier at check-in (FR-TICKET-001). May be less than bookedQuantity.
+          description: Set at check-in (FR-TICKET-001), always equal to bookedQuantity — UAT round 1 moved correction to the Museum Manager, before check-in, so a mismatch can no longer reach check-in at all.
         status:
           $ref: '#/components/schemas/BookingStatus'
         approvalStatus:
@@ -1423,14 +1411,6 @@ components:
         newVisitDate:
           type: string
           format: date
-    CheckInRequest:
-      type: object
-      required:
-      - attendedQuantity
-      properties:
-        attendedQuantity:
-          type: integer
-          minimum: 0
     ChapaWebhookPayload:
       type: object
       description: Chapa's own webhook payload shape; verified by signature before any state change (NFR-SEC-001).

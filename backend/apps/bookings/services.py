@@ -6,15 +6,22 @@ lives here. This is the layer that enforces the business rules from
 Document 02 and is unit-tested directly (NFR-MAINT-001) without spinning
 up HTTP requests.
 
-Authorization (Museum-Manager-only for date closure, Visitor-only for
-creation/cancel/reschedule, Cashier-only for a gate-side category
-correction) is the view layer's job (permission classes), not this
+Authorization (Museum-Manager-only for date closure and for the gate-side
+category/quantity correction below, Visitor-only for creation/cancel/
+reschedule) is the view layer's job (permission classes), not this
 module's -- services assume the caller has already been authorized,
 mirroring accounts/services.py and catalog/services.py's own division of
 labor. What this module *does* check is ownership (a Visitor can only
 cancel/reschedule their own booking) and state (only a `Pending` booking
 can be cancelled/rescheduled/category-corrected) -- those are business
 rules, not authorization.
+
+The gate-side correction below moved from the Cashier to the Museum
+Manager in UAT round 1 (Document 02 Sec 2.5's policy update): the
+Cashier's own role is now narrower -- check-in a matching booking, or
+flag a mismatched one for the Manager (`apps.entrance.services.
+flag_booking_mismatch`) -- and correction only ever happens *before*
+check-in, never after.
 
 Payment-gateway integration (Chapa checkout session creation) is
 deliberately absent here: per Design Spec Sec 3.2, `payments` depends on
@@ -32,6 +39,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Case, IntegerField, When
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
@@ -302,15 +310,43 @@ def create_booking(
 
 
 # --------------------------------------------------------------------------
-# Cashier-only category/quantity correction (ID-verification addendum)
+def _clear_flagged_mismatch_fields(booking, update_fields):
+    """Correcting a booking is what resolves a Cashier's mismatch flag
+    (`apps.entrance.services.flag_booking_mismatch`, UAT round 1) --
+    clearing it here, in every correction path below, is what makes the
+    Manager's flagged-booking queue a plain "still flagged" query rather
+    than needing a separate "reviewed" flag. Called unconditionally by
+    each correction function; a booking that was never flagged simply
+    has these fields cleared from `None` to `None` -- a no-op write, not
+    a special case to branch on."""
+    booking.flagged_mismatch_at = None
+    booking.flagged_mismatch_by_user_id = None
+    booking.flagged_mismatch_note = None
+    update_fields += [
+        "flagged_mismatch_at",
+        "flagged_mismatch_by_user_id",
+        "flagged_mismatch_note",
+    ]
+
+
+# Museum-Manager-only category/quantity correction (ID-verification
+# addendum; moved here from the Cashier in UAT round 1)
 # --------------------------------------------------------------------------
 
 
 def correct_booking_category(*, booking, item_id, actor, category_id=None, quantity=None):
-    """Implements the Cashier-only `PATCH /bookings/{id}/category-correction`
-    (ID-verification addendum to Document 02 Sec 2.2): at the gate, before
-    check-in, a Cashier discovers one of the booking's ticket-holders'
-    ID doesn't match the category they booked under (e.g. booked as
+    """Implements the Museum-Manager-only `PATCH
+    /bookings/{id}/category-correction` (ID-verification addendum to
+    Document 02 Sec 2.2, re-permissioned to the Manager in UAT round 1).
+
+    The Cashier's own job at the gate is now narrow: count the party
+    against what's booked, and either check in (matches) or flag the
+    booking for the Manager (`apps.entrance.services.
+    flag_booking_mismatch`) if it doesn't -- she has no means to fix it
+    herself any more. This function is what the Manager then calls,
+    reached either from her flagged-booking queue or on her own
+    initiative: she discovers one of the booking's ticket-holders' ID
+    doesn't match the category they booked under (e.g. booked as
     Student, no valid student ID), or that the party's actual headcount
     for one line item doesn't match what was booked (e.g. 3 tickets
     bought under one category but only 2 people show up under it, or the
@@ -319,11 +355,11 @@ def correct_booking_category(*, booking, item_id, actor, category_id=None, quant
     `item_id` identifies *which* `BookingItem` on this booking to correct
     -- a party booked under a single category still has exactly one item
     to pick from, but a mixed-category booking (e.g. one Adult plus two
-    Student tickets) can have the Cashier discover the problem is with
+    Student tickets) can have the Manager discover the problem is with
     just one of several ticket-holders, not the whole party.
 
     `category_id`/`quantity` are each optional, but at least one must be
-    given -- a Cashier may be fixing just the category (a bad ID), just
+    given -- the Manager may be fixing just the category (a bad ID), just
     the quantity (a headcount mismatch), or both at once (e.g. one of
     three "Student" ticket-holders lacks an ID *and* it turns out only
     one of the remaining two actually showed up under that ticket).
@@ -337,8 +373,8 @@ def correct_booking_category(*, booking, item_id, actor, category_id=None, quant
     in. Once `apps.entrance.services.check_in_booking` has run, the
     booking is `Visited` and this is no longer reachable, mirroring how
     `_require_own_pending_booking` above already gates cancel/reschedule
-    the same way (both are "before the Cashier has acted" windows, just
-    for different actors).
+    the same way (all "before check-in" windows, just for different
+    actors).
 
     This function only ever mutates the item's own category/quantity/
     price fields and the booking's aggregate total/headcount (and, for
@@ -470,6 +506,8 @@ def correct_booking_category(*, booking, item_id, actor, category_id=None, quant
     # are still corrected for accuracy at the gate and on any future
     # receipt).
 
+    _clear_flagged_mismatch_fields(booking, update_fields)
+
     booking.save(update_fields=update_fields)
 
     write_audit_log(
@@ -496,8 +534,8 @@ def correct_booking_category(*, booking, item_id, actor, category_id=None, quant
 
 
 # --------------------------------------------------------------------------
-# Cashier-only batched correction (fixes the "Too many reopening changes"
-# gate-workflow gap: multiple undercharging edits in one visit)
+# Museum-Manager-only batched correction (fixes the "Too many reopening
+# changes" gate-workflow gap: multiple undercharging edits in one visit)
 # --------------------------------------------------------------------------
 
 
@@ -506,16 +544,18 @@ def apply_booking_corrections(*, booking, actor, ops):
 
     Those two functions are each single-item and each independently flip
     a `Pending` booking to `AwaitingPayment` the moment their own change is
-    an undercharge -- fine for a lone correction, but it means a Cashier
+    an undercharge -- fine for a lone correction, but it means a Manager
     who needs to bump *two* categories' headcounts in the same visit (both
     undercharges) can't: the first PATCH reopens payment and the second
     then 409s against the `Pending`-only guard, because the booking isn't
-    Pending any more. `CategoryCorrectionPanel` (frontend) used to detect
-    this ahead of time and refuse to submit ("Too many reopening
-    changes...") rather than let the second call fail server-side.
+    Pending any more. `CategoryCorrectionPanel` (frontend, now on the
+    Manager's flagged-booking queue rather than the Cashier's gate screen)
+    used to detect this ahead of time and refuse to submit ("Too many
+    reopening changes...") rather than let the second call fail
+    server-side.
 
     This function is the real fix: it takes the *whole* batch of edits/
-    adds the Cashier queued up and applies them as ONE atomic operation
+    adds the Manager queued up and applies them as ONE atomic operation
     against the booking, so there's only ever one combined delta and the
     booking is reopened for payment (or refunded) at most once, no matter
     how many of the individual line changes are themselves undercharges.
@@ -757,6 +797,8 @@ def apply_booking_corrections(*, booking, actor, ops):
             booking.status = Booking.Status.AWAITING_PAYMENT
             update_fields.append("status")
 
+        _clear_flagged_mismatch_fields(booking, update_fields)
+
         booking.save(update_fields=update_fields)
 
         write_audit_log(
@@ -778,8 +820,9 @@ def apply_booking_corrections(*, booking, actor, ops):
 
 
 def add_booking_item(*, booking, actor, category_id, quantity):
-    """Implements the Cashier-only `POST /bookings/{id}/items` (walk-up
-    addendum to the ID-verification correction flow above).
+    """Implements the Museum-Manager-only `POST /bookings/{id}/items`
+    (walk-up addendum to the ID-verification correction flow above,
+    re-permissioned to the Manager in UAT round 1).
 
     `correct_booking_category` only ever touches an *existing*
     `BookingItem` -- it re-prices or re-sizes one already-booked category
@@ -787,7 +830,7 @@ def add_booking_item(*, booking, actor, category_id, quantity):
     Neither branch covers a walk-up party joining an already-paid booking
     under a category that wasn't on it at all (e.g. a group booked as 3
     Students shows up with 2 Adults in tow who were never part of the
-    original booking) -- there is no existing item for the Cashier to
+    original booking) -- there is no existing item for the Manager to
     "correct" into that category, and forcing this through
     `correct_booking_category` would either collide with
     `booking_item_unique_category_per_booking` (if another Adult line
@@ -857,16 +900,16 @@ def add_booking_item(*, booking, actor, category_id, quantity):
     # item is always additive.
     booking.status = Booking.Status.AWAITING_PAYMENT
 
-    booking.save(
-        update_fields=[
-            "total_amount_etb",
-            "booked_quantity",
-            "category_corrected_at",
-            "category_corrected_by_user_id",
-            "status",
-            "updated_at",
-        ]
-    )
+    update_fields = [
+        "total_amount_etb",
+        "booked_quantity",
+        "category_corrected_at",
+        "category_corrected_by_user_id",
+        "status",
+        "updated_at",
+    ]
+    _clear_flagged_mismatch_fields(booking, update_fields)
+    booking.save(update_fields=update_fields)
 
     write_audit_log(
         actor_id=actor.id,
@@ -1093,10 +1136,22 @@ def list_my_bookings(*, visitor, status=None):
     return queryset
 
 
-def list_bookings_for_staff(*, status=None, visit_date=None, booking_type=None):
+def list_bookings_for_staff(*, status=None, visit_date=None, booking_type=None, flagged=None):
     """Implements `GET /bookings` (Staff only). Visitors use
     `list_my_bookings` above -- this has no ownership scoping at all,
-    matching the single-venue, flat-role authorization model (Sec 4.3)."""
+    matching the single-venue, flat-role authorization model (Sec 4.3).
+
+    `flagged=True` is the Museum Manager's queue (UAT round 1,
+    `staff/attendance` in the frontend): every booking a Cashier has
+    flagged for a headcount/category mismatch and that hasn't been
+    corrected yet -- `Booking.flagged_mismatch_at IS NOT NULL` is the
+    entire definition of "on this queue" (see `_clear_flagged_mismatch_
+    fields`'s own docstring for why no separate "reviewed" flag is
+    needed). Ordered oldest-flagged-first, with today's visit date
+    prioritized ahead of every other date -- a party that's already at
+    the gate right now takes precedence over one flagged for a future
+    date, regardless of which was flagged first.
+    """
     # select_related("visitor") -- BookingSerializer reads
     # visitor.full_name/email/phone for every row in this list.
     # prefetch_related("items") -- BookingSerializer now reads the full
@@ -1108,4 +1163,12 @@ def list_bookings_for_staff(*, status=None, visit_date=None, booking_type=None):
         queryset = queryset.filter(visit_date=visit_date)
     if booking_type:
         queryset = queryset.filter(booking_type=booking_type)
+    if flagged:
+        queryset = queryset.filter(flagged_mismatch_at__isnull=False).annotate(
+            _not_today=Case(
+                When(visit_date=timezone.localdate(), then=0),
+                default=1,
+                output_field=IntegerField(),
+            )
+        ).order_by("_not_today", "flagged_mismatch_at")
     return queryset

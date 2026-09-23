@@ -69,11 +69,12 @@ class BookingItemSerializer(serializers.ModelSerializer):
     )
     # Per-category headcount recorded by `apps.entrance.services.
     # check_in_booking` -- null until this item's booking is checked in
-    # (see the field's own comment on the model). Feeds the Cashier's
-    # attendance-entry screen (pre-filled per category) and lets
-    # `apps.refunds.services.compute_refundable_amount` refund a
-    # shortfall at this item's own `unitPriceEtb` rather than a blended
-    # average across the booking's other categories (FR-REFUND-002).
+    # (see the field's own comment on the model). UAT round 1: always
+    # equal to `quantity` at the moment of check-in (a mismatch can no
+    # longer reach check-in at all -- see `check_in_booking`'s own
+    # docstring), so this is kept mainly for `apps.refunds.services.
+    # compute_refundable_amount`'s legacy per-category shortfall
+    # calculation (FR-REFUND-002) rather than as Cashier-entered data.
     attendedQuantity = serializers.IntegerField(
         source="attended_quantity", read_only=True, allow_null=True
     )
@@ -141,6 +142,20 @@ class BookingSerializer(serializers.ModelSerializer):
     categoryCorrectedAt = serializers.DateTimeField(
         source="category_corrected_at", read_only=True, allow_null=True
     )
+    # Set by a Cashier's flag-mismatch call (`apps.entrance.services.
+    # flag_booking_mismatch`, UAT round 1); cleared the moment a Museum
+    # Manager corrects the booking. Non-null here is exactly the
+    # definition of "on the Manager's queue" -- see that queue's own
+    # `GET /bookings?flagged=true` filter.
+    flaggedMismatchAt = serializers.DateTimeField(
+        source="flagged_mismatch_at", read_only=True, allow_null=True
+    )
+    flaggedMismatchByUserId = serializers.UUIDField(
+        source="flagged_mismatch_by_user_id_id", read_only=True, allow_null=True
+    )
+    flaggedMismatchNote = serializers.CharField(
+        source="flagged_mismatch_note", read_only=True, allow_null=True
+    )
     noticeSentAt = serializers.DateTimeField(source="notice_sent_at", read_only=True, allow_null=True)
     checkoutUrl = serializers.CharField(
         source="chapa_checkout_url", read_only=True, allow_null=True
@@ -182,6 +197,9 @@ class BookingSerializer(serializers.ModelSerializer):
             "status",
             "rescheduledCount",
             "categoryCorrectedAt",
+            "flaggedMismatchAt",
+            "flaggedMismatchByUserId",
+            "flaggedMismatchNote",
             "noticeSentAt",
             "checkoutUrl",
             "receiptUrl",
@@ -303,15 +321,16 @@ class BookingRescheduleSerializer(serializers.Serializer):
 
 
 class BookingCategoryCorrectionSerializer(serializers.Serializer):
-    """`BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
-    addendum to Document 02 Sec 2.2). `itemId` identifies which of the
+    """`BookingCategoryCorrectionRequest` -- Museum Manager only
+    (ID-verification addendum to Document 02 Sec 2.2, re-permissioned
+    from the Cashier in UAT round 1). `itemId` identifies which of the
     booking's `BookingItem` line items to correct -- see
     `services.correct_booking_category`'s own docstring for why a
     mixed-category booking needs this instead of assuming there's only
     ever one category to correct.
 
     `categoryId`/`quantity` are each optional at this field-shape layer
-    -- a Cashier may be fixing just the category (bad ID), just the
+    -- the Manager may be fixing just the category (bad ID), just the
     headcount for that item (e.g. 3 tickets bought under it but only 2
     people showed up), or both together. Requiring at least one of them
     is a cross-field rule, not a per-field one, so it's enforced in
@@ -364,8 +383,9 @@ class BookingCorrectionOpSerializer(serializers.Serializer):
 
 
 class BookingCategoryCorrectionBatchSerializer(serializers.Serializer):
-    """`BookingCategoryCorrectionBatchRequest` -- Cashier only
-    (ID-verification addendum, batch extension). Wraps a list of
+    """`BookingCategoryCorrectionBatchRequest` -- Museum Manager only
+    (ID-verification addendum, batch extension; re-permissioned from the
+    Cashier in UAT round 1). Wraps a list of
     `BookingCorrectionOpSerializer` lines and applies all of them as one
     atomic correction with a single combined delta -- see
     `services.apply_booking_corrections`'s own docstring for the full
@@ -387,8 +407,9 @@ class BookingCategoryCorrectionBatchSerializer(serializers.Serializer):
 
 
 class BookingItemAddSerializer(serializers.Serializer):
-    """`BookingItemAddRequest` -- Cashier only (walk-up addendum to the
-    ID-verification correction flow). Adds a brand-new line for a
+    """`BookingItemAddRequest` -- Museum Manager only (walk-up addendum
+    to the ID-verification correction flow, re-permissioned from the
+    Cashier in UAT round 1). Adds a brand-new line for a
     category that isn't already on the booking -- see
     `services.add_booking_item`'s own docstring for why this is a
     separate operation from `BookingCategoryCorrectionSerializer`, which

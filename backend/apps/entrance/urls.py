@@ -36,6 +36,11 @@ entrance_urlpatterns = [
         name="check-in",
     ),  # IsCashier
     path(
+        "bookings/<uuid:id>/flag-mismatch/",
+        views.FlagMismatchView.as_view(),
+        name="flag-mismatch",
+    ),  # IsCashier -- UAT round 1
+    path(
         "bookings/<uuid:id>/ifmis-voucher/",
         views.IfmisVoucherView.as_view(),
         name="ifmis-voucher",

@@ -202,6 +202,32 @@ class Booking(TimeStampedModel):
         related_name="+",
     )
 
+    # Set by a Cashier at the gate (UAT round 1) when the headcount/
+    # category doesn't match what's booked and she has no means to fix
+    # it herself -- correction moved to the Museum Manager, and now only
+    # ever happens *before* check-in. This is a signal, not a
+    # correction: no quantity/category field changes when this is set.
+    # `apps.entrance.services.check_in_booking` refuses outright while
+    # this is set (409); `apps.bookings.services.correct_booking_category`/
+    # `apply_booking_corrections`/`add_booking_item` all clear it as part
+    # of applying the Manager's fix (`_clear_flagged_mismatch_fields`) --
+    # that's what makes "flagged and this is still set" the entire
+    # definition of the Manager's queue, with no separate "reviewed"
+    # column needed. Only ever set on a `Pending` booking, same window as
+    # `category_corrected_at` above.
+    flagged_mismatch_at = models.DateTimeField(null=True, blank=True)
+    flagged_mismatch_by_user_id = models.ForeignKey(
+        "accounts.Account",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    # Optional free-text context the Cashier can leave for the Manager
+    # (e.g. "booked 3 Students, only 2 showed") -- never required, never
+    # itself a source of truth for any quantity/category (see above).
+    flagged_mismatch_note = models.TextField(null=True, blank=True)
+
     # Populated by apps.payments once it exists (Sec 4.2's sequence) --
     # null here until that app creates a Chapa checkout session.
     chapa_checkout_url = models.TextField(null=True, blank=True)

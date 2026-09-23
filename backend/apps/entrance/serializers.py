@@ -18,31 +18,16 @@ from apps.bookings.serializers import BookingSerializer
 from .services import amount_in_words_etb, compute_attended_amount_etb
 
 
-class CheckInItemSerializer(serializers.Serializer):
-    """One `{itemId, attendedQuantity}` entry of a `CheckInRequest`'s
-    `items` list -- one per `BookingItem`/category on the booking being
-    checked in. `attendedQuantity` may be 0 (nobody in that category
-    showed up) but never negative; the upper bound (must not exceed that
-    item's own booked `quantity`, FR-TICKET-005) and "every item must be
-    covered exactly once" are cross-field business rules against the
-    booking being checked in, not field-level constraints this serializer
-    can express on its own -- both checks live in services.
-    check_in_booking."""
+class FlagMismatchRequestSerializer(serializers.Serializer):
+    """`FlagMismatchRequest` -- Cashier only (UAT round 1). Optional
+    free-text `note` for the Museum Manager's benefit (e.g. "booked 3
+    Students, only 2 showed") -- no quantity or category is submitted
+    here at all; see `services.flag_booking_mismatch`'s own docstring
+    for why this is a signal, not a correction."""
 
-    itemId = serializers.UUIDField()
-    attendedQuantity = serializers.IntegerField(min_value=0)
-
-
-class CheckInRequestSerializer(serializers.Serializer):
-    """`CheckInRequest` (Document 04) -- FR-TICKET-001. Per-category, not
-    a single combined headcount: a booking can mix categories
-    (`BookingItem`), and recording only one blended total throws away
-    exactly the information `apps.refunds.services.
-    compute_refundable_amount` needs to refund a later no-show at that
-    category's own price rather than a blended average across every
-    category on the booking (FR-REFUND-002)."""
-
-    items = CheckInItemSerializer(many=True, allow_empty=False)
+    note = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=1000
+    )
 
 
 class CheckInResponseSerializer(BookingSerializer):

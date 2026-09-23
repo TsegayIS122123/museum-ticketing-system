@@ -15,7 +15,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.pagination import EnvelopeLimitOffsetPagination
-from apps.core.permissions import IsCashier, IsMuseumManager, IsStaff, IsVisitor
+from apps.core.permissions import (
+    IsMuseumManager,
+    IsMuseumManagerOrPlatformAdmin,
+    IsStaff,
+    IsVisitor,
+)
 
 from . import services
 from .models import Booking
@@ -102,6 +107,7 @@ class BookingListCreateView(generics.GenericAPIView):
             status=params.get("status"),
             visit_date=params.get("visitDate"),
             booking_type=params.get("bookingType"),
+            flagged=params.get("flagged") == "true",
         )
 
     @extend_schema(operation_id="listBookings", responses=BookingSerializer)
@@ -310,25 +316,30 @@ class BookingRescheduleView(APIView):
 
 
 class BookingCategoryCorrectionView(APIView):
-    """PATCH /bookings/{id}/category-correction -- Cashier only
-    (ID-verification addendum to Document 02 Sec 2.2).
+    """PATCH /bookings/{id}/category-correction -- Museum Manager (or
+    Platform Admin) only (ID-verification addendum to Document 02 Sec
+    2.2; re-permissioned from the Cashier in UAT round 1 -- see
+    `services.correct_booking_category`'s own docstring for the policy
+    change).
 
     Corrects a booking item's category and/or quantity -- category, when
     the visitor's ID at the gate doesn't match what they booked under;
     quantity, when the actual headcount for that item doesn't match what
     was booked (either direction) -- then either reopens payment for the
     difference (undercharge) or issues a refund for the difference
-    (overcharge). Lives here, not in `apps.entrance` -- even though it's
-    a gate-side, Cashier-only action -- because this is where that
-    composition with `apps.payments`/`apps.refunds` already happens
-    (`BookingListCreateView.post`/`BookingCancelView` above); `entrance`
-    depends on `bookings` only, with no dependency of its own on
-    `refunds`/`payments` (`apps.entrance.services`' own module
-    docstring), so putting this endpoint there would violate that
-    boundary. See `services.correct_booking_category`'s own docstring for
-    the full rationale."""
+    (overcharge). Reached from the Manager's flagged-booking queue
+    (`GET /bookings?flagged=true`) or on her own initiative. Lives here,
+    not in `apps.entrance` -- even though it's a gate-side action --
+    because this is where that composition with `apps.payments`/
+    `apps.refunds` already happens (`BookingListCreateView.post`/
+    `BookingCancelView` above); `entrance` depends on `bookings` only,
+    with no dependency of its own on `refunds`/`payments`
+    (`apps.entrance.services`' own module docstring), so putting this
+    endpoint there would violate that boundary. See
+    `services.correct_booking_category`'s own docstring for the full
+    rationale."""
 
-    permission_classes = [IsCashier]
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
 
     @extend_schema(
         request=BookingCategoryCorrectionSerializer, responses=BookingSerializer
@@ -359,22 +370,23 @@ class BookingCategoryCorrectionView(APIView):
 
 
 class BookingCategoryCorrectionBatchView(APIView):
-    """PATCH /bookings/{id}/category-corrections/batch -- Cashier only
-    (ID-verification addendum, batch extension).
+    """PATCH /bookings/{id}/category-corrections/batch -- Museum Manager
+    (or Platform Admin) only (ID-verification addendum, batch extension;
+    re-permissioned from the Cashier in UAT round 1).
 
     Batch sibling of `BookingCategoryCorrectionView`/`BookingItemAddView`
     above: accepts a list of the same per-item edit/add shapes those two
     single-item endpoints take, and applies the whole list as one atomic
     correction with a single combined delta. This is what actually fixes
     the gate-workflow gap those two single-item endpoints have -- a
-    Cashier who needs to bump two categories' headcounts in the same
+    Manager who needs to bump two categories' headcounts in the same
     visit (both undercharges) previously couldn't, because the first
     single-item PATCH flips the booking out of `Pending` and the second
     then 409s. See `services.apply_booking_corrections`'s own docstring
     for the full rationale, including how it orders category-moves within
     the batch and rejects an unresolvable two-way swap."""
 
-    permission_classes = [IsCashier]
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
 
     @extend_schema(
         request=BookingCategoryCorrectionBatchSerializer, responses=BookingSerializer
@@ -406,8 +418,9 @@ class BookingCategoryCorrectionBatchView(APIView):
 
 
 class BookingItemAddView(APIView):
-    """POST /bookings/{id}/items -- Cashier only (walk-up addendum to the
-    ID-verification correction flow).
+    """POST /bookings/{id}/items -- Museum Manager (or Platform Admin)
+    only (walk-up addendum to the ID-verification correction flow;
+    re-permissioned from the Cashier in UAT round 1).
 
     Adds a brand-new line for a category that wasn't on the booking at
     all -- e.g. a group booked as 3 Students shows up with 2 Adults never
@@ -418,7 +431,7 @@ class BookingItemAddView(APIView):
     line. Lives here for the same `apps.payments` composition/module-
     boundary reasons as `BookingCategoryCorrectionView` above."""
 
-    permission_classes = [IsCashier]
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
 
     @extend_schema(request=BookingItemAddSerializer, responses=BookingSerializer)
     def post(self, request, id):

@@ -14,6 +14,7 @@ import {
   Wallet,
   TrendingUp,
   Users,
+  Flag,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ const navByRole: Record<UserRole, NavItem[]> = {
   ],
   museum_manager: [
     { view: 'dashboard', labelKey: 'dashboard', labelFallback: 'Dashboard', icon: LayoutDashboard, path: '/staff/dashboard' },
+    { view: 'attendance', labelKey: 'nav_flagged_bookings', labelFallback: 'Flagged Bookings', icon: Flag, path: '/staff/attendance' },
     { view: 'categories', labelKey: 'nav_ticket_categories_pricing', labelFallback: 'Ticket Categories & Pricing', icon: Tag, path: '/staff/categories' },
     { view: 'availability', labelKey: 'nav_availability', labelFallback: 'Availability', icon: Calendar, path: '/staff/availability' },
     { view: 'refunds', labelKey: 'nav_refunds', labelFallback: 'Refunds', icon: Wallet, path: '/staff/refunds' },

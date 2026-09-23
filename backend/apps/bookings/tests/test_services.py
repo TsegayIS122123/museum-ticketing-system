@@ -1027,3 +1027,40 @@ def test_list_bookings_for_staff_filters_by_status():
 
     assert [b.id for b in matching] == [booking.id]
     assert list(non_matching) == []
+
+
+# --------------------------------------------------------------------------
+# list_bookings_for_staff(flagged=True) -- the Museum Manager's queue
+# (UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_list_bookings_for_staff_flagged_only_returns_flagged():
+    from apps.entrance.services import flag_booking_mismatch
+
+    flagged, _visitor = _make_pending_booking()
+    _unflagged, _visitor2 = _make_pending_booking()
+    cashier = _make_cashier()
+    flag_booking_mismatch(booking=flagged, actor=cashier)
+
+    results = services.list_bookings_for_staff(flagged=True)
+
+    assert [b.id for b in results] == [flagged.id]
+
+
+def test_list_bookings_for_staff_flagged_prioritizes_todays_visit_date():
+    from apps.entrance.services import flag_booking_mismatch
+
+    cashier = _make_cashier()
+    later, _v1 = _make_pending_booking()
+    flag_booking_mismatch(booking=later, actor=cashier)
+
+    today_booking, _v2 = _make_pending_booking()
+    Booking.objects.filter(id=today_booking.id).update(visit_date=date.today())
+    today_booking.refresh_from_db()
+    flag_booking_mismatch(booking=today_booking, actor=cashier)
+
+    results = list(services.list_bookings_for_staff(flagged=True))
+
+    assert results[0].id == today_booking.id
+    assert results[1].id == later.id

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, AlertTriangle, Check, Minus, Plus } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Check, Flag } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -9,9 +9,9 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toast } from '@/components/ui/Toast';
 import { TextField } from '@/components/ui/TextField';
-import { CategoryCorrectionPanel } from './CategoryCorrectionPanel';
 import {
   checkInBooking,
+  flagBookingMismatch,
   recordIfmisVoucherReference,
   type BookingLookupResponse,
   type CheckInResponse,
@@ -30,25 +30,18 @@ export function AttendanceEntryForm({
 }: AttendanceEntryFormProps) {
   const { t, locale } = useTranslation();
 
-  // Local, not derived from a prop on every render: a category
-  // correction (ID-verification addendum) changes this booking's
-  // category/price/status server-side, and the response from that PATCH
-  // is the fastest, most reliable way to reflect the new state -- no
-  // extra round trip back through `lookupBooking`.
+  // Local, not derived from a prop on every render: flagging a mismatch
+  // (UAT round 1) changes this booking's `flaggedMismatchAt` server-side,
+  // and the response from that POST is the fastest, most reliable way to
+  // reflect the new state -- no extra round trip back through
+  // `lookupBooking`.
   const [booking, setBooking] = useState<BookingLookupResponse>(initialBooking);
-  // One entry per `BookingItem`/category on this booking (e.g. 3 Adult +
-  // 4 Student booked together are two separate counters here) -- not a
-  // single combined total. Per-category attendance is what lets the
-  // backend later refund a shortfall at the actual no-show category's
-  // own price instead of a blended average across the booking
-  // (FR-REFUND-002).
-  const [attendedByItem, setAttendedByItem] = useState<Record<string, number>>(() =>
-    Object.fromEntries(booking.items.map((item) => [item.id, item.quantity]))
-  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showCorrection, setShowCorrection] = useState(false);
+  const [showFlagForm, setShowFlagForm] = useState(false);
+  const [flagNote, setFlagNote] = useState('');
+  const [isFlagging, setIsFlagging] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Just-completed check-in, still on screen so the Cashier can key the
@@ -64,7 +57,12 @@ export function AttendanceEntryForm({
   // `status === 'visited'` IS the check-in signal (services.
   // check_in_booking transitions the booking straight to Visited).
   const isCheckedIn = booking.status === 'visited';
-  const canCheckIn = booking.status === 'pending';
+  // UAT round 1: a still-Pending booking with an open mismatch flag is a
+  // third state, distinct from both "checkable" and "not checkable" --
+  // it's Pending (the plain status check would pass) but blocked until a
+  // Museum Manager corrects it, so it's checked separately.
+  const isFlagged = booking.flaggedMismatchAt !== null;
+  const canCheckIn = booking.status === 'pending' && !isFlagged;
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -82,23 +80,8 @@ export function AttendanceEntryForm({
     setError(null);
 
     try {
-      const attendedItems = booking.items.map((item) => ({
-        itemId: item.id,
-        attendedQuantity: attendedByItem[item.id] ?? 0,
-      }));
-      const result = await checkInBooking(booking.id, attendedItems);
-
-      const shortfall = booking.bookedQuantity - totalAttended;
-      let message = t('check_in_success') || 'Check-in successful!';
-      if (shortfall > 0) {
-        message = t('partial_check_in', {
-          attended: totalAttended,
-          total: booking.bookedQuantity,
-          shortfall,
-        });
-      }
-
-      setToast({ message, type: 'success' });
+      const result = await checkInBooking(booking.id);
+      setToast({ message: t('check_in_success') || 'Check-in successful!', type: 'success' });
       setJustCheckedIn(result);
     } catch (err: any) {
       setError(err.message || t('check_in_failed') || 'Failed to check in. Please try again.');
@@ -108,6 +91,30 @@ export function AttendanceEntryForm({
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleFlagMismatch = async () => {
+    setIsFlagging(true);
+    setError(null);
+
+    try {
+      const updated = await flagBookingMismatch(booking.id, flagNote.trim() || undefined);
+      setBooking(updated);
+      setShowFlagForm(false);
+      setToast({
+        message:
+          t('mismatch_flagged') ||
+          "Flagged for the Museum Manager. This booking can't be checked in until she corrects it.",
+        type: 'success',
+      });
+    } catch (err: any) {
+      setToast({
+        message: err.message || t('flag_mismatch_failed') || 'Failed to flag this booking.',
+        type: 'error',
+      });
+    } finally {
+      setIsFlagging(false);
     }
   };
 
@@ -133,17 +140,6 @@ export function AttendanceEntryForm({
       setIsSavingVoucher(false);
     }
   };
-
-  const handleItemQuantityChange = (itemId: string, max: number, value: number) => {
-    const clamped = Math.min(Math.max(value, 0), max);
-    setAttendedByItem((prev) => ({ ...prev, [itemId]: clamped }));
-  };
-
-  const totalAttended = booking.items.reduce(
-    (sum, item) => sum + (attendedByItem[item.id] ?? 0),
-    0
-  );
-  const shortfall = booking.bookedQuantity - totalAttended;
 
   // Just checked in this booking -- show the IFMIS voucher-prep step
   // (payer name / amount in figures & words / purpose string) and let
@@ -263,8 +259,43 @@ export function AttendanceEntryForm({
     );
   }
 
+  // UAT round 1: flagged and still awaiting a Museum Manager correction.
+  // Distinct from the "cannot check in" block below -- the booking IS
+  // still Pending, it's just blocked by the open flag, not by its own
+  // status.
+  if (isFlagged) {
+    return (
+      <Card className="bg-secondary-50 border-secondary-200">
+        <div className="text-center py-4">
+          <div className="text-3xl mb-2 flex justify-center text-secondary-600">
+            <Flag className="w-8 h-8" />
+          </div>
+          <div className="font-semibold text-secondary-800">
+            {t('flagged_for_manager') || 'Flagged for Manager Review'}
+          </div>
+          <div className="text-sm text-secondary-700 mt-1 max-w-sm mx-auto">
+            {t('flagged_for_manager_description') ||
+              "This booking can't be checked in until a Museum Manager corrects the mismatch."}
+          </div>
+          {booking.flaggedMismatchNote && (
+            <div className="text-xs text-secondary-600 mt-2 italic">
+              &ldquo;{booking.flaggedMismatchNote}&rdquo;
+            </div>
+          )}
+          <Button
+            variant="secondary"
+            className="mt-4"
+            onClick={onCancel}
+          >
+            {t('back') || 'Back'}
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
   // Not pending or already processed
-  if (!canCheckIn) {
+  if (booking.status !== 'pending') {
     return (
       <Card className="bg-yellow-50 border-yellow-200">
         <div className="text-center py-4">
@@ -319,29 +350,11 @@ export function AttendanceEntryForm({
       <Card>
         {/* Booking details */}
         <div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="font-mono tabular-nums text-sm font-semibold text-stone-600">
-                #{booking.reference}
-              </span>
-              <StatusBadge status={booking.status} />
-            </div>
-            {/* Category/headcount correction (ID-verification addendum)
-                -- a full bordered button in the header, not a small
-                underlined link buried next to the "Category" field
-                below, so it's actually noticeable at a busy gate
-                counter. Label spells out what it does rather than just
-                saying "Correct", which on its own doesn't say correct
-                *what*. */}
-            {canCheckIn && (
-              <button
-                type="button"
-                onClick={() => setShowCorrection((v) => !v)}
-                className="shrink-0 text-xs font-medium text-secondary-700 border border-secondary-300 bg-secondary-50 hover:bg-secondary-100 rounded-lg px-3 py-1.5 transition-colors"
-              >
-                {t('correct_category') || 'Fix category / headcount'}
-              </button>
-            )}
+          <div className="flex items-center gap-3">
+            <span className="font-mono tabular-nums text-sm font-semibold text-stone-600">
+              #{booking.reference}
+            </span>
+            <StatusBadge status={booking.status} />
           </div>
           <h3 className="text-xl font-semibold text-stone-900 mt-2">
             {displayName}
@@ -388,173 +401,72 @@ export function AttendanceEntryForm({
           </div>
         </div>
 
-        {showCorrection && (
-          <CategoryCorrectionPanel
-            booking={booking}
-            onCancel={() => setShowCorrection(false)}
-            onCorrected={(updated, partialError) => {
-              const previousTotal = Number(booking.totalAmountEtb);
-              setBooking(updated);
-              // A correction can change an item's category/quantity (or
-              // even remove/replace it) -- re-seed the per-category
-              // counters from the corrected booking rather than leaving
-              // stale counts keyed to quantities that no longer exist.
-              setAttendedByItem(
-                Object.fromEntries(updated.items.map((item) => [item.id, item.quantity]))
-              );
-              setShowCorrection(false);
-              if (partialError) {
-                // The panel already stopped after whatever succeeded --
-                // `updated` reflects that partial progress. Tell the
-                // Cashier plainly rather than showing a success toast for
-                // a batch that didn't fully go through.
-                setToast({ message: partialError, type: 'error' });
-                return;
-              }
-              // The panel can now apply several changes at once, so the
-              // net effect on the total (not just the final status) is
-              // what determines the right message -- a batch that nets to
-              // no change in price (e.g. a pure category swap between two
-              // equally-priced categories) shouldn't claim a refund.
-              const totalDelta = Number(updated.totalAmountEtb) - previousTotal;
-              if (updated.status === 'awaiting_payment') {
-                setToast({
-                  message:
-                    t('correction_needs_payment') ||
-                    "Category corrected. The visitor now owes the difference online before they can be checked in -- they'll see a Pay Now button on their own booking page.",
-                  type: 'success',
-                });
-              } else if (totalDelta < 0) {
-                setToast({
-                  message:
-                    t('correction_refund_issued') ||
-                    'Category corrected. The overcharge is being refunded automatically.',
-                  type: 'success',
-                });
-              } else {
-                setToast({
-                  message: t('correction_applied') || 'Category correction applied.',
-                  type: 'success',
-                });
-              }
-            }}
-          />
-        )}
-
-        {/* Attendance entry -- same card, hairline divider instead of a
-            second shadowed panel: this is one continuous task (look at
-            the booking, then record who showed up), not two. */}
+        {/* UAT round 1: no more per-category attendance counters here --
+            the Cashier's whole job at the gate is one decision: does the
+            party in front of her match what's booked? Check in if it
+            does; flag it for the Museum Manager if it doesn't. She has
+            no means to fix a mismatch herself any more (that moved to
+            the Manager's own queue). */}
         <div className="mt-4 pt-4 border-t border-stone-200">
-          <h4 className="text-sm font-semibold text-stone-900 uppercase tracking-wider mb-3">
-            {t('record_attendance') || 'Record Attendance'}
-          </h4>
-
-          <div className="space-y-4">
-            {/* One counter per category (`BookingItem`), not one combined
-                total -- e.g. 3 Adult + 4 Student booked together get two
-                separate steppers here, so the Cashier records exactly
-                which category's ticket-holders didn't show up. This is
-                what lets a later shortfall refund use that category's
-                own price instead of a blended average (FR-REFUND-002). */}
-            {booking.items.map((item) => {
-              const categoryLabel = locale === 'en' ? item.categoryNameEn : item.categoryNameAm;
-              const value = attendedByItem[item.id] ?? 0;
-              return (
-                <div key={item.id}>
-                  <label className="text-sm font-medium text-stone-700">
-                    {categoryLabel}
-                  </label>
-                  <div className="flex items-center gap-4 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleItemQuantityChange(item.id, item.quantity, value - 1)}
-                      disabled={value <= 0}
-                      className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      aria-label={`${t('decrease_attended_count') || 'Decrease attended count'} — ${categoryLabel}`}
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <input
-                      type="number"
-                      value={value}
-                      onChange={(e) => {
-                        const parsed = parseInt(e.target.value);
-                        handleItemQuantityChange(item.id, item.quantity, isNaN(parsed) ? 0 : parsed);
-                      }}
-                      min={0}
-                      max={item.quantity}
-                      className="w-20 text-center px-2 py-2 rounded-lg border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-secondary-500 text-lg font-semibold font-mono tabular-nums"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleItemQuantityChange(item.id, item.quantity, value + 1)}
-                      // Attendance can never exceed what was actually
-                      // booked for this line -- increasing the headcount
-                      // itself is a category correction (Fix Category &
-                      // Headcount above), not something check-in does.
-                      // handleItemQuantityChange already clamps to
-                      // item.quantity, but disabling the button once
-                      // that ceiling is reached makes it visibly a hard
-                      // stop rather than a no-op the Cashier has to
-                      // discover by tapping it.
-                      disabled={value >= item.quantity}
-                      className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      aria-label={`${t('increase_attended_count') || 'Increase attended count'} — ${categoryLabel}`}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm text-stone-500">
-                      / {item.quantity} {t('max') || 'max'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div className="text-sm text-stone-600 border-t border-stone-100 pt-3">
-              {t('total_attended') || 'Total attended'}:{' '}
-              <span className="font-semibold font-mono tabular-nums text-stone-900">
-                {totalAttended} / {booking.bookedQuantity}
-              </span>
-            </div>
-
-            {shortfall > 0 && (
-              <div className="p-3 bg-secondary-50 border border-secondary-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <span className="text-secondary-600"><AlertTriangle className="w-4 h-4" /></span>
-                  <div>
-                    <div className="text-sm font-medium text-secondary-800">
-                      {t('partial_attendance') || 'Partial Attendance'}
-                    </div>
-                    <div className="text-xs text-secondary-700">
-                      {shortfall} {t('visitors_did_not_attend') || 'visitors did not attend.'}
-                      {t('refund_available_on_request') || 'Refund available on request.'}
-                    </div>
-                  </div>
-                </div>
+          {showFlagForm ? (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-stone-900">
+                {t('flag_mismatch') || 'Flag for Manager Review'}
+              </h4>
+              <p className="text-xs text-stone-500">
+                {t('flag_mismatch_description') ||
+                  "Leave a quick note for the Manager (e.g. \"booked 3 Students, only 2 showed\"). No numbers change here -- she'll make the correction."}
+              </p>
+              <textarea
+                value={flagNote}
+                onChange={(e) => setFlagNote(e.target.value)}
+                placeholder={t('flag_note_placeholder') || 'Optional note...'}
+                rows={2}
+                maxLength={1000}
+                className="w-full text-sm rounded-lg border border-stone-300 p-2.5 focus:outline-none focus:ring-2 focus:ring-secondary-500"
+              />
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => setShowFlagForm(false)}
+                  disabled={isFlagging}
+                >
+                  {t('cancel') || 'Cancel'}
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1 bg-secondary-600 hover:bg-secondary-700"
+                  onClick={handleFlagMismatch}
+                  disabled={isFlagging}
+                >
+                  {isFlagging ? t('processing') || 'Processing...' : t('submit_flag') || 'Submit Flag'}
+                </Button>
               </div>
-            )}
-
-            <div className="flex gap-3 pt-2">
+            </div>
+          ) : (
+            <div className="flex gap-3">
               <Button
                 type="button"
                 variant="secondary"
                 className="flex-1"
-                onClick={onCancel}
-                disabled={isProcessing}
+                onClick={() => setShowFlagForm(true)}
+                disabled={isProcessing || !canCheckIn}
               >
-                {t('cancel') || 'Cancel'}
+                <Flag className="w-4 h-4 mr-1.5 inline" />
+                {t('flag_mismatch') || "Doesn't Match"}
               </Button>
               <Button
                 type="button"
                 className="flex-1 bg-brand-primary hover:bg-primary-700"
                 onClick={() => setShowConfirm(true)}
-                disabled={isProcessing || totalAttended === 0}
+                disabled={isProcessing || !canCheckIn}
               >
                 {isProcessing ? t('processing') || 'Processing...' : t('confirm_check_in') || 'Confirm Check-in'}
               </Button>
             </div>
-          </div>
+          )}
         </div>
       </Card>
 
@@ -563,11 +475,7 @@ export function AttendanceEntryForm({
         onClose={() => setShowConfirm(false)}
         onConfirm={handleCheckIn}
         title={t('confirm_check_in') || 'Confirm Check-in'}
-        message={
-          shortfall === 0
-            ? `${t('confirm_check_in_message') || 'Confirm check-in for'} ${displayName} (${totalAttended} ${t('visitors') || 'visitors'})?`
-            : `${t('partial_check_in_confirmation') || 'Only'} ${totalAttended} ${t('out_of') || 'out of'} ${booking.bookedQuantity} ${t('visitors_attending') || 'visitors are attending'}. ${shortfall} ${t('will_not_attend') || 'will not attend'}. ${t('refund_available_on_request_confirm') || 'A refund for the shortfall is available on request.'}`
-        }
+        message={`${t('confirm_check_in_message') || 'Confirm check-in for'} ${displayName} (${booking.bookedQuantity} ${t('visitors') || 'visitors'})?`}
         confirmLabel={t('confirm') || 'Confirm'}
       />
     </div>

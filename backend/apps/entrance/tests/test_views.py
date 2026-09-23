@@ -68,15 +68,6 @@ def _make_pending_booking(quantity=20):
     return booking
 
 
-def _items_payload(booking, attended_quantity):
-    """Builds the `{"items": [...]}` request body `POST .../check-in`
-    now expects -- one `{itemId, attendedQuantity}` entry per
-    `BookingItem`. Every booking in this test module has exactly one
-    item, so this just points the whole `attended_quantity` at it."""
-    (item,) = booking.items.all()
-    return {"items": [{"itemId": str(item.id), "attendedQuantity": attended_quantity}]}
-
-
 # --------------------------------------------------------------------------
 # GET /bookings/lookup
 # --------------------------------------------------------------------------
@@ -137,9 +128,7 @@ def test_check_in_requires_authentication():
     booking = _make_pending_booking()
     client = APIClient()
 
-    response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 20), format="json"
-    )
+    response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
 
     assert response.status_code == 401
 
@@ -149,9 +138,7 @@ def test_check_in_rejects_visitor():
     visitor = _make_visitor_account(email="other-visitor@example.com")
     client = _authed_client(visitor)
 
-    response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 20), format="json"
-    )
+    response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
 
     assert response.status_code == 403
 
@@ -161,13 +148,11 @@ def test_check_in_succeeds_for_cashier():
     cashier = _make_account(Account.Role.CASHIER)
     client = _authed_client(cashier)
 
-    response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 15), format="json"
-    )
+    response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
 
     assert response.status_code == 200
     assert response.data["status"] == "visited"
-    assert response.data["attendedQuantity"] == 15
+    assert response.data["attendedQuantity"] == 20
 
 
 def test_check_in_group_booking_includes_payer_name_and_tin_for_ifmis_voucher():
@@ -179,9 +164,7 @@ def test_check_in_group_booking_includes_payer_name_and_tin_for_ifmis_voucher():
     cashier = _make_account(Account.Role.CASHIER)
     client = _authed_client(cashier)
 
-    response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 25), format="json"
-    )
+    response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
 
     assert response.status_code == 200
     assert response.data["payerName"] == "BS School Group"
@@ -193,25 +176,11 @@ def test_check_in_individual_booking_has_no_payer_tin():
     cashier = _make_account(Account.Role.CASHIER)
     client = _authed_client(cashier)
 
-    response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 1), format="json"
-    )
+    response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
 
     assert response.status_code == 200
     assert response.data["payerName"] == booking.visitor.full_name
     assert response.data["payerTin"] is None
-
-
-def test_check_in_excess_attendance_is_bad_request():
-    booking = _make_pending_booking(quantity=20)
-    cashier = _make_account(Account.Role.CASHIER)
-    client = _authed_client(cashier)
-
-    response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 21), format="json"
-    )
-
-    assert response.status_code == 400
 
 
 def test_check_in_non_pending_booking_conflicts():
@@ -221,9 +190,20 @@ def test_check_in_non_pending_booking_conflicts():
     cashier = _make_account(Account.Role.CASHIER)
     client = _authed_client(cashier)
 
-    response = client.post(
-        f"/api/v1/bookings/{booking.id}/check-in/", _items_payload(booking, 20), format="json"
-    )
+    response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
+
+    assert response.status_code == 409
+
+
+def test_check_in_a_flagged_booking_conflicts():
+    """UAT round 1: an open mismatch flag blocks check-in outright, even
+    while the booking is still Pending."""
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+    client.post(f"/api/v1/bookings/{booking.id}/flag-mismatch/", {}, format="json")
+
+    response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
 
     assert response.status_code == 409
 
@@ -233,9 +213,83 @@ def test_check_in_unknown_booking_returns_404():
     client = _authed_client(cashier)
 
     response = client.post(
-        "/api/v1/bookings/00000000-0000-0000-0000-000000000000/check-in/",
-        {"attendedQuantity": 1},
-        format="json",
+        "/api/v1/bookings/00000000-0000-0000-0000-000000000000/check-in/"
     )
 
     assert response.status_code == 404
+
+
+# --------------------------------------------------------------------------
+# POST /bookings/{id}/flag-mismatch/ (UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_flag_mismatch_requires_authentication():
+    booking = _make_pending_booking()
+    client = APIClient()
+
+    response = client.post(f"/api/v1/bookings/{booking.id}/flag-mismatch/", {}, format="json")
+
+    assert response.status_code == 401
+
+
+def test_flag_mismatch_rejects_visitor():
+    booking = _make_pending_booking()
+    visitor = _make_visitor_account(email="other-visitor@example.com")
+    client = _authed_client(visitor)
+
+    response = client.post(f"/api/v1/bookings/{booking.id}/flag-mismatch/", {}, format="json")
+
+    assert response.status_code == 403
+
+
+def test_flag_mismatch_rejects_museum_manager():
+    """Flagging is the Cashier's job -- the Manager's job starts on the
+    other side of the queue (correcting), not here."""
+    booking = _make_pending_booking()
+    manager = _make_account(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
+    client = _authed_client(manager)
+
+    response = client.post(f"/api/v1/bookings/{booking.id}/flag-mismatch/", {}, format="json")
+
+    assert response.status_code == 403
+
+
+def test_flag_mismatch_succeeds_for_cashier():
+    booking = _make_pending_booking()
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+
+    response = client.post(
+        f"/api/v1/bookings/{booking.id}/flag-mismatch/",
+        {"note": "only 18 showed"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "pending"
+    assert response.data["flaggedMismatchAt"] is not None
+    assert response.data["flaggedMismatchNote"] == "only 18 showed"
+
+
+def test_flag_mismatch_note_is_optional():
+    booking = _make_pending_booking()
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+
+    response = client.post(f"/api/v1/bookings/{booking.id}/flag-mismatch/", {}, format="json")
+
+    assert response.status_code == 200
+    assert response.data["flaggedMismatchNote"] is None
+
+
+def test_flag_mismatch_non_pending_booking_conflicts():
+    booking = _make_pending_booking()
+    booking.status = Booking.Status.VISITED
+    booking.save(update_fields=["status"])
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+
+    response = client.post(f"/api/v1/bookings/{booking.id}/flag-mismatch/", {}, format="json")
+
+    assert response.status_code == 409

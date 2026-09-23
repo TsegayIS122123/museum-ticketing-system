@@ -333,23 +333,28 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * @description PATCH /bookings/{id}/category-correction -- Cashier only
-         *     (ID-verification addendum to Document 02 Sec 2.2).
+         * @description PATCH /bookings/{id}/category-correction -- Museum Manager (or
+         *     Platform Admin) only (ID-verification addendum to Document 02 Sec
+         *     2.2; re-permissioned from the Cashier in UAT round 1 -- see
+         *     `services.correct_booking_category`'s own docstring for the policy
+         *     change).
          *
          *     Corrects a booking item's category and/or quantity -- category, when
          *     the visitor's ID at the gate doesn't match what they booked under;
          *     quantity, when the actual headcount for that item doesn't match what
          *     was booked (either direction) -- then either reopens payment for the
          *     difference (undercharge) or issues a refund for the difference
-         *     (overcharge). Lives here, not in `apps.entrance` -- even though it's
-         *     a gate-side, Cashier-only action -- because this is where that
-         *     composition with `apps.payments`/`apps.refunds` already happens
-         *     (`BookingListCreateView.post`/`BookingCancelView` above); `entrance`
-         *     depends on `bookings` only, with no dependency of its own on
-         *     `refunds`/`payments` (`apps.entrance.services`' own module
-         *     docstring), so putting this endpoint there would violate that
-         *     boundary. See `services.correct_booking_category`'s own docstring for
-         *     the full rationale.
+         *     (overcharge). Reached from the Manager's flagged-booking queue
+         *     (`GET /bookings?flagged=true`) or on her own initiative. Lives here,
+         *     not in `apps.entrance` -- even though it's a gate-side action --
+         *     because this is where that composition with `apps.payments`/
+         *     `apps.refunds` already happens (`BookingListCreateView.post`/
+         *     `BookingCancelView` above); `entrance` depends on `bookings` only,
+         *     with no dependency of its own on `refunds`/`payments`
+         *     (`apps.entrance.services`' own module docstring), so putting this
+         *     endpoint there would violate that boundary. See
+         *     `services.correct_booking_category`'s own docstring for the full
+         *     rationale.
          */
         patch: operations["v1_bookings_category_correction_partial_update"];
         trace?: never;
@@ -367,6 +372,12 @@ export interface paths {
          * @description POST /bookings/{id}/check-in -- Cashier only
          *     (FR-TICKET-001 - FR-TICKET-003, FR-TICKET-005).
          *
+         *     Takes no request body (UAT round 1): the Cashier no longer supplies a
+         *     per-item attended count here -- see `services.check_in_booking`'s own
+         *     docstring for why a mismatch can no longer reach this call at all.
+         *     409s if the booking is not `Pending`, or if it has an open mismatch
+         *     flag (`FlagMismatchView` below) still awaiting a Manager correction.
+         *
          *     Returns `CheckInResponseSerializer`, not the plain `BookingSerializer`
          *     -- the IFMIS-decision build prompt's Step 7: the response carries the
          *     extra fields the Cashier needs to key this transaction into IFMIS
@@ -377,6 +388,34 @@ export interface paths {
          *     `Booking`.
          */
         post: operations["checkInBooking"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/flag-mismatch/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /bookings/{id}/flag-mismatch/ -- Cashier only (UAT round 1,
+         *     Document 02 Sec 2.5's policy update).
+         *
+         *     The other branch of the gate-side check-in decision, alongside
+         *     `CheckInView` above: called instead of check-in when the party at the
+         *     gate doesn't match what's booked. Puts the booking on the Museum
+         *     Manager's flagged-booking queue (`GET /bookings?flagged=true`) for
+         *     her to correct -- see `services.flag_booking_mismatch`'s own
+         *     docstring for why this never touches a quantity/category field
+         *     itself. 409s if the booking is not `Pending`.
+         */
+        post: operations["flagBookingMismatch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -869,6 +908,11 @@ export interface components {
             /** Format: date-time */
             readonly categoryCorrectedAt: string | null;
             /** Format: date-time */
+            readonly flaggedMismatchAt: string | null;
+            /** Format: uuid */
+            readonly flaggedMismatchByUserId: string | null;
+            readonly flaggedMismatchNote: string | null;
+            /** Format: date-time */
             readonly noticeSentAt: string | null;
             readonly checkoutUrl: string | null;
             readonly receiptUrl: string | null;
@@ -1112,34 +1156,6 @@ export interface components {
             currency?: string | null;
         };
         /**
-         * @description One `{itemId, attendedQuantity}` entry of a `CheckInRequest`'s
-         *     `items` list -- one per `BookingItem`/category on the booking being
-         *     checked in. `attendedQuantity` may be 0 (nobody in that category
-         *     showed up) but never negative; the upper bound (must not exceed that
-         *     item's own booked `quantity`, FR-TICKET-005) and "every item must be
-         *     covered exactly once" are cross-field business rules against the
-         *     booking being checked in, not field-level constraints this serializer
-         *     can express on its own -- both checks live in services.
-         *     check_in_booking.
-         */
-        CheckInItem: {
-            /** Format: uuid */
-            itemId: string;
-            attendedQuantity: number;
-        };
-        /**
-         * @description `CheckInRequest` (Document 04) -- FR-TICKET-001. Per-category, not
-         *     a single combined headcount: a booking can mix categories
-         *     (`BookingItem`), and recording only one blended total throws away
-         *     exactly the information `apps.refunds.services.
-         *     compute_refundable_amount` needs to refund a later no-show at that
-         *     category's own price rather than a blended average across every
-         *     category on the booking (FR-REFUND-002).
-         */
-        CheckInRequest: {
-            items: components["schemas"]["CheckInItem"][];
-        };
-        /**
          * @description `Booking`, extended with the IFMIS voucher-prep fields the Cashier
          *     needs to key into IFMIS herself at the moment of check-in (per the
          *     IFMIS decision: the platform never calls IFMIS -- it only gives her
@@ -1176,6 +1192,11 @@ export interface components {
             readonly rescheduledCount: number;
             /** Format: date-time */
             readonly categoryCorrectedAt: string | null;
+            /** Format: date-time */
+            readonly flaggedMismatchAt: string | null;
+            /** Format: uuid */
+            readonly flaggedMismatchByUserId: string | null;
+            readonly flaggedMismatchNote: string | null;
             /** Format: date-time */
             readonly noticeSentAt: string | null;
             readonly checkoutUrl: string | null;
@@ -1234,6 +1255,16 @@ export interface components {
         };
         DetailResponse: {
             detail: string;
+        };
+        /**
+         * @description `FlagMismatchRequest` -- Cashier only (UAT round 1). Optional
+         *     free-text `note` for the Museum Manager's benefit (e.g. "booked 3
+         *     Students, only 2 showed") -- no quantity or category is submitted
+         *     here at all; see `services.flag_booking_mismatch`'s own docstring
+         *     for why this is a signal, not a correction.
+         */
+        FlagMismatchRequest: {
+            note?: string | null;
         };
         /** @description `ForgotPasswordRequest` -- Staff only (FR-ACC-006). */
         ForgotPassword: {
@@ -1942,11 +1973,32 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInResponse"];
+                };
+            };
+        };
+    };
+    flagBookingMismatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["CheckInRequest"];
-                "application/x-www-form-urlencoded": components["schemas"]["CheckInRequest"];
-                "multipart/form-data": components["schemas"]["CheckInRequest"];
+                "application/json": components["schemas"]["FlagMismatchRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["FlagMismatchRequest"];
+                "multipart/form-data": components["schemas"]["FlagMismatchRequest"];
             };
         };
         responses: {
@@ -1955,7 +2007,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CheckInResponse"];
+                    "application/json": components["schemas"]["Booking"];
                 };
             };
         };

@@ -446,26 +446,9 @@ def _make_pending_booking_via_api(client, category, quantity=1):
     return booking
 
 
-def test_category_correction_rejected_for_non_cashier():
-    student = _make_category(name_en="Student", price_etb="50.00")
-    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
-    visitor_client = _authed_client(_make_visitor())
-    booking = _make_pending_booking_via_api(visitor_client, student)
-    item = booking.items.get()
-    manager_client = _authed_client(
-        _make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com")
-    )
-
-    response = manager_client.patch(
-        f"/api/v1/bookings/{booking.id}/category-correction/",
-        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
-        format="json",
-    )
-
-    assert response.status_code == 403
-
-
-def test_category_correction_undercharge_reopens_payment():
+def test_category_correction_rejected_for_cashier():
+    """UAT round 1: correction moved to the Museum Manager -- the
+    Cashier, who used to own this endpoint, is now rejected by it."""
     student = _make_category(name_en="Student", price_etb="50.00")
     non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
     visitor_client = _authed_client(_make_visitor())
@@ -474,6 +457,40 @@ def test_category_correction_undercharge_reopens_payment():
     cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
 
     response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
+        format="json",
+    )
+
+    assert response.status_code == 403
+
+
+def test_category_correction_allowed_for_platform_admin():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student)
+    item = booking.items.get()
+    admin_client = _authed_client(_make_staff(Account.Role.PLATFORM_ADMIN, email="admin@example.com"))
+
+    response = admin_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
+        format="json",
+    )
+
+    assert response.status_code == 200
+
+
+def test_category_correction_undercharge_reopens_payment():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student)
+    item = booking.items.get()
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
+
+    response = manager_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
         {"itemId": str(item.id), "categoryId": str(non_resident.id)},
         format="json",
@@ -496,9 +513,9 @@ def test_category_correction_overcharge_issues_refund_and_stays_pending():
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, non_resident)
     item = booking.items.get()
-    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
 
-    response = cashier_client.patch(
+    response = manager_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
         {"itemId": str(item.id), "categoryId": str(student.id)},
         format="json",
@@ -522,9 +539,9 @@ def test_category_correction_rejected_once_no_longer_pending():
     item = booking.items.get()
     booking.status = Booking.Status.VISITED
     booking.save(update_fields=["status"])
-    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
 
-    response = cashier_client.patch(
+    response = manager_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
         {"itemId": str(item.id), "categoryId": str(non_resident.id)},
         format="json",
@@ -543,9 +560,9 @@ def test_quantity_correction_undercharge_reopens_payment():
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, student, quantity=2)
     item = booking.items.get()
-    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
 
-    response = cashier_client.patch(
+    response = manager_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
         {"itemId": str(item.id), "quantity": 3},
         format="json",
@@ -566,9 +583,9 @@ def test_quantity_correction_overcharge_issues_refund_and_stays_pending():
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, student, quantity=3)
     item = booking.items.get()
-    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
 
-    response = cashier_client.patch(
+    response = manager_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
         {"itemId": str(item.id), "quantity": 2},
         format="json",
@@ -591,10 +608,10 @@ def test_quantity_and_category_correction_together_in_one_request():
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, student, quantity=3)
     item = booking.items.get()
-    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
 
     # old: 3 x 50 = 150.00; new: 1 x 100 = 100.00 -> overcharge, refund 50
-    response = cashier_client.patch(
+    response = manager_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
         {"itemId": str(item.id), "categoryId": str(adult.id), "quantity": 1},
         format="json",
@@ -615,15 +632,129 @@ def test_quantity_correction_rejects_missing_category_and_quantity():
     visitor_client = _authed_client(_make_visitor())
     booking = _make_pending_booking_via_api(visitor_client, student, quantity=2)
     item = booking.items.get()
-    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
 
-    response = cashier_client.patch(
+    response = manager_client.patch(
         f"/api/v1/bookings/{booking.id}/category-correction/",
         {"itemId": str(item.id)},
         format="json",
     )
 
     assert response.status_code == 400
+
+
+# --------------------------------------------------------------------------
+# PATCH /bookings/{id}/category-corrections/batch, POST /bookings/{id}/items
+# -- same Museum-Manager-only permission boundary as the single-item
+# correction endpoint above (UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_batch_correction_rejected_for_cashier():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student, quantity=2)
+    item = booking.items.get()
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    response = cashier_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-corrections/batch/",
+        {"ops": [{"itemId": str(item.id), "categoryId": str(non_resident.id)}]},
+        format="json",
+    )
+
+    assert response.status_code == 403
+
+
+def test_batch_correction_allowed_for_museum_manager():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student, quantity=2)
+    item = booking.items.get()
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
+
+    response = manager_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-corrections/batch/",
+        {"ops": [{"itemId": str(item.id), "categoryId": str(non_resident.id)}]},
+        format="json",
+    )
+
+    assert response.status_code == 200
+
+
+def test_item_add_rejected_for_cashier():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student)
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+
+    response = cashier_client.post(
+        f"/api/v1/bookings/{booking.id}/items/",
+        {"categoryId": str(adult.id), "quantity": 2},
+        format="json",
+    )
+
+    assert response.status_code == 403
+
+
+def test_item_add_allowed_for_museum_manager():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    adult = _make_category(name_en="Adult", price_etb="100.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student)
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager@example.com"))
+
+    response = manager_client.post(
+        f"/api/v1/bookings/{booking.id}/items/",
+        {"categoryId": str(adult.id), "quantity": 2},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "awaiting_payment"
+
+
+# --------------------------------------------------------------------------
+# GET /bookings?flagged=true -- the Museum Manager's queue (UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_flagged_queue_only_returns_flagged_bookings():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    visitor_client = _authed_client(_make_visitor())
+    flagged = _make_pending_booking_via_api(visitor_client, student)
+    _make_pending_booking_via_api(visitor_client, student)  # never flagged
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+    cashier_client.post(f"/api/v1/bookings/{flagged.id}/flag-mismatch/", {}, format="json")
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager2@example.com"))
+
+    response = manager_client.get("/api/v1/bookings/", {"flagged": "true"})
+
+    ids = [row["id"] for row in response.data["data"]]
+    assert ids == [str(flagged.id)]
+
+
+def test_booking_drops_off_flagged_queue_once_corrected():
+    student = _make_category(name_en="Student", price_etb="50.00")
+    non_resident = _make_category(name_en="Non-Resident", price_etb="500.00")
+    visitor_client = _authed_client(_make_visitor())
+    booking = _make_pending_booking_via_api(visitor_client, student)
+    item = booking.items.get()
+    cashier_client = _authed_client(_make_staff(Account.Role.CASHIER, email="cashier@example.com"))
+    cashier_client.post(f"/api/v1/bookings/{booking.id}/flag-mismatch/", {}, format="json")
+    manager_client = _authed_client(_make_staff(Account.Role.MUSEUM_MANAGER, email="manager2@example.com"))
+    manager_client.patch(
+        f"/api/v1/bookings/{booking.id}/category-correction/",
+        {"itemId": str(item.id), "categoryId": str(non_resident.id)},
+        format="json",
+    )
+
+    response = manager_client.get("/api/v1/bookings/", {"flagged": "true"})
+
+    assert response.data["data"] == []
 
 
 # --------------------------------------------------------------------------
