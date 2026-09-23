@@ -16,11 +16,36 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children, className }: ModalProps) {
   const { t } = useTranslation();
   const modalRef = useRef<HTMLDivElement>(null);
+  // Where focus was before the modal opened, so closing it (Esc, backdrop
+  // click, or the X button) gives focus back to whatever the person was
+  // on rather than dropping it to <body> -- the other half of "keyboard
+  // reachable": getting *out* has to be as clean as getting in.
+  const previouslyFocused = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open) {
         onClose();
+        return;
+      }
+      // Focus trap: Tab/Shift+Tab cycle only through this modal's own
+      // focusable elements, never escaping to the page behind the
+      // backdrop -- required for a real `role="dialog"` (WAI-ARIA
+      // Dialog pattern), not just decorative.
+      if (e.key === 'Tab' && open && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -30,8 +55,19 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
+      previouslyFocused.current = document.activeElement as HTMLElement | null;
+      // Move focus into the modal the moment it opens -- without this,
+      // focus stays on whatever triggered it, behind the backdrop, and
+      // the first Tab press would jump somewhere on the page the person
+      // can no longer see or interact with.
+      const firstFocusable = modalRef.current?.querySelector<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      (firstFocusable ?? modalRef.current)?.focus();
     } else {
       document.body.style.overflow = '';
+      previouslyFocused.current?.focus();
+      previouslyFocused.current = null;
     }
     return () => {
       document.body.style.overflow = '';
@@ -48,6 +84,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
       />
       <div
         ref={modalRef}
+        tabIndex={-1}
         className={cn(
           "relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto",
           className

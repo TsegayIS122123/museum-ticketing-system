@@ -1,6 +1,6 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import { PublicHeader } from '@/components/layout/PublicHeader';
+import { BookVisitCTA } from '@/components/landing/BookVisitCTA';
 import { SpecimenGallery } from '@/components/ui/SpecimenGallery';
 import { specimens } from '@/lib/gallery/specimens';
 import en from '@/lib/i18n/locales/en/common.json';
@@ -48,27 +48,24 @@ export default async function LandingPage({ params }: LandingPageProps) {
             <p className="mt-4 text-lg text-stone-600 max-w-2xl mx-auto lg:mx-0">
               {t.landing_subtitle}
             </p>
-            {/* Individuals booking their own tickets are the overwhelming
-                majority of visitors here, so the primary CTA takes them
-                straight into that flow with no interstitial choice to
-                make first. Group/school visits are a real but much rarer
-                path -- someone planning one is already looking for that
-                option, not stumbling onto it -- so it gets a quieter,
-                secondary link underneath instead of competing equally
-                inside the same button. */}
+            {/* UAT round 1: the previous primary button + quiet secondary
+                text link ("book_group_visit_link") wasn't being noticed
+                for the school/institution path -- replaced with one
+                button that opens a modal offering both paths as equal
+                choices. See BookVisitCTA's own comment for the full
+                rationale. */}
             <div className="mt-8 flex flex-col items-center gap-3 lg:items-start">
-              <Link
-                href={`/${lang}/book`}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-6 py-3 text-sm font-medium text-white transition-all hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-1"
-              >
-                {t.book_now}
-              </Link>
-              <Link
-                href={`/${lang}/group-visits/new`}
-                className="text-sm font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 transition-colors hover:text-brand-primary hover:decoration-brand-primary"
-              >
-                {t.book_group_visit_link}
-              </Link>
+              <BookVisitCTA
+                lang={lang}
+                labels={{
+                  bookNow: t.book_now,
+                  modalTitle: t.choose_visit_type,
+                  schoolTitle: t.school_visit_title,
+                  schoolDescription: t.school_visit_description,
+                  personalTitle: t.personal_visit_title,
+                  personalDescription: t.personal_visit_description,
+                }}
+              />
             </div>
           </div>
           {/* Real specimen photography stands in for the old illustrated
