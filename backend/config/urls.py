@@ -42,6 +42,9 @@ urlpatterns = [
     # resources (no `/catalog` segment) -- unlike most other apps below,
     # this app's urls.py is included at the `/api/v1/` root directly.
     path("api/v1/", include("apps.catalog.urls")),
+    # UAT round 1: `/institutions` is likewise top-level, same reasoning
+    # as `/categories` above.
+    path("api/v1/", include("apps.institutions.urls")),
     # Likewise `/availability` and `/availability/{date}` are top-level
     # (no `/bookings` segment) per Document 04.
     path("api/v1/", include(availability_urlpatterns)),

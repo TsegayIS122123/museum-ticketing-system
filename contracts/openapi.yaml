@@ -1089,6 +1089,38 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/institutions/:
+    get:
+      operationId: lookupInstitution
+      description: |-
+        GET /institutions/?tin={tin} (UAT round 1).
+
+        The group-visit-request form's autofill: as a booker types a TIN
+        that matches an institution already on file, this fills the name
+        field in for them rather than trusting a fresh, possibly
+        inconsistent spelling every time (see `services.resolve_institution`'s
+        own docstring for the write-time half of this).
+
+        Returns `{"institution": null}` for a TIN that isn't on file yet --
+        that's the expected, common case for a school's first-ever booking,
+        not an error -- rather than 404.
+      parameters:
+      - in: query
+        name: tin
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstitutionLookupResponse'
+          description: ''
   /api/v1/payments/webhooks/chapa/:
     post:
       operationId: handleChapaWebhook
@@ -1570,6 +1602,11 @@ components:
           type: string
           readOnly: true
           nullable: true
+        institutionId:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
         visitorName:
           type: string
           readOnly: true
@@ -1659,6 +1696,7 @@ components:
       - groupTin
       - id
       - ifmisVoucherReference
+      - institutionId
       - items
       - noticeSentAt
       - receiptUrl
@@ -2228,6 +2266,11 @@ components:
           type: string
           readOnly: true
           nullable: true
+        institutionId:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
         visitorName:
           type: string
           readOnly: true
@@ -2337,6 +2380,7 @@ components:
       - id
       - ifmisPurpose
       - ifmisVoucherReference
+      - institutionId
       - items
       - noticeSentAt
       - payerName
@@ -2460,6 +2504,38 @@ components:
       required:
       - group
       - individual
+    Institution:
+      type: object
+      description: |-
+        `Institution` (UAT round 1). Read-only -- there is no
+        create/update endpoint for this model at all; every write goes
+        through `services.resolve_institution`, called only from
+        `apps.bookings.services.create_booking`'s group path.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        nameAm:
+          type: string
+          readOnly: true
+          nullable: true
+        tin:
+          type: string
+          readOnly: true
+    InstitutionLookupResponse:
+      type: object
+      description: Response envelope for `GET /institutions/?tin=...`. `institution` is null for a TIN that isn't on file yet -- the expected, common case for a school's first-ever booking, not an error.
+      properties:
+        institution:
+          allOf:
+          - $ref: '#/components/schemas/Institution'
+          nullable: true
+      required:
+      - institution
     LanguagePreferenceEnum:
       enum:
       - en

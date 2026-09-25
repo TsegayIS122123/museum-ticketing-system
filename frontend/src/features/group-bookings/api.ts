@@ -61,6 +61,21 @@ export async function getGroupBookings(params?: {
   return apiClient.get<BookingListResponse>(`/bookings/?${query.toString()}`);
 }
 
+// GET /institutions/?tin={tin} -- UAT round 1. The autofill lookup
+// GroupVisitRequestForm calls once the TIN field reaches 10 digits;
+// `null` means the TIN isn't on file yet (a new institution's first
+// booking), not an error. See apps.institutions.services.
+// resolve_institution's own docstring for the write-time half of this
+// (which institution/typed-name pair actually gets saved, at submit).
+export async function lookupInstitutionByTin(
+  tin: string
+): Promise<{ id: string; name: string; nameAm: string | null; tin: string } | null> {
+  const response = await apiClient.get<{
+    institution: { id: string; name: string; nameAm: string | null; tin: string } | null;
+  }>(`/institutions/?tin=${encodeURIComponent(tin)}`);
+  return response.institution;
+}
+
 // GET /bookings/{id}/ -- the owning visitor or any Staff member.
 export async function getGroupBooking(id: string): Promise<Booking> {
   return apiClient.get<Booking>(`/bookings/${id}/`);

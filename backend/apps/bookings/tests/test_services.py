@@ -289,6 +289,73 @@ def test_create_group_booking_starts_awaiting_payment():
 
     assert booking.status == Booking.Status.AWAITING_PAYMENT
     assert booking.group_tin == "0000900158"
+    assert booking.institution is not None
+    assert booking.institution.tin == "0000900158"
+    assert booking.institution.name == "Example Primary School"
+
+
+def test_create_group_booking_reuses_existing_institution_for_same_tin():
+    """UAT round 1: two bookings from the same school, by different
+    visitors, resolve to one shared `Institution` row rather than two
+    independent ones -- see `apps.institutions.services.
+    resolve_institution`."""
+    category = _make_category()
+    first_visitor = _make_visitor(email="teacher1@example.com")
+    second_visitor = _make_visitor(email="teacher2@example.com")
+
+    first = services.create_booking(
+        visitor=first_visitor,
+        items=[{"category_id": category.id, "quantity": 20}],
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.GROUP,
+        group_name="Example Primary School",
+        group_tin="0000900158",
+    )
+    second = services.create_booking(
+        visitor=second_visitor,
+        items=[{"category_id": category.id, "quantity": 15}],
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.GROUP,
+        group_name="Example Primary School",
+        group_tin="0000900158",
+    )
+
+    assert first.institution_id == second.institution_id
+
+
+def test_create_group_booking_rejects_malformed_tin():
+    visitor = _make_visitor()
+    category = _make_category()
+
+    with pytest.raises(ValidationError):
+        services.create_booking(
+            visitor=visitor,
+            items=[{"category_id": category.id, "quantity": 30}],
+            visit_date=TOMORROW,
+            booking_type=Booking.BookingType.GROUP,
+            group_name="Example Primary School",
+            group_tin="123",
+        )
+
+
+def test_create_group_booking_normalizes_tin_with_separators():
+    """A booker typing "0000-900158" or "0000 900158" still resolves to
+    the same institution as the clean digit string -- see
+    `apps.institutions.services.normalize_tin`."""
+    visitor = _make_visitor()
+    category = _make_category()
+
+    booking = services.create_booking(
+        visitor=visitor,
+        items=[{"category_id": category.id, "quantity": 30}],
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.GROUP,
+        group_name="Example Primary School",
+        group_tin="0000-900158",
+    )
+
+    assert booking.group_tin == "0000900158"
+    assert booking.institution.tin == "0000900158"
 
 
 def test_create_group_booking_requires_group_name():

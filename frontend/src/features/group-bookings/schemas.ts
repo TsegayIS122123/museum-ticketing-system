@@ -36,14 +36,18 @@ export const groupVisitRequestSchema = z.object({
     .regex(/^(\+251|0)?[7-9][0-9]{8}$/, 'Please enter a valid Ethiopian phone number')
     .optional()
     .or(z.literal('')),
-  // Deliberately permissive rather than pinned to a fixed digit count --
-  // this only needs to catch an empty/obviously-wrong value before
-  // submit, not fully validate a real Ethiopian TIN's checksum, which
-  // this form has no authoritative source for.
+  // Section 8's TIN decision (UAT round 1): exactly 10 digits, leading
+  // zeros preserved -- matches `apps.institutions.services.
+  // normalize_tin` exactly, so a value this schema accepts is never
+  // rejected server-side for its format. Hyphens/spaces are stripped
+  // before the digit-count check (the same separators normalize_tin
+  // itself strips), so "0000-900158" and "0000 900158" both pass here
+  // exactly as they do on the backend -- this schema doesn't fully
+  // validate a real Ethiopian TIN's checksum, which this form has no
+  // authoritative source for, only its format.
   groupTin: z.string().trim()
-    .min(5, 'TIN looks too short')
-    .max(20, 'TIN looks too long')
-    .regex(/^\d+$/, 'TIN should contain digits only'),
+    .transform((value) => value.replace(/[\s-]/g, ''))
+    .refine((value) => /^\d{10}$/.test(value), 'TIN must be exactly 10 digits'),
 });
 
 export type GroupVisitRequestInput = z.infer<typeof groupVisitRequestSchema>;

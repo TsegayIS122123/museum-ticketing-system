@@ -11,7 +11,7 @@ import { TextField } from '@/components/ui/TextField';
 import { QuantityInput } from '@/components/ui/QuantityInput';
 import { Toast } from '@/components/ui/Toast';
 import { AvailabilityDatePicker } from '@/features/booking/components/AvailabilityDatePicker';
-import { submitGroupBooking } from '../api';
+import { submitGroupBooking, lookupInstitutionByTin } from '../api';
 import { groupVisitRequestSchema, type GroupVisitRequestInput } from '../schemas';
 import { getCategories } from '@/features/catalog/api';
 import type { Category } from '@/features/catalog/schemas';
@@ -52,6 +52,46 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
   const [groupName, setGroupName] = useState('');
   const [groupTin, setGroupTin] = useState('');
   const [groupContactPhone, setGroupContactPhone] = useState('');
+  // UAT round 1: autofills groupName from a matching Institution once
+  // the TIN field reaches 10 digits, so returning schools don't have to
+  // retype (and risk re-spelling) their own name every visit. Only ever
+  // overwrites a *blank* groupName, or one this same effect filled in
+  // last time (`autofilledName`) -- never something the booker typed
+  // themselves, matching-TIN or not; see `resolve_institution`'s own
+  // docstring for how a booker overriding the name is still handled at
+  // submit time (last-typed-name-wins, audit-logged), not blocked here.
+  const [autofilledName, setAutofilledName] = useState<string | null>(null);
+  const [institutionMatch, setInstitutionMatch] = useState<{ name: string } | null>(null);
+
+  useEffect(() => {
+    const cleaned = groupTin.replace(/[\s-]/g, '');
+    if (!/^\d{10}$/.test(cleaned)) {
+      setInstitutionMatch(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const institution = await lookupInstitutionByTin(cleaned);
+        if (cancelled) return;
+        setInstitutionMatch(institution ? { name: institution.name } : null);
+        if (institution && (groupName.trim() === '' || groupName === autofilledName)) {
+          setGroupName(institution.name);
+          setAutofilledName(institution.name);
+        }
+      } catch {
+        // A failed lookup just means no autofill this time -- the
+        // booker can still type the name themselves and submit
+        // normally; this is a convenience, not a required step.
+        if (!cancelled) setInstitutionMatch(null);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupTin]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -203,6 +243,12 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
             {t('group_tin_help') ||
               "Your institution's Tax Identification Number, needed for the finance office's receipt voucher."}
           </p>
+          {institutionMatch && (
+            <p className="text-xs text-secondary-700 -mt-3">
+              {(t('institution_matched') || 'Matched institution on file:') + ' '}
+              <span className="font-medium">{institutionMatch.name}</span>
+            </p>
+          )}
 
           <TextField
             id="groupContactPhone"

@@ -199,6 +199,7 @@
   "initiate_transfer_title": "ስሌት ማወራረድ ጀምር",
   "initiated": "ተጀምሯል",
   "initiated_at": "የተጀመረበት ጊዜ",
+  "institution_matched": "በመዝገብ ላይ የተገኘ ተቋም:",
   "invalid_credentials": "ትክክለኛ ያልሆነ ኢሜል ወይም የይለፍ ቃል።",
   "keep_current_category": "ምድቡን አትቀይር",
   "keyboard_wedge_hint": "የቁልፍ ሰሌዳ QR ስካነሮች በማጣቀሻ መስኩ ውስጥ ይሰራሉ",

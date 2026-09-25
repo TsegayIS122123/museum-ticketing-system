@@ -60,6 +60,7 @@ LOCAL_APPS = [
     "apps.core",
     "apps.accounts",
     "apps.catalog",
+    "apps.institutions",
     "apps.bookings",
     "apps.payments",
     "apps.entrance",

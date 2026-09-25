@@ -574,6 +574,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/institutions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /institutions/?tin={tin} (UAT round 1).
+         *
+         *     The group-visit-request form's autofill: as a booker types a TIN
+         *     that matches an institution already on file, this fills the name
+         *     field in for them rather than trusting a fresh, possibly
+         *     inconsistent spelling every time (see `services.resolve_institution`'s
+         *     own docstring for the write-time half of this).
+         *
+         *     Returns `{"institution": null}` for a TIN that isn't on file yet --
+         *     that's the expected, common case for a school's first-ever booking,
+         *     not an error -- rather than 404.
+         */
+        get: operations["lookupInstitution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/webhooks/chapa/": {
         parameters: {
             query?: never;
@@ -898,6 +927,8 @@ export interface components {
             readonly groupName: string | null;
             readonly groupContactPhone: string | null;
             readonly groupTin: string | null;
+            /** Format: uuid */
+            readonly institutionId: string | null;
             readonly visitorName: string;
             readonly visitorEmail: string;
             readonly visitorPhone: string | null;
@@ -1183,6 +1214,8 @@ export interface components {
             readonly groupName: string | null;
             readonly groupContactPhone: string | null;
             readonly groupTin: string | null;
+            /** Format: uuid */
+            readonly institutionId: string | null;
             readonly visitorName: string;
             readonly visitorEmail: string;
             readonly visitorPhone: string | null;
@@ -1274,6 +1307,23 @@ export interface components {
         GroupVsIndividualSplit: {
             group: number;
             individual: number;
+        };
+        /**
+         * @description `Institution` (UAT round 1). Read-only -- there is no
+         *     create/update endpoint for this model at all; every write goes
+         *     through `services.resolve_institution`, called only from
+         *     `apps.bookings.services.create_booking`'s group path.
+         */
+        Institution: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly name: string;
+            readonly nameAm: string | null;
+            readonly tin: string;
+        };
+        /** @description Response envelope for `GET /institutions/?tin=...`. `institution` is null for a TIN that isn't on file yet -- the expected, common case for a school's first-ever booking, not an error. */
+        InstitutionLookupResponse: {
+            institution: components["schemas"]["Institution"] | null;
         };
         /**
          * @description * `en` - English
@@ -1517,6 +1567,27 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    lookupInstitution: {
+        parameters: {
+            query: {
+                tin: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionLookupResponse"];
+                };
+            };
+        };
+    };
     v1_admin_staff_list: {
         parameters: {
             query?: {

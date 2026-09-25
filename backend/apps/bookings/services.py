@@ -46,6 +46,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from apps.catalog.models import Category
 from apps.core.exceptions import Conflict
 from apps.core.services import write_audit_log
+from apps.institutions import services as institutions_services
 
 from .models import Booking, BookingItem, DateAvailability
 
@@ -268,12 +269,26 @@ def create_booking(
     if not is_date_open_for_booking(visit_date):
         raise Conflict("This date is closed to online booking.")
 
+    is_group = booking_type == Booking.BookingType.GROUP
+    institution = None
+    if is_group:
+        # UAT round 1: resolves (or, the institution's first-ever
+        # booking, creates) the canonical `apps.institutions.Institution`
+        # this TIN belongs to -- see that function's own docstring for
+        # the name-mismatch/audit-log behavior. `normalize_tin` is also
+        # what makes `group_tin` on the row below the normalized form
+        # (exactly 10 digits) rather than whatever spacing/punctuation
+        # the booker happened to type.
+        institution = institutions_services.resolve_institution(
+            name=group_name, tin=group_tin, actor=visitor
+        )
+        group_tin = institution.tin
+
     booked_quantity = sum(item["quantity"] for item in resolved_items)
     total_amount_etb = sum(
         item["category"].price_etb * item["quantity"] for item in resolved_items
     )
 
-    is_group = booking_type == Booking.BookingType.GROUP
     booking = Booking.objects.create(
         visitor=visitor,
         visit_date=visit_date,
@@ -281,6 +296,7 @@ def create_booking(
         group_name=group_name if is_group else None,
         group_contact_phone=group_contact_phone,
         group_tin=group_tin if is_group else None,
+        institution=institution,
         booked_quantity=booked_quantity,
         total_amount_etb=total_amount_etb,
         status=Booking.Status.AWAITING_PAYMENT,

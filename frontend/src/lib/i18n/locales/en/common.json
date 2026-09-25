@@ -199,6 +199,7 @@
   "initiate_transfer_title": "Initiate Settlement Reconciliation",
   "initiated": "Initiated",
   "initiated_at": "Initiated At",
+  "institution_matched": "Matched institution on file:",
   "invalid_credentials": "Invalid email or password.",
   "keep_current_category": "Don't change category",
   "keyboard_wedge_hint": "Keyboard wedge QR scanners work in the reference field",

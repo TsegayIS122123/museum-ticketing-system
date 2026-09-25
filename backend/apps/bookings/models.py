@@ -2,7 +2,7 @@
 bookings -- models
 
 Implements FR modules: FR-BOOK
-Depends on: catalog, accounts
+Depends on: catalog, accounts, institutions
 
 Per Design Spec Sec 3.1: data shape and database-level constraints ONLY.
 No business logic here -- see services.py.
@@ -145,6 +145,26 @@ class Booking(TimeStampedModel):
     # integer, since a real TIN can carry leading zeros that a numeric
     # type would silently drop.
     group_tin = models.TextField(null=True, blank=True)
+
+    # UAT round 1: the `apps.institutions.Institution` this group booking
+    # resolved to (`apps.institutions.services.resolve_institution`),
+    # keyed by the normalized `group_tin` above -- same
+    # snapshot-plus-canonical-record relationship as `BookingItem.
+    # category` to `apps.catalog.Category`: `group_name`/`group_tin`
+    # above remain this booking's own immutable manifest snapshot, this
+    # FK is only a pointer to the canonical, cross-booking institution
+    # record. Null for an individual booking (same shape as `group_name`/
+    # `group_tin`) and, historically, for a group booking made before
+    # this app existed and never backfilled (see `apps.institutions`'s
+    # `0002_backfill_from_bookings` data migration) -- so code reading
+    # this field must not assume every group booking has one.
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="bookings",
+    )
 
     # Sum of every BookingItem.quantity on this booking.
     booked_quantity = models.PositiveIntegerField()

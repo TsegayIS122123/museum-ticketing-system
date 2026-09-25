@@ -122,6 +122,15 @@ class BookingSerializer(serializers.ModelSerializer):
     # `Booking.group_tin`'s own field comment for why (IFMIS
     # reconciliation).
     groupTin = serializers.CharField(source="group_tin", read_only=True, allow_null=True)
+    # UAT round 1: the canonical `apps.institutions.Institution` this
+    # booking resolved to at creation time -- see `Booking.institution`'s
+    # own field comment for why this is a pointer, not the source of
+    # truth for this booking's own `groupName`/`groupTin` snapshot above.
+    # Null for an individual booking, and for a historical group booking
+    # never backfilled.
+    institutionId = serializers.UUIDField(
+        source="institution_id", read_only=True, allow_null=True
+    )
     # The booking's own Visitor -- who a Cashier reaches for an
     # *individual* booking (a group booking instead has its own
     # `groupContactPhone` above, since the requester need not be one of
@@ -189,7 +198,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "groupName",
             "groupContactPhone",
             "groupTin",
-            "visitorName",
+            "institutionId",
             "visitorEmail",
             "visitorPhone",
             "bookedQuantity",
