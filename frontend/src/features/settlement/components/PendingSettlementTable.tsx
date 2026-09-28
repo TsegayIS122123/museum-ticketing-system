@@ -1,6 +1,6 @@
 'use client';
 
-import { RefreshCw, Landmark, ArrowRight } from 'lucide-react';
+import { RefreshCw, Landmark, ArrowRight, AlertTriangle } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -87,6 +87,19 @@ export function PendingSettlementTable({
       {amount <= 0 && (
         <p className="mt-3 text-sm text-secondary-700">
           {t('nothing_to_settle') || 'Nothing to settle right now.'}
+        </p>
+      )}
+      {/* Phase 6, UAT round 1: "must appear in her end-of-shift settlement
+          view so nothing is left pending". Only a count (no itemized
+          list -- there's no backend endpoint for that, see this file's
+          own top-of-file comment) -- she can re-open any one of her
+          recent check-ins' voucher panels (GET /bookings/{id}/
+          ifmis-voucher/) to finish it. */}
+      {!!balance && balance.pendingVoucherCount > 0 && (
+        <p className="mt-3 flex items-center gap-1.5 text-sm text-amber-700">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          {t('pending_voucher_count_warning', { count: String(balance.pendingVoucherCount) }) ||
+            `${balance.pendingVoucherCount} checked-in booking(s) still need their IFMIS voucher recorded.`}
         </p>
       )}
     </Card>

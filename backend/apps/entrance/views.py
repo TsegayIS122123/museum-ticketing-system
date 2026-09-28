@@ -9,10 +9,10 @@ Staff -- gate operations are a Cashier-specific responsibility, unlike
 `apps.bookings`' `IsStaff`-gated listing endpoint. UAT round 1 narrowed
 what the Cashier can do at the gate: she can look up a booking, check in
 a matching one, flag a mismatched one for the Museum Manager
-(`FlagMismatchView`, new below), or record an IFMIS voucher reference --
-she can no longer correct a mismatch herself (that moved to
-`apps.bookings.views.BookingCategoryCorrectionView` and friends,
-Manager-only).
+(`FlagMismatchView`, new below), or view/record an IFMIS voucher
+(`IfmisVoucherView`, Phase 6) -- she can no longer correct a mismatch
+herself (that moved to `apps.bookings.views.
+BookingCategoryCorrectionView` and friends, Manager-only).
 """
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -29,6 +29,7 @@ from .serializers import (
     CheckInResponseSerializer,
     FlagMismatchRequestSerializer,
     IfmisVoucherUpdateSerializer,
+    VoucherSerializer,
 )
 
 
@@ -126,17 +127,34 @@ class FlagMismatchView(APIView):
 
 
 class IfmisVoucherView(APIView):
-    """PATCH /bookings/{id}/ifmis-voucher/ -- Cashier only, and only the
-    same Cashier who checked this booking in (services.py enforces this,
-    not this permission class -- it needs the specific booking, not just
-    the role). Called after she's actually entered the transaction into
-    IFMIS and gotten the real voucher reference back; settable once.
+    """/bookings/{id}/ifmis-voucher/ -- Cashier only.
+
+    GET re-opens the voucher panel (Phase 6 Step 6) for a Cashier who
+    navigated away before recording the Document No/Ref No -- the exact
+    same `voucher` shape `CheckInResponseSerializer` returns right after
+    check-in, computed by the same `services.compute_voucher`, so the
+    panel looks identical whichever way it was reached. Available on any
+    checked-in booking (not restricted to the checking-in Cashier --
+    unlike the write below, simply viewing the voucher again isn't the
+    sensitive half of this).
+
+    PATCH is restricted to the same Cashier who checked this booking in
+    (services.py enforces this, not this permission class -- it needs
+    the specific booking, not just the role). Called after she's
+    actually entered the transaction into IFMIS and gotten the real
+    Document No *and* Ref No back; settable once, both together
+    (Section 8's default).
     """
 
     permission_classes = [IsCashier]
 
+    @extend_schema(operation_id="getIfmisVoucher", responses=VoucherSerializer)
+    def get(self, request, id):
+        booking = get_object_or_404(Booking.objects.select_related("visitor"), id=id)
+        return Response(VoucherSerializer(services.compute_voucher(booking=booking)).data)
+
     @extend_schema(
-        operation_id="recordIfmisVoucherReference",
+        operation_id="recordIfmisVoucher",
         request=IfmisVoucherUpdateSerializer,
         responses=BookingSerializer,
     )
@@ -144,9 +162,10 @@ class IfmisVoucherView(APIView):
         booking = get_object_or_404(Booking.objects.select_related("visitor"), id=id)
         serializer = IfmisVoucherUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        booking = services.record_ifmis_voucher_reference(
+        booking = services.record_ifmis_voucher(
             booking=booking,
             actor=request.user,
-            voucher_reference=serializer.validated_data["voucherReference"],
+            document_no=serializer.validated_data["documentNo"],
+            ref_no=serializer.validated_data["refNo"],
         )
         return Response(BookingSerializer(booking).data)

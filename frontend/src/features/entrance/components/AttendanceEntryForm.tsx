@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, AlertTriangle, Check, Flag } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Check, Flag, Copy } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -12,10 +12,48 @@ import { TextField } from '@/components/ui/TextField';
 import {
   checkInBooking,
   flagBookingMismatch,
-  recordIfmisVoucherReference,
+  getIfmisVoucher,
+  recordIfmisVoucher,
   type BookingLookupResponse,
   type CheckInResponse,
+  type Voucher,
 } from '../api';
+
+// A row of the voucher panel below: the label/value IFMIS itself prints,
+// plus a one-tap copy so the Cashier doesn't have to hand-retype every
+// field into IFMIS's own form. Purely a UI convenience -- copying
+// (or not) never changes what gets recorded; only the Document No/Ref
+// No inputs further down do that.
+function VoucherRow({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard access can fail (permissions, non-HTTPS context) --
+      // the value is still visible on screen to copy by hand, so this
+      // is a silent no-op, not an error worth interrupting her with.
+    }
+  };
+  return (
+    <div className="flex justify-between items-start gap-2">
+      <span className="text-stone-500 flex-shrink-0">{label}</span>
+      <span className="flex items-center gap-1.5 text-right">
+        <span className="font-medium text-stone-900">{value}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="text-stone-400 hover:text-stone-700 flex-shrink-0"
+          aria-label="Copy"
+        >
+          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+      </span>
+    </div>
+  );
+}
 
 interface AttendanceEntryFormProps {
   booking: BookingLookupResponse;
@@ -49,9 +87,15 @@ export function AttendanceEntryForm({
   // Booking) is what carries payerName/amountFigures/amountWords/
   // ifmisPurpose.
   const [justCheckedIn, setJustCheckedIn] = useState<CheckInResponse | null>(null);
-  const [voucherReference, setVoucherReference] = useState('');
+  // Section 8's default (Phase 6, UAT round 1): both identifiers are
+  // required together -- there's no real intermediate state where she
+  // legitimately has one but not the other, so one pair of inputs, one
+  // save, not two independent ones.
+  const [documentNo, setDocumentNo] = useState('');
+  const [refNo, setRefNo] = useState('');
   const [isSavingVoucher, setIsSavingVoucher] = useState(false);
-  const [voucherSaved, setVoucherSaved] = useState(false);
+  const [voucherSaveError, setVoucherSaveError] = useState<string | null>(null);
+  const [isReopeningVoucher, setIsReopeningVoucher] = useState(false);
 
   // There is no separate "checked in" flag or timestamp in the API --
   // `status === 'visited'` IS the check-in signal (services.
@@ -119,25 +163,52 @@ export function AttendanceEntryForm({
   };
 
   const handleSaveVoucher = async () => {
-    if (!justCheckedIn || !voucherReference.trim()) return;
+    if (!justCheckedIn || !documentNo.trim() || !refNo.trim()) return;
     setIsSavingVoucher(true);
+    setVoucherSaveError(null);
     try {
-      await recordIfmisVoucherReference(justCheckedIn.id, voucherReference.trim());
-      setVoucherSaved(true);
+      const updated = await recordIfmisVoucher(justCheckedIn.id, documentNo.trim(), refNo.trim());
+      // Reuses CheckInResponse's own shape (voucher included) rather than
+      // re-fetching -- `recordIfmisVoucher` actually returns the plain
+      // `Booking`, not `CheckInResponse`, so only the fields both share
+      // are safe to trust here; `justCheckedIn` is left as-is except for
+      // what changed (the two identifiers), matching the "trust the
+      // response, don't round-trip" pattern used elsewhere in this file.
+      setJustCheckedIn({
+        ...justCheckedIn,
+        ifmisDocumentNo: updated.ifmisDocumentNo,
+        ifmisVoucherReference: updated.ifmisVoucherReference,
+        voucher: { ...justCheckedIn.voucher, documentNo: documentNo.trim(), refNo: refNo.trim(), voucherRecorded: true },
+      });
       setToast({
-        message: t('voucher_saved') || 'IFMIS voucher reference saved.',
+        message: t('voucher_saved') || 'IFMIS voucher recorded.',
         type: 'success',
       });
-      setTimeout(() => {
-        onCheckInComplete();
-      }, 1200);
+    } catch (err: any) {
+      const message = err.message || t('voucher_save_failed') || 'Failed to save the IFMIS voucher.';
+      setVoucherSaveError(message);
+      setToast({ message, type: 'error' });
+    } finally {
+      setIsSavingVoucher(false);
+    }
+  };
+
+  const handleReopenVoucher = async () => {
+    setIsReopeningVoucher(true);
+    try {
+      const voucher = await getIfmisVoucher(booking.id);
+      // Synthesizes the same shape checkInBooking's own response has
+      // (Booking fields + voucher) so the identical panel above renders
+      // -- `booking` here already has every Booking field this screen
+      // needs (Phase 6 Step 6: "re-open the panel later").
+      setJustCheckedIn({ ...booking, voucher } as CheckInResponse);
     } catch (err: any) {
       setToast({
-        message: err.message || t('voucher_save_failed') || 'Failed to save voucher reference.',
+        message: err.message || t('failed_to_load') || 'Failed to load the voucher.',
         type: 'error',
       });
     } finally {
-      setIsSavingVoucher(false);
+      setIsReopeningVoucher(false);
     }
   };
 
@@ -146,6 +217,7 @@ export function AttendanceEntryForm({
   // the Cashier key the real Document No/Ref No back in once she's
   // entered the transaction into IFMIS herself.
   if (justCheckedIn) {
+    const voucher = justCheckedIn.voucher;
     return (
       <Card className="bg-green-50 border-green-200">
         <div className="py-2">
@@ -158,50 +230,54 @@ export function AttendanceEntryForm({
             </div>
           </div>
 
+          {/* Every field laid out top-to-bottom exactly as the real
+              printed IFMIS voucher does (Phase 6, UAT round 1) -- this
+              is what she copies into IFMIS's own form; Document No/Ref
+              No (below) is what she copies back the other way, once
+              IFMIS gives them to her. */}
           <div className="bg-white rounded-lg border border-green-200 p-4 text-sm space-y-2">
             <div className="font-semibold text-stone-900 mb-2">
               {t('ifmis_voucher_details') || 'IFMIS Voucher Details'}
             </div>
-            <div className="flex justify-between">
-              <span className="text-stone-500">{t('payer_name') || 'Payer Name'}</span>
-              <span className="font-medium text-stone-900">{justCheckedIn.payerName}</span>
-            </div>
-            {/* Only present for a group booking's institutional payer --
-                CheckInResponseSerializer.get_payerTin returns null for
-                an individual Visitor, who has no TIN on file. */}
-            {justCheckedIn.payerTin && (
-              <div className="flex justify-between">
-                <span className="text-stone-500">{t('payer_tin') || 'Payer TIN'}</span>
-                <span className="font-medium text-stone-900">{justCheckedIn.payerTin}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-stone-500">{t('amount_figures') || 'Amount (figures)'}</span>
-              <span className="font-medium font-mono tabular-nums text-stone-900">ETB {justCheckedIn.amountFigures}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-stone-500">{t('amount_words') || 'Amount (words)'}</span>
-              <span className="font-medium text-stone-900 text-right">{justCheckedIn.amountWords}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-stone-500">{t('purpose') || 'Purpose'}</span>
-              <span className="font-medium text-stone-900 text-right">{justCheckedIn.ifmisPurpose}</span>
-            </div>
+            <VoucherRow
+              label={t('name_of_public_body') || 'Name of Public Body'}
+              value={voucher.nameOfPublicBody}
+            />
+            <VoucherRow label={t('received_from') || 'Received From'} value={voucher.receivedFrom} />
+            <VoucherRow label={t('amount_figures') || 'Amount (figures)'} value={voucher.amountFigures} />
+            <VoucherRow label={t('amount_words') || 'Amount (words)'} value={voucher.amountWords} />
+            <VoucherRow label={t('purpose') || 'Purpose'} value={voucher.purpose} />
           </div>
 
-          {voucherSaved ? (
+          {voucher.voucherRecorded ? (
             <div className="mt-4 text-center text-sm font-medium text-green-800 flex items-center justify-center gap-1.5">
-              <Check className="w-4 h-4" /> {t('voucher_saved') || 'IFMIS voucher reference saved.'}
+              <Check className="w-4 h-4" /> {t('voucher_saved') || 'IFMIS voucher recorded.'}
             </div>
           ) : (
             <div className="mt-4 space-y-3">
-              <TextField
-                id="voucher-reference"
-                label={t('ifmis_voucher_reference') || 'IFMIS Document No / Ref No'}
-                placeholder={t('ifmis_voucher_placeholder') || 'Enter the reference IFMIS gave you'}
-                value={voucherReference}
-                onChange={(e) => setVoucherReference(e.target.value)}
-              />
+              <p className="text-xs text-stone-500">
+                {t('ifmis_voucher_prompt') ||
+                  'Once IFMIS gives you back the Document No and Ref No for this transaction, enter both here.'}
+              </p>
+              {voucherSaveError && (
+                <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                  {voucherSaveError}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <TextField
+                  id="ifmis-document-no"
+                  label={t('ifmis_document_no') || 'Document No'}
+                  value={documentNo}
+                  onChange={(e) => setDocumentNo(e.target.value)}
+                />
+                <TextField
+                  id="ifmis-ref-no"
+                  label={t('ifmis_ref_no') || 'Ref No'}
+                  value={refNo}
+                  onChange={(e) => setRefNo(e.target.value)}
+                />
+              </div>
               <div className="flex gap-3">
                 <Button
                   variant="secondary"
@@ -214,9 +290,9 @@ export function AttendanceEntryForm({
                 <Button
                   className="flex-1 bg-brand-primary hover:bg-primary-700"
                   onClick={handleSaveVoucher}
-                  disabled={isSavingVoucher || !voucherReference.trim()}
+                  disabled={isSavingVoucher || !documentNo.trim() || !refNo.trim()}
                 >
-                  {isSavingVoucher ? t('saving') || 'Saving...' : t('save_voucher') || 'Save Reference'}
+                  {isSavingVoucher ? t('saving') || 'Saving...' : t('save_voucher') || 'Save Voucher'}
                 </Button>
               </div>
             </div>
@@ -247,13 +323,26 @@ export function AttendanceEntryForm({
               {t('attended')}: {booking.attendedQuantity} / {booking.bookedQuantity}
             </div>
           )}
-          <Button
-            variant="secondary"
-            className="mt-4"
-            onClick={onCancel}
-          >
-            {t('back') || 'Back'}
-          </Button>
+          {/* Phase 6 Step 6: a Cashier who navigated away before
+              recording the Document No/Ref No needs a way back in --
+              this re-fetches the exact same voucher panel shown right
+              after check-in. Shown regardless of whether the voucher's
+              already recorded, since re-opening it to double-check a
+              value already keyed in is legitimate too. */}
+          <div className="mt-4 flex gap-3 justify-center">
+            <Button variant="secondary" onClick={onCancel}>
+              {t('back') || 'Back'}
+            </Button>
+            <Button
+              className="bg-brand-primary hover:bg-primary-700"
+              onClick={handleReopenVoucher}
+              disabled={isReopeningVoucher}
+            >
+              {isReopeningVoucher
+                ? t('loading') || 'Loading...'
+                : t('view_ifmis_voucher') || 'View IFMIS Voucher'}
+            </Button>
+          </div>
         </div>
       </Card>
     );

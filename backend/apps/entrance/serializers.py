@@ -8,14 +8,12 @@ serializers below build on `apps.bookings.serializers.BookingSerializer`
 since it's the same underlying `Booking` row either way.
 """
 
-from decimal import Decimal
-
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.bookings.serializers import BookingSerializer
 
-from .services import amount_in_words_etb, compute_attended_amount_etb
+from .services import compute_voucher
 
 
 class FlagMismatchRequestSerializer(serializers.Serializer):
@@ -30,88 +28,75 @@ class FlagMismatchRequestSerializer(serializers.Serializer):
     )
 
 
+class VoucherSerializer(serializers.Serializer):
+    """The `voucher` object (Phase 6, UAT round 1): every field the
+    Cashier needs to key into IFMIS, laid out in the same top-to-bottom
+    order as the real printed voucher, computed entirely by
+    `services.compute_voucher` -- this serializer only shapes the field
+    names/types of what that function already returns, matching it key
+    for key (a plain dict, no `source=` remapping needed). Shared,
+    unmodified, by both `CheckInResponseSerializer` below (right after
+    check-in) and `GET /bookings/{id}/ifmis-voucher/` (re-opening the
+    panel later) -- one shape, one place it's computed, so the two
+    callers can never drift apart.
+
+    `documentNo`/`refNo` are null until `record_ifmis_voucher` sets them;
+    `voucherRecorded` is true only once *both* are set (Section 8's "both
+    required together" default) and is what should drive a "voucher
+    pending" badge, rather than the frontend checking either field
+    individually.
+    """
+
+    documentNo = serializers.CharField(allow_null=True)
+    date = serializers.CharField(allow_null=True)
+    refNo = serializers.CharField(allow_null=True)
+    nameOfPublicBody = serializers.CharField()
+    receivedFrom = serializers.CharField()
+    amountFigures = serializers.CharField()
+    amountWords = serializers.CharField()
+    purpose = serializers.CharField()
+    voucherRecorded = serializers.BooleanField()
+
+
 class CheckInResponseSerializer(BookingSerializer):
-    """`Booking`, extended with the IFMIS voucher-prep fields the Cashier
+    """`Booking`, extended with the single `voucher` object the Cashier
     needs to key into IFMIS herself at the moment of check-in (per the
     IFMIS decision: the platform never calls IFMIS -- it only gives her
     the exact fields to copy in). Returned only from `POST
     /bookings/{id}/check-in` -- every other endpoint that returns a
-    `Booking` keeps using the plain `BookingSerializer`, since these
-    fields are only meaningful right after a check-in action, not as a
-    general-purpose booking field.
+    `Booking` keeps using the plain `BookingSerializer`, since this field
+    is only meaningful right after a check-in action, not as a
+    general-purpose booking field. Before Phase 6, this exposed five
+    separate flat fields (`payerName`/`payerTin`/`amountFigures`/
+    `amountWords`/`ifmisPurpose`); those are now all inside `voucher`,
+    alongside the Document No/Ref No/date/public-body-name fields the
+    real sample voucher turned out to need too.
 
-    All four are derived read-only from data `check_in_booking` already
+    `voucher` is derived read-only from data `check_in_booking` already
     wrote (or that existed on the booking beforehand) -- nothing here
     changes `check_in_booking`'s own business logic or return value; this
     serializer only shapes its *response* representation.
     """
 
-    payerName = serializers.SerializerMethodField()
-    # The institutional payer's TIN, for the same "Received From: <name>,
-    # Tin <tin>" line on the IFMIS receipt voucher that `payerName` feeds
-    # -- present only for a group booking (`booking_group_requires_group_
-    # tin` guarantees it's set whenever `payerName` resolves to a group
-    # name), null for an individual one, same shape as `payerName` itself.
-    payerTin = serializers.SerializerMethodField()
-    # NOT `total_amount_etb` (the full booked amount) -- a partial
-    # no-show means part of that money is refund-eligible, not museum
-    # revenue, so both figures below reflect only what was actually
-    # attended. See `compute_attended_amount_etb`'s docstring.
-    amountFigures = serializers.SerializerMethodField()
-    amountWords = serializers.SerializerMethodField()
-    ifmisPurpose = serializers.SerializerMethodField()
+    voucher = serializers.SerializerMethodField()
 
     class Meta(BookingSerializer.Meta):
-        fields = BookingSerializer.Meta.fields + [
-            "payerName",
-            "payerTin",
-            "amountFigures",
-            "amountWords",
-            "ifmisPurpose",
-        ]
+        fields = BookingSerializer.Meta.fields + ["voucher"]
         read_only_fields = fields
 
-    @extend_schema_field(serializers.CharField)
-    def get_payerName(self, booking) -> str:
-        """The name the Cashier writes on the IFMIS voucher: the group's
-        name for a group booking (FR-BOOK-003's `group_name`, always
-        present there per `booking_group_requires_group_name`), otherwise
-        the individual Visitor's own name."""
-        if booking.booking_type == booking.BookingType.GROUP:
-            return booking.group_name
-        return booking.visitor.full_name
-
-    @extend_schema_field(serializers.CharField)
-    def get_payerTin(self, booking) -> str | None:
-        """The institutional payer's TIN, alongside `payerName` above, on
-        a group booking's IFMIS voucher (e.g. "Received From: BS School
-        Group, Tin 0000900158"). `None` for an individual booking -- an
-        individual Visitor isn't issued a TIN by this system."""
-        if booking.booking_type == booking.BookingType.GROUP:
-            return booking.group_tin
-        return None
-
-    @extend_schema_field(serializers.DecimalField(max_digits=12, decimal_places=2))
-    def get_amountFigures(self, booking) -> Decimal:
-        return compute_attended_amount_etb(booking=booking)
-
-    @extend_schema_field(serializers.CharField)
-    def get_amountWords(self, booking) -> str:
-        return amount_in_words_etb(compute_attended_amount_etb(booking=booking))
-
-    @extend_schema_field(serializers.CharField)
-    def get_ifmisPurpose(self, booking) -> str:
-        return (
-            f"Museum entry — booking {booking.reference}, "
-            f"{booking.attended_quantity} visitor(s)"
-        )
+    @extend_schema_field(VoucherSerializer)
+    def get_voucher(self, booking) -> dict:
+        return compute_voucher(booking=booking)
 
 
 class IfmisVoucherUpdateSerializer(serializers.Serializer):
-    """`IfmisVoucherUpdateRequest` -- Cashier only. The real Document
-    No/Ref No she gets back from IFMIS after keying the check-in
-    transaction in herself (services.record_ifmis_voucher_reference
-    enforces the "same cashier, settable once" rule -- this serializer is
-    field-shape validation only)."""
+    """`IfmisVoucherUpdateRequest` -- Cashier only. The real Document No
+    *and* Ref No she gets back from IFMIS after keying the check-in
+    transaction in herself -- both required together (Section 8's
+    default, Phase 6, UAT round 1): IFMIS issues them as a pair, not one
+    at a time. `services.record_ifmis_voucher` enforces the "same
+    cashier, settable once" rule -- this serializer is field-shape
+    validation only."""
 
-    voucherReference = serializers.CharField(max_length=255)
+    documentNo = serializers.CharField(max_length=255)
+    refNo = serializers.CharField(max_length=255)

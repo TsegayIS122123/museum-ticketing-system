@@ -1,5 +1,8 @@
 import { apiClient } from '@/lib/api/client';
 import type { Booking, CheckInResponse } from '@/lib/api-contract';
+import type { components } from '@/lib/api-types';
+
+export type Voucher = components['schemas']['Voucher'];
 
 // GET /bookings/lookup and POST /bookings/{id}/check-in both return the
 // plain `Booking` shape (apps.bookings.serializers.BookingSerializer) --
@@ -14,9 +17,10 @@ import type { Booking, CheckInResponse } from '@/lib/api-contract';
 export type BookingLookupResponse = Booking;
 
 // POST /bookings/{id}/check-in's response (CheckInResponseSerializer,
-// apps.entrance.serializers) -- the same Booking fields above, plus four
-// IFMIS voucher-prep fields the Cashier needs to key this transaction
-// into IFMIS herself (the platform never calls IFMIS directly).
+// apps.entrance.serializers) -- the same Booking fields above, plus a
+// single `voucher` object (Phase 6, UAT round 1) with everything the
+// Cashier needs to key this transaction into IFMIS herself (the
+// platform never calls IFMIS directly).
 export type { CheckInResponse };
 
 // GET /bookings/lookup?reference=... -- Cashier only (FR-TICKET-001,
@@ -62,18 +66,32 @@ export async function getBooking(id: string): Promise<BookingLookupResponse> {
   return apiClient.get<BookingLookupResponse>(`/bookings/${id}`);
 }
 
+// GET /bookings/{id}/ifmis-voucher/ -- Cashier only (Phase 6, UAT round
+// 1). Re-opens the voucher panel for a Cashier who navigated away
+// before recording the Document No/Ref No -- the exact same `voucher`
+// shape checkInBooking's response carries, computed the same way
+// server-side, so the panel looks identical whichever way it was
+// reached.
+export async function getIfmisVoucher(bookingId: string): Promise<Voucher> {
+  return apiClient.get<Voucher>(`/bookings/${bookingId}/ifmis-voucher/`);
+}
+
 // PATCH /bookings/{id}/ifmis-voucher/ -- Cashier only, and only the same
-// Cashier who checked this booking in (services.record_ifmis_voucher_
-// reference enforces the "same cashier, settable once" rule against the
-// specific booking, not just the role). Called after she's actually
-// entered the transaction into IFMIS and gotten the real voucher
-// reference back. Was entirely missing from the frontend before now --
-// there was no way to complete the IFMIS half of the check-in workflow.
-export async function recordIfmisVoucherReference(
+// Cashier who checked this booking in (services.record_ifmis_voucher
+// enforces the "same cashier, settable once" rule against the specific
+// booking, not just the role). Called after she's actually entered the
+// transaction into IFMIS and gotten the real Document No *and* Ref No
+// back -- both required together (Section 8's default, Phase 6, UAT
+// round 1): IFMIS issues them as a pair, not one at a time.
+export async function recordIfmisVoucher(
   bookingId: string,
-  voucherReference: string
+  documentNo: string,
+  refNo: string
 ): Promise<Booking> {
-  return apiClient.patch<Booking>(`/bookings/${bookingId}/ifmis-voucher/`, { voucherReference });
+  return apiClient.patch<Booking>(`/bookings/${bookingId}/ifmis-voucher/`, {
+    documentNo,
+    refNo,
+  });
 }
 
 // PATCH /bookings/{id}/category-correction/ -- Museum Manager (or

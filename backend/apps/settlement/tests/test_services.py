@@ -550,3 +550,48 @@ def test_webhook_is_idempotent_on_replay():
     # The replay must not re-enqueue rendering either -- an already-issued
     # transfer receipt is never regenerated (ADR-009).
     mock_render.assert_called_once()
+
+
+# --------------------------------------------------------------------------
+# count_pending_vouchers (Phase 6, UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_count_pending_vouchers_zero_when_none_outstanding():
+    cashier = _make_cashier()
+
+    assert services.count_pending_vouchers(cashier=cashier) == 0
+
+
+def test_count_pending_vouchers_counts_booking_with_neither_identifier():
+    cashier = _make_cashier()
+    _make_visited_booking(cashier=cashier)
+
+    assert services.count_pending_vouchers(cashier=cashier) == 1
+
+
+def test_count_pending_vouchers_counts_booking_with_only_one_identifier():
+    cashier = _make_cashier()
+    booking = _make_visited_booking(cashier=cashier)
+    booking.ifmis_document_no = "0001082"
+    booking.save(update_fields=["ifmis_document_no"])
+
+    assert services.count_pending_vouchers(cashier=cashier) == 1
+
+
+def test_count_pending_vouchers_excludes_a_fully_recorded_voucher():
+    cashier = _make_cashier()
+    booking = _make_visited_booking(cashier=cashier)
+    booking.ifmis_document_no = "0001082"
+    booking.ifmis_voucher_reference = "be395"
+    booking.save(update_fields=["ifmis_document_no", "ifmis_voucher_reference"])
+
+    assert services.count_pending_vouchers(cashier=cashier) == 0
+
+
+def test_count_pending_vouchers_scoped_to_own_cashier():
+    cashier = _make_cashier()
+    other_cashier = _make_cashier(email="other@example.com")
+    _make_visited_booking(cashier=other_cashier)
+
+    assert services.count_pending_vouchers(cashier=cashier) == 0

@@ -149,6 +149,20 @@ USE_TZ = True
 FISCAL_YEAR_START_MONTH = env.int("FISCAL_YEAR_START_MONTH", default=7)
 FISCAL_YEAR_START_DAY = env.int("FISCAL_YEAR_START_DAY", default=1)
 
+# The "Name of Public Body" field on the printed IFMIS receipt voucher
+# (Phase 6, UAT round 1) -- a fixed institutional name, not derived from
+# `museum_name`/`landing_title` (the frontend i18n strings, Phase 1's
+# rebrand): IFMIS is a government finance system with its own registered
+# name for the office that actually issues the voucher, which does not
+# match the museum's own public-facing brand name and must not silently
+# follow it if that brand name changes again later. Default is the exact
+# string (including its capitalization) printed on the real sample
+# voucher this phase was built from -- not something to "clean up".
+IFMIS_PUBLIC_BODY_NAME = env(
+    "IFMIS_PUBLIC_BODY_NAME",
+    default="AAU - College of Natural & computational Science Internal Revenue",
+)
+
 # Weekly closure (UAT round 1): the museum is closed every Sunday, always,
 # regardless of `DateAvailability` -- this is a standing museum-hours rule,
 # not a Manager decision, so it lives here as configuration rather than a

@@ -375,3 +375,206 @@ def test_attended_amount_falls_back_to_total_before_check_in():
     booking = _make_pending_booking(quantity=20)
 
     assert services.compute_attended_amount_etb(booking=booking) == booking.total_amount_etb
+
+
+# --------------------------------------------------------------------------
+# amount_in_words_etb -- IFMIS-exact format (Phase 6, UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_amount_in_words_includes_cents_clause_even_at_zero():
+    """The sample voucher: `One Thousand ETB And Zero Cents` -- the old
+    pre-Phase-6 format omitted the cents clause entirely at zero."""
+    assert services.amount_in_words_etb(Decimal("1000.00")) == "One Thousand ETB And Zero Cents"
+
+
+def test_amount_in_words_nonzero_cents():
+    assert (
+        services.amount_in_words_etb(Decimal("1250.50"))
+        == "One Thousand Two Hundred Fifty ETB And Fifty Cents"
+    )
+
+
+def test_amount_in_words_uses_etb_not_birr():
+    words = services.amount_in_words_etb(Decimal("100.00"))
+    assert "ETB" in words
+    assert "Birr" not in words
+
+
+# --------------------------------------------------------------------------
+# compute_voucher (Phase 6, UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_compute_voucher_for_individual_booking():
+    booking = _make_pending_booking(quantity=1)
+    cashier = _make_cashier()
+    booking = services.check_in_booking(booking=booking, actor=cashier)
+
+    voucher = services.compute_voucher(booking=booking)
+
+    assert voucher["receivedFrom"] == booking.visitor.full_name
+    assert voucher["documentNo"] is None
+    assert voucher["refNo"] is None
+    assert voucher["voucherRecorded"] is False
+    assert voucher["nameOfPublicBody"]
+    assert voucher["date"] is not None
+    assert voucher["purpose"] == "To visit 1 student"
+
+
+def test_compute_voucher_for_school_booking_uses_institution():
+    from apps.institutions.services import resolve_institution
+
+    visitor = _make_visitor(email="teacher@example.com")
+    category = _make_category()
+    institution = resolve_institution(name="Example Primary School", tin="0000900158")
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.GROUP,
+        group_name="Example Primary School",
+        group_tin="0000900158",
+        institution=institution,
+        booked_quantity=20,
+        total_amount_etb=category.price_etb * 20,
+        status=Booking.Status.PENDING,
+    )
+    BookingItem.objects.create(
+        booking=booking,
+        category=category,
+        category_name_en=category.name_en,
+        category_name_am=category.name_am,
+        unit_price_etb=category.price_etb,
+        quantity=20,
+        subtotal_etb=category.price_etb * 20,
+    )
+    cashier = _make_cashier()
+    booking = services.check_in_booking(booking=booking, actor=cashier)
+
+    voucher = services.compute_voucher(booking=booking)
+
+    assert voucher["receivedFrom"] == "Example Primary School Tin 0000900158"
+    assert voucher["purpose"] == "To visit 20 student"
+
+
+def test_compute_voucher_amount_reflects_attended_not_booked():
+    """A partial-attendance booking's voucher amount must be the
+    attended total, never the full booked amount (FR-TICKET-002) --
+    simulates a legacy checked-in booking by setting attended_quantity
+    directly, same technique as the shortfall tests elsewhere in this
+    module."""
+    booking = _make_pending_booking(quantity=20)  # unit price 50.00
+    (item,) = booking.items.all()
+    item.attended_quantity = 15
+    item.save(update_fields=["attended_quantity"])
+    booking.attended_quantity = 15
+    booking.status = Booking.Status.VISITED
+    booking.checked_in_at = timezone.now()
+    booking.save(update_fields=["attended_quantity", "status", "checked_in_at"])
+
+    voucher = services.compute_voucher(booking=booking)
+
+    assert voucher["amountFigures"] == "ETB 750.00"
+    assert voucher["purpose"] == "To visit 15 student"
+
+
+def test_compute_voucher_purpose_for_mixed_categories():
+    visitor = _make_visitor()
+    adult = Category.objects.create(name_en="Adult", name_am="Adult", price_etb=Decimal("100"))
+    student = _make_category(price_etb="30.00")
+    booking = Booking.objects.create(
+        visitor=visitor,
+        visit_date=TOMORROW,
+        booking_type=Booking.BookingType.GROUP,
+        group_name="Mixed Group",
+        group_tin="0000900158",
+        booked_quantity=4,
+        total_amount_etb=Decimal("220"),
+        status=Booking.Status.PENDING,
+    )
+    BookingItem.objects.create(
+        booking=booking,
+        category=student,
+        category_name_en=student.name_en,
+        category_name_am=student.name_am,
+        unit_price_etb=student.price_etb,
+        quantity=3,
+        subtotal_etb=student.price_etb * 3,
+    )
+    BookingItem.objects.create(
+        booking=booking,
+        category=adult,
+        category_name_en=adult.name_en,
+        category_name_am=adult.name_am,
+        unit_price_etb=adult.price_etb,
+        quantity=1,
+        subtotal_etb=adult.price_etb,
+    )
+    cashier = _make_cashier()
+    booking = services.check_in_booking(booking=booking, actor=cashier)
+
+    voucher = services.compute_voucher(booking=booking)
+
+    assert voucher["purpose"] == "To visit 3 student, 1 adult"
+
+
+def test_compute_voucher_reflects_recorded_identifiers():
+    booking = _make_pending_booking(quantity=1)
+    cashier = _make_cashier()
+    booking = services.check_in_booking(booking=booking, actor=cashier)
+    booking = services.record_ifmis_voucher(
+        booking=booking, actor=cashier, document_no="0001082", ref_no="be395"
+    )
+
+    voucher = services.compute_voucher(booking=booking)
+
+    assert voucher["documentNo"] == "0001082"
+    assert voucher["refNo"] == "be395"
+    assert voucher["voucherRecorded"] is True
+
+
+# --------------------------------------------------------------------------
+# record_ifmis_voucher (Phase 6, UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_record_ifmis_voucher_sets_both_identifiers():
+    booking = _make_pending_booking(quantity=1)
+    cashier = _make_cashier()
+    booking = services.check_in_booking(booking=booking, actor=cashier)
+
+    booking = services.record_ifmis_voucher(
+        booking=booking, actor=cashier, document_no="0001082", ref_no="be395"
+    )
+
+    assert booking.ifmis_document_no == "0001082"
+    assert booking.ifmis_voucher_reference == "be395"
+    AuditLogEntry.objects.get(action="booking.ifmis_voucher_recorded")
+
+
+def test_record_ifmis_voucher_rejects_a_different_cashier():
+    from rest_framework.exceptions import PermissionDenied
+
+    booking = _make_pending_booking(quantity=1)
+    cashier = _make_cashier()
+    other_cashier = _make_cashier(email="other@example.com")
+    booking = services.check_in_booking(booking=booking, actor=cashier)
+
+    with pytest.raises(PermissionDenied):
+        services.record_ifmis_voucher(
+            booking=booking, actor=other_cashier, document_no="0001082", ref_no="be395"
+        )
+
+
+def test_record_ifmis_voucher_settable_only_once():
+    booking = _make_pending_booking(quantity=1)
+    cashier = _make_cashier()
+    booking = services.check_in_booking(booking=booking, actor=cashier)
+    services.record_ifmis_voucher(
+        booking=booking, actor=cashier, document_no="0001082", ref_no="be395"
+    )
+
+    with pytest.raises(Conflict):
+        services.record_ifmis_voucher(
+            booking=booking, actor=cashier, document_no="9999999", ref_no="zzzzz"
+        )

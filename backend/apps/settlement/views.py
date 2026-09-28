@@ -32,7 +32,10 @@ from .serializers import (
 class MyBalanceView(APIView):
     """GET /settlement/my-balance/ -- Cashier only. Her own outstanding
     balance (unreconciled Visited bookings minus unreconciled completed
-    refunds) -- never a platform-wide total (IFMIS decision)."""
+    refunds) -- never a platform-wide total (IFMIS decision). Also
+    surfaces `pendingVoucherCount` (Phase 6, UAT round 1) -- how many of
+    those outstanding bookings still need their IFMIS Document No/Ref No
+    recorded, so nothing is silently left pending at end of shift."""
 
     permission_classes = [IsCashier]
 
@@ -42,7 +45,10 @@ class MyBalanceView(APIView):
     )
     def get(self, request):
         balance = services.get_outstanding_balance(cashier=request.user)
-        serializer = OutstandingBalanceSerializer({"balance_etb": balance})
+        pending_voucher_count = services.count_pending_vouchers(cashier=request.user)
+        serializer = OutstandingBalanceSerializer(
+            {"balance_etb": balance, "pending_voucher_count": pending_voucher_count}
+        )
         return Response(serializer.data)
 
 

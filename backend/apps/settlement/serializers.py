@@ -20,10 +20,18 @@ class OutstandingBalanceSerializer(serializers.Serializer):
     Decimal (the return value of `services.get_outstanding_balance`) --
     there is no model behind this endpoint, it's a computed figure, so a
     plain `Serializer` over a `{"balance_etb": ...}` dict is used rather
-    than a `ModelSerializer`."""
+    than a `ModelSerializer`.
+
+    `pendingVoucherCount` (Phase 6, UAT round 1) -- how many of her own
+    outstanding bookings don't yet have both IFMIS identifiers recorded
+    (`services.count_pending_vouchers`), so nothing is silently left
+    pending at end of shift. Zero is the expected, common case."""
 
     balanceEtb = serializers.DecimalField(
         source="balance_etb", max_digits=12, decimal_places=2, read_only=True
+    )
+    pendingVoucherCount = serializers.IntegerField(
+        source="pending_voucher_count", read_only=True
     )
 
 

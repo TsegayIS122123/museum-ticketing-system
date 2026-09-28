@@ -41,7 +41,7 @@ import requests
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework.exceptions import APIException, ValidationError
 
@@ -100,6 +100,33 @@ def _undeducted_refunds_queryset(*, cashier):
 # --------------------------------------------------------------------------
 # 1. Outstanding balance (read-only -- "my balance" screen)
 # --------------------------------------------------------------------------
+
+
+def count_pending_vouchers(*, cashier):
+    """Implements the `pendingVoucherCount` half of `GET
+    /settlement/my-balance/` (Phase 6, UAT round 1, Step 6: "must appear
+    in her end-of-shift settlement view so nothing is left pending").
+
+    Counts this cashier's own outstanding (unreconciled, `Visited`)
+    bookings that don't yet have *both* IFMIS identifiers recorded
+    (`Booking.ifmis_document_no`/`ifmis_voucher_reference` --
+    `apps.entrance.services.record_ifmis_voucher`'s own "both together"
+    rule, mirrored here rather than imported, since `settlement` reads
+    `Booking` fields directly the same way it already reads
+    `checked_in_by_user_id`/`status` for `_outstanding_bookings_queryset`
+    above, rather than depending on `apps.entrance`).
+
+    Deliberately just a count, not an itemized list -- the existing
+    "no itemized bookings/refunds breakdown endpoint" decision on
+    `get_outstanding_balance` above applies here too; a Cashier with a
+    nonzero count already knows which of her own recent check-ins it
+    is (she was just there), and the voucher panel itself
+    (`GET /bookings/{id}/ifmis-voucher/`) is how she re-opens any one of
+    them once she tracks it down.
+    """
+    return _outstanding_bookings_queryset(cashier=cashier).filter(
+        Q(ifmis_document_no__isnull=True) | Q(ifmis_voucher_reference__isnull=True)
+    ).count()
 
 
 def get_outstanding_balance(*, cashier):

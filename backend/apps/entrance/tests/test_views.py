@@ -155,7 +155,12 @@ def test_check_in_succeeds_for_cashier():
     assert response.data["attendedQuantity"] == 20
 
 
-def test_check_in_group_booking_includes_payer_name_and_tin_for_ifmis_voucher():
+def test_check_in_group_booking_receivedFrom_falls_back_to_group_snapshot():
+    """A group booking with no linked `institution` (legacy, or -- as
+    here -- mutated directly via the ORM rather than through
+    `create_booking`) still gets a usable voucher, via the `group_name`/
+    `group_tin` fallback (see `_resolve_received_from`'s own
+    docstring)."""
     booking = _make_pending_booking(quantity=25)
     booking.booking_type = Booking.BookingType.GROUP
     booking.group_name = "BS School Group"
@@ -167,11 +172,10 @@ def test_check_in_group_booking_includes_payer_name_and_tin_for_ifmis_voucher():
     response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
 
     assert response.status_code == 200
-    assert response.data["payerName"] == "BS School Group"
-    assert response.data["payerTin"] == "0000900158"
+    assert response.data["voucher"]["receivedFrom"] == "BS School Group Tin 0000900158"
 
 
-def test_check_in_individual_booking_has_no_payer_tin():
+def test_check_in_individual_booking_receivedFrom_is_visitor_name():
     booking = _make_pending_booking(quantity=1)
     cashier = _make_account(Account.Role.CASHIER)
     client = _authed_client(cashier)
@@ -179,8 +183,7 @@ def test_check_in_individual_booking_has_no_payer_tin():
     response = client.post(f"/api/v1/bookings/{booking.id}/check-in/")
 
     assert response.status_code == 200
-    assert response.data["payerName"] == booking.visitor.full_name
-    assert response.data["payerTin"] is None
+    assert response.data["voucher"]["receivedFrom"] == booking.visitor.full_name
 
 
 def test_check_in_non_pending_booking_conflicts():
@@ -291,5 +294,109 @@ def test_flag_mismatch_non_pending_booking_conflicts():
     client = _authed_client(cashier)
 
     response = client.post(f"/api/v1/bookings/{booking.id}/flag-mismatch/", {}, format="json")
+
+    assert response.status_code == 409
+
+
+# --------------------------------------------------------------------------
+# GET/PATCH /bookings/{id}/ifmis-voucher/ (Phase 6, UAT round 1)
+# --------------------------------------------------------------------------
+
+
+def test_get_voucher_before_check_in_has_no_document_or_ref_no():
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+
+    response = client.get(f"/api/v1/bookings/{booking.id}/ifmis-voucher/")
+
+    assert response.status_code == 200
+    assert response.data["documentNo"] is None
+    assert response.data["refNo"] is None
+    assert response.data["voucherRecorded"] is False
+    assert response.data["date"] is None
+
+
+def test_get_voucher_after_check_in_shows_date_and_purpose():
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+    client.post(f"/api/v1/bookings/{booking.id}/check-in/")
+
+    response = client.get(f"/api/v1/bookings/{booking.id}/ifmis-voucher/")
+
+    assert response.status_code == 200
+    assert response.data["date"] is not None
+    assert response.data["purpose"].startswith("To visit")
+    assert response.data["amountFigures"].startswith("ETB ")
+
+
+def test_patch_voucher_requires_both_document_no_and_ref_no():
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+    client.post(f"/api/v1/bookings/{booking.id}/check-in/")
+
+    response = client.patch(
+        f"/api/v1/bookings/{booking.id}/ifmis-voucher/",
+        {"documentNo": "0001082"},
+        format="json",
+    )
+
+    assert response.status_code == 400
+
+
+def test_patch_voucher_succeeds_with_both_identifiers():
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+    client.post(f"/api/v1/bookings/{booking.id}/check-in/")
+
+    response = client.patch(
+        f"/api/v1/bookings/{booking.id}/ifmis-voucher/",
+        {"documentNo": "0001082", "refNo": "be395"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    voucher_response = client.get(f"/api/v1/bookings/{booking.id}/ifmis-voucher/")
+    assert voucher_response.data["documentNo"] == "0001082"
+    assert voucher_response.data["refNo"] == "be395"
+    assert voucher_response.data["voucherRecorded"] is True
+
+
+def test_patch_voucher_rejects_a_different_cashier():
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_account(Account.Role.CASHIER, email="cashier1@example.com")
+    other_cashier = _make_account(Account.Role.CASHIER, email="cashier2@example.com")
+    client = _authed_client(cashier)
+    client.post(f"/api/v1/bookings/{booking.id}/check-in/")
+    other_client = _authed_client(other_cashier)
+
+    response = other_client.patch(
+        f"/api/v1/bookings/{booking.id}/ifmis-voucher/",
+        {"documentNo": "0001082", "refNo": "be395"},
+        format="json",
+    )
+
+    assert response.status_code == 403
+
+
+def test_patch_voucher_settable_only_once():
+    booking = _make_pending_booking(quantity=20)
+    cashier = _make_account(Account.Role.CASHIER)
+    client = _authed_client(cashier)
+    client.post(f"/api/v1/bookings/{booking.id}/check-in/")
+    client.patch(
+        f"/api/v1/bookings/{booking.id}/ifmis-voucher/",
+        {"documentNo": "0001082", "refNo": "be395"},
+        format="json",
+    )
+
+    response = client.patch(
+        f"/api/v1/bookings/{booking.id}/ifmis-voucher/",
+        {"documentNo": "9999999", "refNo": "zzzzz"},
+        format="json",
+    )
 
     assert response.status_code == 409

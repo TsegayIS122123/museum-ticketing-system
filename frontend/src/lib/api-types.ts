@@ -429,20 +429,51 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * @description /bookings/{id}/ifmis-voucher/ -- Cashier only.
+         *
+         *     GET re-opens the voucher panel (Phase 6 Step 6) for a Cashier who
+         *     navigated away before recording the Document No/Ref No -- the exact
+         *     same `voucher` shape `CheckInResponseSerializer` returns right after
+         *     check-in, computed by the same `services.compute_voucher`, so the
+         *     panel looks identical whichever way it was reached. Available on any
+         *     checked-in booking (not restricted to the checking-in Cashier --
+         *     unlike the write below, simply viewing the voucher again isn't the
+         *     sensitive half of this).
+         *
+         *     PATCH is restricted to the same Cashier who checked this booking in
+         *     (services.py enforces this, not this permission class -- it needs
+         *     the specific booking, not just the role). Called after she's
+         *     actually entered the transaction into IFMIS and gotten the real
+         *     Document No *and* Ref No back; settable once, both together
+         *     (Section 8's default).
+         */
+        get: operations["getIfmisVoucher"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         /**
-         * @description PATCH /bookings/{id}/ifmis-voucher/ -- Cashier only, and only the
-         *     same Cashier who checked this booking in (services.py enforces this,
-         *     not this permission class -- it needs the specific booking, not just
-         *     the role). Called after she's actually entered the transaction into
-         *     IFMIS and gotten the real voucher reference back; settable once.
+         * @description /bookings/{id}/ifmis-voucher/ -- Cashier only.
+         *
+         *     GET re-opens the voucher panel (Phase 6 Step 6) for a Cashier who
+         *     navigated away before recording the Document No/Ref No -- the exact
+         *     same `voucher` shape `CheckInResponseSerializer` returns right after
+         *     check-in, computed by the same `services.compute_voucher`, so the
+         *     panel looks identical whichever way it was reached. Available on any
+         *     checked-in booking (not restricted to the checking-in Cashier --
+         *     unlike the write below, simply viewing the voucher again isn't the
+         *     sensitive half of this).
+         *
+         *     PATCH is restricted to the same Cashier who checked this booking in
+         *     (services.py enforces this, not this permission class -- it needs
+         *     the specific booking, not just the role). Called after she's
+         *     actually entered the transaction into IFMIS and gotten the real
+         *     Document No *and* Ref No back; settable once, both together
+         *     (Section 8's default).
          */
-        patch: operations["recordIfmisVoucherReference"];
+        patch: operations["recordIfmisVoucher"];
         trace?: never;
     };
     "/api/v1/bookings/{id}/refund-requests/": {
@@ -947,6 +978,7 @@ export interface components {
             readonly noticeSentAt: string | null;
             readonly checkoutUrl: string | null;
             readonly receiptUrl: string | null;
+            readonly ifmisDocumentNo: string | null;
             readonly ifmisVoucherReference: string | null;
             /** Format: uuid */
             readonly reconciliationId: string | null;
@@ -1187,16 +1219,20 @@ export interface components {
             currency?: string | null;
         };
         /**
-         * @description `Booking`, extended with the IFMIS voucher-prep fields the Cashier
+         * @description `Booking`, extended with the single `voucher` object the Cashier
          *     needs to key into IFMIS herself at the moment of check-in (per the
          *     IFMIS decision: the platform never calls IFMIS -- it only gives her
          *     the exact fields to copy in). Returned only from `POST
          *     /bookings/{id}/check-in` -- every other endpoint that returns a
-         *     `Booking` keeps using the plain `BookingSerializer`, since these
-         *     fields are only meaningful right after a check-in action, not as a
-         *     general-purpose booking field.
+         *     `Booking` keeps using the plain `BookingSerializer`, since this field
+         *     is only meaningful right after a check-in action, not as a
+         *     general-purpose booking field. Before Phase 6, this exposed five
+         *     separate flat fields (`payerName`/`payerTin`/`amountFigures`/
+         *     `amountWords`/`ifmisPurpose`); those are now all inside `voucher`,
+         *     alongside the Document No/Ref No/date/public-body-name fields the
+         *     real sample voucher turned out to need too.
          *
-         *     All four are derived read-only from data `check_in_booking` already
+         *     `voucher` is derived read-only from data `check_in_booking` already
          *     wrote (or that existed on the booking beforehand) -- nothing here
          *     changes `check_in_booking`'s own business logic or return value; this
          *     serializer only shapes its *response* representation.
@@ -1234,6 +1270,7 @@ export interface components {
             readonly noticeSentAt: string | null;
             readonly checkoutUrl: string | null;
             readonly receiptUrl: string | null;
+            readonly ifmisDocumentNo: string | null;
             readonly ifmisVoucherReference: string | null;
             /** Format: uuid */
             readonly reconciliationId: string | null;
@@ -1241,12 +1278,7 @@ export interface components {
             readonly totalAmountEtb: string;
             /** Format: date-time */
             readonly createdAt: string;
-            readonly payerName: string;
-            readonly payerTin: string;
-            /** Format: decimal */
-            readonly amountFigures: string;
-            readonly amountWords: string;
-            readonly ifmisPurpose: string;
+            readonly voucher: components["schemas"]["Voucher"];
         };
         /** @description `GET /reports/dashboard` response shape (FR-REPORT-001). */
         Dashboard: {
@@ -1337,10 +1369,16 @@ export interface components {
          *     there is no model behind this endpoint, it's a computed figure, so a
          *     plain `Serializer` over a `{"balance_etb": ...}` dict is used rather
          *     than a `ModelSerializer`.
+         *
+         *     `pendingVoucherCount` (Phase 6, UAT round 1) -- how many of her own
+         *     outstanding bookings don't yet have both IFMIS identifiers recorded
+         *     (`services.count_pending_vouchers`), so nothing is silently left
+         *     pending at end of shift. Zero is the expected, common case.
          */
         OutstandingBalance: {
             /** Format: decimal */
             readonly balanceEtb: string;
+            readonly pendingVoucherCount: number;
         };
         PaginatedAccountList: {
             data: components["schemas"]["Account"][];
@@ -1405,14 +1443,17 @@ export interface components {
             quantity?: number;
         };
         /**
-         * @description `IfmisVoucherUpdateRequest` -- Cashier only. The real Document
-         *     No/Ref No she gets back from IFMIS after keying the check-in
-         *     transaction in herself (services.record_ifmis_voucher_reference
-         *     enforces the "same cashier, settable once" rule -- this serializer is
-         *     field-shape validation only).
+         * @description `IfmisVoucherUpdateRequest` -- Cashier only. The real Document No
+         *     *and* Ref No she gets back from IFMIS after keying the check-in
+         *     transaction in herself -- both required together (Section 8's
+         *     default, Phase 6, UAT round 1): IFMIS issues them as a pair, not one
+         *     at a time. `services.record_ifmis_voucher` enforces the "same
+         *     cashier, settable once" rule -- this serializer is field-shape
+         *     validation only.
          */
         PatchedIfmisVoucherUpdate: {
-            voucherReference?: string;
+            documentNo?: string;
+            refNo?: string;
         };
         /**
          * @description * `daily` - daily
@@ -1557,6 +1598,35 @@ export interface components {
             /** Format: uuid */
             verification_id: string;
             otp_expires_in_seconds: number;
+        };
+        /**
+         * @description The `voucher` object (Phase 6, UAT round 1): every field the
+         *     Cashier needs to key into IFMIS, laid out in the same top-to-bottom
+         *     order as the real printed voucher, computed entirely by
+         *     `services.compute_voucher` -- this serializer only shapes the field
+         *     names/types of what that function already returns, matching it key
+         *     for key (a plain dict, no `source=` remapping needed). Shared,
+         *     unmodified, by both `CheckInResponseSerializer` below (right after
+         *     check-in) and `GET /bookings/{id}/ifmis-voucher/` (re-opening the
+         *     panel later) -- one shape, one place it's computed, so the two
+         *     callers can never drift apart.
+         *
+         *     `documentNo`/`refNo` are null until `record_ifmis_voucher` sets them;
+         *     `voucherRecorded` is true only once *both* are set (Section 8's "both
+         *     required together" default) and is what should drive a "voucher
+         *     pending" badge, rather than the frontend checking either field
+         *     individually.
+         */
+        Voucher: {
+            documentNo: string | null;
+            date: string | null;
+            refNo: string | null;
+            nameOfPublicBody: string;
+            receivedFrom: string;
+            amountFigures: string;
+            amountWords: string;
+            purpose: string;
+            voucherRecorded: boolean;
         };
     };
     responses: never;
@@ -2083,7 +2153,28 @@ export interface operations {
             };
         };
     };
-    recordIfmisVoucherReference: {
+    getIfmisVoucher: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Voucher"];
+                };
+            };
+        };
+    };
+    recordIfmisVoucher: {
         parameters: {
             query?: never;
             header?: never;

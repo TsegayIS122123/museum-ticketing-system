@@ -31,6 +31,7 @@ flaggable) and, for check-in, that no mismatch flag is still open.
 
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -215,11 +216,14 @@ def flag_booking_mismatch(*, booking, actor, note=None):
 
 
 # --------------------------------------------------------------------------
-# IFMIS voucher-prep at check-in (the settlement-rebuild build prompt's
-# Step 7). Reuses `check_in_booking`'s existing return value -- neither
-# function above is touched -- this is presentation logic for the
-# Cashier's IFMIS data-entry screen, plus a small follow-up write once she
-# reports back the real voucher reference.
+# IFMIS voucher-prep at check-in (originally the settlement-rebuild build
+# prompt's Step 7; the voucher shape and amount-in-words format below were
+# both corrected in UAT round 1 Phase 6 against a real sample voucher --
+# see `compute_voucher`'s own docstring). Reuses `check_in_booking`'s
+# existing return value -- neither function above is touched -- this is
+# presentation logic for the Cashier's IFMIS data-entry screen, plus a
+# small follow-up write once she reports the real Document No/Ref No
+# back.
 # --------------------------------------------------------------------------
 
 _ONES = [
@@ -284,49 +288,150 @@ def compute_attended_amount_etb(*, booking) -> Decimal:
 
 
 def amount_in_words_etb(amount: Decimal) -> str:
-    """The "amount in words" field a Cashier copies onto an IFMIS
-    voucher -- e.g. `Decimal("1250.50")` -> `"One Thousand Two Hundred
-    Fifty Birr and Fifty Cents"`. `amount` is always non-negative here
-    (a `Booking.total_amount_etb`, DB-constrained positive elsewhere), so
-    no sign handling is needed."""
+    """The "amount in words" (የገንዘቡ ልክ በፊደል) field a Cashier copies
+    onto an IFMIS voucher -- format fixed to match IFMIS's own output
+    exactly (Phase 6, UAT round 1, matched against a real sample
+    voucher): `"{words} ETB And {cents_words} Cents"`, e.g.
+    `Decimal("1250.50")` -> `"One Thousand Two Hundred Fifty ETB And
+    Fifty Cents"`, and, critically, `Decimal("1000.00")` -> `"One
+    Thousand ETB And Zero Cents"` -- the cents clause is ALWAYS present,
+    even at zero, unlike this function's pre-Phase-6 shape (which used
+    "Birr" instead of "ETB" and omitted the cents clause entirely when
+    zero). `amount` is always non-negative here (a `Booking.
+    total_amount_etb`, DB-constrained positive elsewhere), so no sign
+    handling is needed.
+    """
     quantized = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     birr, cents = divmod(int(quantized * 100), 100)
-    words = f"{_integer_to_words(birr)} Birr"
-    if cents:
-        words += f" and {_integer_to_words(cents)} Cents"
-    return words
+    return f"{_integer_to_words(birr)} ETB And {_integer_to_words(cents)} Cents"
 
 
-def record_ifmis_voucher_reference(*, booking, actor, voucher_reference):
+def _resolve_received_from(booking) -> str:
+    """"Received From" / ደረሰኝ ከ -- matches the sample voucher's
+    single-line `"{name} Tin {tin}"` shape exactly (`BS School Group Tin
+    0000900158`, name and TIN run together, no comma, no colon).
+
+    Institution-aware (Phase 6, now that `apps.institutions` exists,
+    Phase 5): prefers `booking.institution`'s own canonical name/TIN over
+    the booking's own `group_name`/`group_tin` snapshot, since the
+    institution record is what stays correct if a later booking corrects
+    a spelling (`apps.institutions.services.resolve_institution`) -- but
+    falls back to the booking's own snapshot for a legacy group booking
+    that predates this app and was never backfilled (`Booking.
+    institution`'s own field comment), so a booking without a linked
+    institution still gets a usable voucher. Falls back further, to the
+    individual Visitor's own name, for a non-group booking, which has
+    neither.
+    """
+    if booking.institution_id:
+        return f"{booking.institution.name} Tin {booking.institution.tin}"
+    if booking.booking_type == booking.BookingType.GROUP:
+        return f"{booking.group_name} Tin {booking.group_tin}"
+    return booking.visitor.full_name
+
+
+def _compute_purpose(booking) -> str:
+    """"Purpose" -- the sample voucher has no line-item table at all;
+    category counts are prose inside this one field instead (Phase 6's
+    sample-voucher correction to an earlier, table-based assumption).
+    `To visit 20 student` for one category, `To visit 3 student, 1
+    adult` for a mix -- deliberately plain (no pluralization, no
+    alphabetical/price sorting) rather than over-engineered, per this
+    phase's own instruction; ordering is simply each `BookingItem`'s
+    creation order.
+
+    Uses `attended_quantity` -- what actually needs paying for, matching
+    `compute_attended_amount_etb` -- falling back to `quantity` for an
+    item checked in before per-item attendance existed (same legacy
+    fallback that function documents). A category with zero attendance
+    doesn't appear in the sentence at all: nobody from it is entering.
+    """
+    parts = []
+    for item in booking.items.order_by("created_at"):
+        quantity = item.attended_quantity if item.attended_quantity is not None else item.quantity
+        if not quantity:
+            continue
+        parts.append(f"{quantity} {item.category_name_en.lower()}")
+    if not parts:
+        return "To visit the museum"
+    return "To visit " + ", ".join(parts)
+
+
+def compute_voucher(*, booking) -> dict:
+    """Builds the single `voucher` object returned by both `POST
+    /bookings/{id}/check-in` (via `CheckInResponseSerializer`) and `GET
+    /bookings/{id}/ifmis-voucher/` (so the panel can be re-opened later,
+    Phase 6 Step 6) -- one function, computed here and nowhere else
+    (never in the frontend), so the two callers can never drift apart.
+
+    Fields match the real sample voucher's own layout, top to bottom
+    (Phase 6's table): `documentNo`/`refNo` are whatever's been recorded
+    so far via `record_ifmis_voucher` (both `None` until she reports
+    them back -- IFMIS is a closed system this platform never calls, so
+    neither can be known any earlier than that). `date` is the
+    Gregorian check-in date, formatted to match the sample
+    (`13-AUG-2026`); the Ethiopian-calendar ቀን field on the paper is
+    printed by IFMIS itself and isn't reproduced here at all (it's for
+    cross-checking against the paper, not a value we generate).
+    `nameOfPublicBody` is a fixed constant (`settings.
+    IFMIS_PUBLIC_BODY_NAME`), never derived from this platform's own
+    museum branding -- see that setting's own comment for why.
+    `voucherRecorded` is `True` only once *both* identifiers are present
+    (Section 8's default: both required together) -- the frontend's
+    "voucher pending" badge is driven by this flag, not by checking
+    either field individually.
+    """
+    checked_in_at = timezone.localtime(booking.checked_in_at) if booking.checked_in_at else None
+    amount = compute_attended_amount_etb(booking=booking)
+    return {
+        "documentNo": booking.ifmis_document_no,
+        "date": checked_in_at.strftime("%d-%b-%Y").upper() if checked_in_at else None,
+        "refNo": booking.ifmis_voucher_reference,
+        "nameOfPublicBody": settings.IFMIS_PUBLIC_BODY_NAME,
+        "receivedFrom": _resolve_received_from(booking),
+        "amountFigures": f"ETB {amount:,.2f}",
+        "amountWords": amount_in_words_etb(amount),
+        "purpose": _compute_purpose(booking),
+        "voucherRecorded": bool(booking.ifmis_document_no and booking.ifmis_voucher_reference),
+    }
+
+
+def record_ifmis_voucher(*, booking, actor, document_no, ref_no):
     """Implements `PATCH /bookings/{id}/ifmis-voucher/`. Called once the
     Cashier has actually keyed this transaction into IFMIS and gotten the
-    real Document No/Ref No back -- the platform never generates or
-    guesses this value itself (per the IFMIS decision: IFMIS is a closed
-    system, no API calls to it).
+    real Document No *and* Ref No back -- the platform never generates or
+    guesses either value itself (per the IFMIS decision: IFMIS is a
+    closed system, no API calls to it).
+
+    Section 8's default: both identifiers are required together, in one
+    call -- IFMIS issues them as a pair at the moment it accepts the
+    transaction, so there's no real intermediate state where a Cashier
+    legitimately has one but not the other to report back yet.
 
     Restricted to the same Cashier who checked this booking in
     (`checked_in_by_user_id`) -- not any Cashier on shift today, since
     it's *her* name on that IFMIS entry, and settable only once: a
-    voucher reference already recorded here is never overwritten, since
-    that would let the one thing tying this booking to a specific IFMIS
-    entry silently change after the fact.
+    voucher already recorded here is never overwritten (either field),
+    since that would let the one thing tying this booking to a specific
+    IFMIS entry silently change after the fact.
     """
     if booking.checked_in_by_user_id_id != actor.id:
         raise PermissionDenied(
             "Only the cashier who checked this booking in may record its IFMIS voucher."
         )
 
-    if booking.ifmis_voucher_reference:
-        raise Conflict("An IFMIS voucher reference has already been recorded for this booking.")
+    if booking.ifmis_document_no or booking.ifmis_voucher_reference:
+        raise Conflict("An IFMIS voucher has already been recorded for this booking.")
 
-    booking.ifmis_voucher_reference = voucher_reference
-    booking.save(update_fields=["ifmis_voucher_reference", "updated_at"])
+    booking.ifmis_document_no = document_no
+    booking.ifmis_voucher_reference = ref_no
+    booking.save(update_fields=["ifmis_document_no", "ifmis_voucher_reference", "updated_at"])
 
     write_audit_log(
         actor_id=actor.id,
         action="booking.ifmis_voucher_recorded",
         target_type="booking",
         target_id=booking.id,
-        metadata={"ifmis_voucher_reference": voucher_reference},
+        metadata={"ifmis_document_no": document_no, "ifmis_voucher_reference": ref_no},
     )
     return booking

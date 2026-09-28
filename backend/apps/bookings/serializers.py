@@ -174,7 +174,13 @@ class BookingSerializer(serializers.ModelSerializer):
         source="total_amount_etb", read_only=True, max_digits=12, decimal_places=2
     )
     # The real Document No/Ref No the Cashier keys back in via `PATCH
-    # /bookings/{id}/ifmis-voucher/` (apps.entrance) -- null until then.
+    # /bookings/{id}/ifmis-voucher/` (apps.entrance) -- both null until
+    # then, and, per Section 8's default (Phase 6, UAT round 1), set
+    # together or not at all -- `apps.entrance.services.
+    # record_ifmis_voucher` enforces that, not this serializer.
+    ifmisDocumentNo = serializers.CharField(
+        source="ifmis_document_no", read_only=True, allow_null=True
+    )
     ifmisVoucherReference = serializers.CharField(
         source="ifmis_voucher_reference", read_only=True, allow_null=True
     )
@@ -212,6 +218,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "noticeSentAt",
             "checkoutUrl",
             "receiptUrl",
+            "ifmisDocumentNo",
             "ifmisVoucherReference",
             "reconciliationId",
             "totalAmountEtb",

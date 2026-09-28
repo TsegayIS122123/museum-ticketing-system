@@ -91,8 +91,9 @@ class Booking(TimeStampedModel):
     (payments, entrance, refunds, settlement, reporting) hangs off it.
 
     Fields owned operationally by a future app (`checked_in_*`,
-    `chapa_checkout_url`, `receipt_url`, `ifmis_voucher_reference`,
-    `reconciliation`) are declared here because this is the authoritative
+    `chapa_checkout_url`, `receipt_url`, `ifmis_document_no`,
+    `ifmis_voucher_reference`, `reconciliation`) are declared here because
+    this is the authoritative
     table per Document 05 -- they are simply never *written* by this
     app's services.py, only read.
     """
@@ -254,10 +255,23 @@ class Booking(TimeStampedModel):
     # Populated once, at payment confirmation, by apps.payments (ADR-009).
     receipt_url = models.TextField(null=True, blank=True)
 
-    # The real Document No/Ref No the Cashier gets back from IFMIS at
-    # check-in. Not known at the instant `check_in_booking` runs -- she
-    # keys the transaction into IFMIS separately and reports it back via
-    # `PATCH /bookings/{id}/ifmis-voucher/` (apps.entrance, Step 7).
+    # UAT round 1 (Phase 6): IFMIS issues *two* separate identifiers per
+    # voucher, printed on the paper as "Document No" and "Ref No" --
+    # neither is known at the instant `check_in_booking` runs; the
+    # Cashier keys the transaction into IFMIS separately afterwards and
+    # reports both back via `PATCH /bookings/{id}/ifmis-voucher/`
+    # (apps.entrance.services.record_ifmis_voucher). Section 8's default:
+    # both are required together before the booking counts as fully
+    # recorded -- `record_ifmis_voucher` enforces that, not this field
+    # definition, so a partially-recorded voucher (this field set, that
+    # one not) should never actually occur, but both are still nullable
+    # here since neither exists between check-in and that PATCH call.
+    #
+    # `ifmis_document_no` is the "Document No" field on the printed
+    # voucher. `ifmis_voucher_reference` -- kept under its original name
+    # for migration continuity -- is the "Ref No" field, e.g. `be395` on
+    # the sample voucher.
+    ifmis_document_no = models.TextField(null=True, blank=True)
     ifmis_voucher_reference = models.TextField(null=True, blank=True)
 
     # Set once this booking's amount has been included in a *completed*
