@@ -26,4 +26,35 @@ urlpatterns = [
         views.BookingTimelineView.as_view(),
         name="booking-timeline",
     ),
+    # Phase 7b (UAT round 1)
+    path(
+        "institutions/",
+        views.InstitutionsReportView.as_view(),
+        name="institutions-report",
+    ),
+    path(
+        "institutions/<uuid:id>/",
+        views.InstitutionDetailView.as_view(),
+        name="institution-detail",
+    ),
+    path(
+        "categories/",
+        views.CategoriesReportView.as_view(),
+        name="categories-report",
+    ),
+    path(
+        "attendance/",
+        views.AttendanceReportView.as_view(),
+        name="attendance-report",
+    ),
+    path(
+        "revenue/",
+        views.RevenueReportView.as_view(),
+        name="revenue-report",
+    ),
+    path(
+        "comparison/",
+        views.PeriodComparisonView.as_view(),
+        name="comparison",
+    ),
 ]

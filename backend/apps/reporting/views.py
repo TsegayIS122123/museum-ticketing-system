@@ -14,10 +14,16 @@ from apps.core.permissions import IsMuseumManagerOrPlatformAdmin
 
 from . import services
 from .serializers import (
+    AttendanceReportSerializer,
     BookingTimelineSerializer,
     CashierBalancesSerializer,
+    CategoriesReportSerializer,
     DashboardSerializer,
+    InstitutionDetailSerializer,
+    InstitutionsReportSerializer,
+    PeriodComparisonSerializer,
     ReportSummarySerializer,
+    RevenueReportSerializer,
 )
 
 
@@ -97,3 +103,119 @@ class BookingTimelineView(APIView):
 
         timeline = services.get_booking_timeline(date_from=date_from, date_to=date_to)
         return Response(BookingTimelineSerializer(timeline).data)
+
+
+# ============================================================================
+# Phase 7b (UAT round 1)
+# ============================================================================
+
+
+def _resolve_range_from_request(request):
+    """Shared `preset`/`from`/`to` query-param parsing for every Phase 7b
+    view below -- `services.resolve_report_range` does the actual
+    resolution (and enforces the both-or-neither/preset-required rules);
+    this only reads the three raw query params off the request."""
+    preset = request.query_params.get("preset")
+    date_from = _parse_optional_date(request, "from")
+    date_to = _parse_optional_date(request, "to")
+    return services.resolve_report_range(preset=preset, date_from=date_from, date_to=date_to)
+
+
+class InstitutionsReportView(APIView):
+    """GET /reports/institutions -- Museum Manager/Platform Admin only
+    (Phase 7b). Per-institution rollup over a `preset`- or `from`/`to`-
+    resolved range -- see `services.get_institutions_report`."""
+
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
+
+    @extend_schema(operation_id="getInstitutionsReport", responses=InstitutionsReportSerializer)
+    def get(self, request):
+        date_from, date_to = _resolve_range_from_request(request)
+        institution_id = request.query_params.get("institutionId") or None
+        limit = int(request.query_params.get("limit", 25))
+        offset = int(request.query_params.get("offset", 0))
+        sort = request.query_params.get("sort", "-revenue_etb")
+
+        report = services.get_institutions_report(
+            date_from=date_from,
+            date_to=date_to,
+            institution_id=institution_id,
+            limit=limit,
+            offset=offset,
+            sort=sort,
+        )
+        return Response(InstitutionsReportSerializer(report).data)
+
+
+class InstitutionDetailView(APIView):
+    """GET /reports/institutions/{id} -- Museum Manager/Platform Admin
+    only (Phase 7b). One school's own visit history -- see
+    `services.get_institution_detail`. `from`/`to` optional here (unlike
+    every other Phase 7b report), both-or-neither."""
+
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
+
+    @extend_schema(operation_id="getInstitutionDetail", responses=InstitutionDetailSerializer)
+    def get(self, request, id):
+        date_from = _parse_optional_date(request, "from")
+        date_to = _parse_optional_date(request, "to")
+        detail = services.get_institution_detail(
+            institution_id=id, date_from=date_from, date_to=date_to
+        )
+        return Response(InstitutionDetailSerializer(detail).data)
+
+
+class CategoriesReportView(APIView):
+    """GET /reports/categories -- Museum Manager/Platform Admin only
+    (Phase 7b). Headcount/revenue by category plus a time series -- see
+    `services.get_categories_report`."""
+
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
+
+    @extend_schema(operation_id="getCategoriesReport", responses=CategoriesReportSerializer)
+    def get(self, request):
+        date_from, date_to = _resolve_range_from_request(request)
+        report = services.get_categories_report(date_from=date_from, date_to=date_to)
+        return Response(CategoriesReportSerializer(report).data)
+
+
+class AttendanceReportView(APIView):
+    """GET /reports/attendance -- Museum Manager/Platform Admin only
+    (Phase 7b). Booked vs. attended vs. shortfall, plus the Manager's own
+    correction workload -- see `services.get_attendance_report`."""
+
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
+
+    @extend_schema(operation_id="getAttendanceReport", responses=AttendanceReportSerializer)
+    def get(self, request):
+        date_from, date_to = _resolve_range_from_request(request)
+        report = services.get_attendance_report(date_from=date_from, date_to=date_to)
+        return Response(AttendanceReportSerializer(report).data)
+
+
+class RevenueReportView(APIView):
+    """GET /reports/revenue -- Museum Manager/Platform Admin only
+    (Phase 7b). Gross/refunds/net by period and category, individual vs.
+    institutional -- see `services.get_revenue_report`."""
+
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
+
+    @extend_schema(operation_id="getRevenueReport", responses=RevenueReportSerializer)
+    def get(self, request):
+        date_from, date_to = _resolve_range_from_request(request)
+        report = services.get_revenue_report(date_from=date_from, date_to=date_to)
+        return Response(RevenueReportSerializer(report).data)
+
+
+class PeriodComparisonView(APIView):
+    """GET /reports/comparison -- Museum Manager/Platform Admin only
+    (Phase 7b). Current range vs. the immediately preceding one of the
+    same length -- see `services.get_period_comparison`."""
+
+    permission_classes = [IsMuseumManagerOrPlatformAdmin]
+
+    @extend_schema(operation_id="getPeriodComparison", responses=PeriodComparisonSerializer)
+    def get(self, request):
+        date_from, date_to = _resolve_range_from_request(request)
+        comparison = services.get_period_comparison(date_from=date_from, date_to=date_to)
+        return Response(PeriodComparisonSerializer(comparison).data)

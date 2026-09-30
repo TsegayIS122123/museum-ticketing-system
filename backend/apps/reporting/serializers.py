@@ -147,3 +147,200 @@ class BookingTimelineSerializer(serializers.Serializer):
         fields = super().get_fields()
         fields["from"] = fields.pop("from_")
         return fields
+
+
+# ============================================================================
+# Phase 7b (UAT round 1)
+# ============================================================================
+
+
+class InstitutionsReportRowSerializer(serializers.Serializer):
+    institutionId = serializers.UUIDField(source="institution_id", allow_null=True)
+    name = serializers.CharField()
+    tin = serializers.CharField(allow_null=True)
+    visitCount = serializers.IntegerField(source="visit_count")
+    distinctVisitDates = serializers.IntegerField(source="distinct_visit_dates")
+    bookedTotal = serializers.IntegerField(source="booked_total")
+    attendedTotal = serializers.IntegerField(source="attended_total")
+    revenueEtb = serializers.DecimalField(source="revenue_etb", max_digits=12, decimal_places=2)
+    firstVisit = serializers.DateField(source="first_visit")
+    lastVisit = serializers.DateField(source="last_visit")
+
+
+class InstitutionsReportMetaSerializer(serializers.Serializer):
+    limit = serializers.IntegerField()
+    offset = serializers.IntegerField()
+    total = serializers.IntegerField()
+
+
+class InstitutionsReportSerializer(serializers.Serializer):
+    """`GET /reports/institutions` response shape (Phase 7b)."""
+
+    from_ = serializers.DateField()
+    to = serializers.DateField()
+    data = InstitutionsReportRowSerializer(many=True)
+    meta = InstitutionsReportMetaSerializer()
+
+    def get_fields(self):
+        # Same DRF/drf-spectacular renaming trick used elsewhere in this
+        # codebase (see apps.reporting.serializers' own ReportSummary
+        # `from`/`from_` precedent) -- `from` is a Python keyword, so the
+        # field is declared as `from_` and renamed back to `from` here.
+        fields = super().get_fields()
+        fields["from"] = fields.pop("from_")
+        return fields
+
+
+class InstitutionBriefSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    nameAm = serializers.CharField(source="name_am", allow_null=True)
+    tin = serializers.CharField(allow_null=True)
+
+
+class InstitutionVisitSerializer(serializers.Serializer):
+    bookingId = serializers.UUIDField(source="booking_id")
+    reference = serializers.CharField()
+    visitDate = serializers.DateField(source="visit_date")
+    checkedInAt = serializers.DateTimeField(source="checked_in_at", allow_null=True)
+    headcountByCategory = serializers.DictField(
+        source="headcount_by_category", child=serializers.IntegerField()
+    )
+    bookedQuantity = serializers.IntegerField(source="booked_quantity")
+    attendedQuantity = serializers.IntegerField(source="attended_quantity", allow_null=True)
+    amountEtb = serializers.DecimalField(source="amount_etb", max_digits=12, decimal_places=2)
+    ifmisDocumentNo = serializers.CharField(source="ifmis_document_no", allow_null=True)
+    ifmisVoucherReference = serializers.CharField(source="ifmis_voucher_reference", allow_null=True)
+
+
+class InstitutionDetailSerializer(serializers.Serializer):
+    """`GET /reports/institutions/{id}` response shape (Phase 7b)."""
+
+    institution = InstitutionBriefSerializer()
+    from_ = serializers.DateField(allow_null=True)
+    to = serializers.DateField(allow_null=True)
+    visits = InstitutionVisitSerializer(many=True)
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["from"] = fields.pop("from_")
+        return fields
+
+
+class CategoryReportRowSerializer(serializers.Serializer):
+    category = serializers.CharField()
+    bookedTotal = serializers.IntegerField(source="booked_total")
+    attendedTotal = serializers.IntegerField(source="attended_total")
+    revenueEtb = serializers.DecimalField(source="revenue_etb", max_digits=12, decimal_places=2)
+    revenueSharePct = serializers.FloatField(source="revenue_share_pct", allow_null=True)
+
+
+class CategoryPeriodBucketSerializer(serializers.Serializer):
+    bucketStart = serializers.DateField(source="bucket_start")
+    countsByCategory = serializers.DictField(
+        source="counts_by_category", child=serializers.IntegerField()
+    )
+
+
+class CategoriesReportSerializer(serializers.Serializer):
+    """`GET /reports/categories` response shape (Phase 7b)."""
+
+    from_ = serializers.DateField()
+    to = serializers.DateField()
+    granularity = serializers.ChoiceField(choices=["daily", "weekly", "monthly"])
+    categories = CategoryReportRowSerializer(many=True)
+    periodBuckets = CategoryPeriodBucketSerializer(source="period_buckets", many=True)
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["from"] = fields.pop("from_")
+        return fields
+
+
+class AttendanceByCategorySerializer(serializers.Serializer):
+    category = serializers.CharField()
+    bookedTotal = serializers.IntegerField(source="booked_total")
+    attendedTotal = serializers.IntegerField(source="attended_total")
+    shortfallTotal = serializers.IntegerField(source="shortfall_total")
+    shortfallRatePct = serializers.FloatField(source="shortfall_rate_pct", allow_null=True)
+
+
+class AttendanceReportSerializer(serializers.Serializer):
+    """`GET /reports/attendance` response shape (Phase 7b)."""
+
+    from_ = serializers.DateField()
+    to = serializers.DateField()
+    bookedTotal = serializers.IntegerField(source="booked_total")
+    attendedTotal = serializers.IntegerField(source="attended_total")
+    shortfallTotal = serializers.IntegerField(source="shortfall_total")
+    shortfallRatePct = serializers.FloatField(source="shortfall_rate_pct", allow_null=True)
+    byCategory = AttendanceByCategorySerializer(source="by_category", many=True)
+    correctedBookingCount = serializers.IntegerField(source="corrected_booking_count")
+    currentlyFlaggedCount = serializers.IntegerField(source="currently_flagged_count")
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["from"] = fields.pop("from_")
+        return fields
+
+
+class RevenuePeriodBucketSerializer(serializers.Serializer):
+    bucketStart = serializers.DateField(source="bucket_start")
+    grossEtb = serializers.DecimalField(source="gross_etb", max_digits=12, decimal_places=2)
+    refundsEtb = serializers.DecimalField(source="refunds_etb", max_digits=12, decimal_places=2)
+    netEtb = serializers.DecimalField(source="net_etb", max_digits=12, decimal_places=2)
+
+
+class RevenueReportSerializer(serializers.Serializer):
+    """`GET /reports/revenue` response shape (Phase 7b)."""
+
+    from_ = serializers.DateField()
+    to = serializers.DateField()
+    granularity = serializers.ChoiceField(choices=["daily", "weekly", "monthly"])
+    grossEtb = serializers.DecimalField(source="gross_etb", max_digits=12, decimal_places=2)
+    refundsEtb = serializers.DecimalField(source="refunds_etb", max_digits=12, decimal_places=2)
+    netEtb = serializers.DecimalField(source="net_etb", max_digits=12, decimal_places=2)
+    revenueByCategory = serializers.DictField(
+        source="revenue_by_category", child=serializers.DecimalField(max_digits=12, decimal_places=2)
+    )
+    individualEtb = serializers.DecimalField(source="individual_etb", max_digits=12, decimal_places=2)
+    institutionalEtb = serializers.DecimalField(
+        source="institutional_etb", max_digits=12, decimal_places=2
+    )
+    periodBuckets = RevenuePeriodBucketSerializer(source="period_buckets", many=True)
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["from"] = fields.pop("from_")
+        return fields
+
+
+class ComparisonFigureSerializer(serializers.Serializer):
+    from_ = serializers.DateField()
+    to = serializers.DateField()
+    revenueEtb = serializers.DecimalField(source="revenue_etb", max_digits=12, decimal_places=2)
+    bookingCount = serializers.IntegerField(source="booking_count")
+    attendedTotal = serializers.IntegerField(source="attended_total")
+    shortfallRatePct = serializers.FloatField(source="shortfall_rate_pct", allow_null=True)
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["from"] = fields.pop("from_")
+        return fields
+
+
+class ComparisonDeltasSerializer(serializers.Serializer):
+    revenueEtbPct = serializers.FloatField(source="revenue_etb_pct", allow_null=True)
+    bookingCountPct = serializers.FloatField(source="booking_count_pct", allow_null=True)
+    attendedTotalPct = serializers.FloatField(source="attended_total_pct", allow_null=True)
+
+
+class PeriodComparisonSerializer(serializers.Serializer):
+    """`GET /reports/comparison` response shape (Phase 7b) -- powers the
+    Overview tab's "+12% vs previous period" KPI deltas. See
+    `services.get_period_comparison`'s own docstring for why this is
+    separate from `DashboardSerializer` above."""
+
+    current = ComparisonFigureSerializer()
+    previous = ComparisonFigureSerializer()
+    deltas = ComparisonDeltasSerializer()
