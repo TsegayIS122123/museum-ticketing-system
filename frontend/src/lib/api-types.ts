@@ -292,14 +292,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description GET /bookings/{id} -- the owning Visitor or any Staff member. */
+        /**
+         * @description GET /bookings/{id} -- the owning Visitor or any Staff member.
+         *
+         *     Also handles PATCH /bookings/{id} -- the owning Visitor only, editing
+         *     their own booking's ticket mix and/or visit date while it's still
+         *     `AwaitingPayment` (see `BookingUpdateSerializer`/`services.
+         *     update_awaiting_payment_booking`). Kept on the same resource/URL as
+         *     the GET above rather than a separate endpoint, since it's the same
+         *     `Booking` -- just a different HTTP method and a narrower audience.
+         */
         get: operations["getBooking"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * @description GET /bookings/{id} -- the owning Visitor or any Staff member.
+         *
+         *     Also handles PATCH /bookings/{id} -- the owning Visitor only, editing
+         *     their own booking's ticket mix and/or visit date while it's still
+         *     `AwaitingPayment` (see `BookingUpdateSerializer`/`services.
+         *     update_awaiting_payment_booking`). Kept on the same resource/URL as
+         *     the GET above rather than a separate endpoint, since it's the same
+         *     `Booking` -- just a different HTTP method and a narrower audience.
+         */
+        patch: operations["updateBooking"];
         trace?: never;
     };
     "/api/v1/bookings/{id}/cancel/": {
@@ -311,7 +330,16 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description POST /bookings/{id}/cancel -- FR-BOOK-005/006. */
+        /**
+         * @description POST /bookings/{id}/cancel -- FR-BOOK-005/006 for a `Pending`
+         *     (i.e. already paid) booking.
+         *
+         *     Also reachable against a still-unpaid `AwaitingPayment` booking, as
+         *     the delete half of the Visitor's own pre-payment editing capability
+         *     alongside `BookingDetailView.patch` above -- deliberately the same
+         *     endpoint rather than a separate one, since "cancel" is the right verb
+         *     either way; only the consequence (refund, or not) differs.
+         */
         post: operations["v1_bookings_cancel_create"];
         delete?: never;
         options?: never;
@@ -357,6 +385,39 @@ export interface paths {
          *     rationale.
          */
         patch: operations["v1_bookings_category_correction_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/category-corrections/batch/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description PATCH /bookings/{id}/category-corrections/batch -- Museum Manager
+         *     (or Platform Admin) only (ID-verification addendum, batch extension;
+         *     re-permissioned from the Cashier in UAT round 1).
+         *
+         *     Batch sibling of `BookingCategoryCorrectionView`/`BookingItemAddView`
+         *     above: accepts a list of the same per-item edit/add shapes those two
+         *     single-item endpoints take, and applies the whole list as one atomic
+         *     correction with a single combined delta. This is what actually fixes
+         *     the gate-workflow gap those two single-item endpoints have -- a
+         *     Manager who needs to bump two categories' headcounts in the same
+         *     visit (both undercharges) previously couldn't, because the first
+         *     single-item PATCH flips the booking out of `Pending` and the second
+         *     then 409s. See `services.apply_booking_corrections`'s own docstring
+         *     for the full rationale, including how it orders category-moves within
+         *     the batch and rejects an unresolvable two-way swap.
+         */
+        patch: operations["v1_bookings_category_corrections_batch_partial_update"];
         trace?: never;
     };
     "/api/v1/bookings/{id}/check-in/": {
@@ -474,6 +535,69 @@ export interface paths {
          *     (Section 8's default).
          */
         patch: operations["recordIfmisVoucher"];
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/items/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /bookings/{id}/items -- Museum Manager (or Platform Admin)
+         *     only (walk-up addendum to the ID-verification correction flow;
+         *     re-permissioned from the Cashier in UAT round 1).
+         *
+         *     Adds a brand-new line for a category that wasn't on the booking at
+         *     all -- e.g. a group booked as 3 Students shows up with 2 Adults never
+         *     part of the original booking -- then reopens payment for the new
+         *     item's full price. See `services.add_booking_item`'s own docstring
+         *     for why this is a distinct operation from
+         *     `BookingCategoryCorrectionView`, which only ever edits an existing
+         *     line. Lives here for the same `apps.payments` composition/module-
+         *     boundary reasons as `BookingCategoryCorrectionView` above.
+         */
+        post: operations["v1_bookings_items_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookings/{id}/receipt/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /bookings/{id}/receipt/download/ -- the owning Visitor or any
+         *     Staff member (same access rule as BookingDetailView).
+         *
+         *     `booking.receipt_url` (exposed as `receiptUrl` on BookingSerializer)
+         *     is a direct link straight to storage, used to *view* the PDF in a
+         *     new tab. It isn't a reliable target for a forced download initiated
+         *     from frontend JS: browser navigation to it works fine, but a
+         *     scripted `fetch()` of it can be blocked by CORS (storage is served
+         *     by the reverse proxy/object storage in staging/production, not this
+         *     Django app -- see config/urls.py) or by mixed-content restrictions
+         *     if that storage host isn't on HTTPS. Streaming the same bytes back
+         *     through this API host instead -- which the frontend already talks
+         *     to successfully for everything else -- sidesteps both, and
+         *     `as_attachment=True` makes the browser save it regardless of how
+         *     the response is loaded.
+         */
+        get: operations["v1_bookings_receipt_download_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/bookings/{id}/refund-requests/": {
@@ -675,6 +799,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/attendance/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /reports/attendance -- Museum Manager/Platform Admin only
+         *     (Phase 7b). Booked vs. attended vs. shortfall, plus the Manager's own
+         *     correction workload -- see `services.get_attendance_report`.
+         */
+        get: operations["getAttendanceReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/booking-timeline/": {
         parameters: {
             query?: never;
@@ -719,6 +864,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/categories/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /reports/categories -- Museum Manager/Platform Admin only
+         *     (Phase 7b). Headcount/revenue by category plus a time series -- see
+         *     `services.get_categories_report`.
+         */
+        get: operations["getCategoriesReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/comparison/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /reports/comparison -- Museum Manager/Platform Admin only
+         *     (Phase 7b). Current range vs. the immediately preceding one of the
+         *     same length -- see `services.get_period_comparison`.
+         */
+        get: operations["getPeriodComparison"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/dashboard/": {
         parameters: {
             query?: never;
@@ -731,6 +918,70 @@ export interface paths {
          *     (FR-REPORT-001).
          */
         get: operations["getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/institutions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /reports/institutions -- Museum Manager/Platform Admin only
+         *     (Phase 7b). Per-institution rollup over a `preset`- or `from`/`to`-
+         *     resolved range -- see `services.get_institutions_report`.
+         */
+        get: operations["getInstitutionsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/institutions/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /reports/institutions/{id} -- Museum Manager/Platform Admin
+         *     only (Phase 7b). One school's own visit history -- see
+         *     `services.get_institution_detail`. `from`/`to` optional here (unlike
+         *     every other Phase 7b report), both-or-neither.
+         */
+        get: operations["getInstitutionDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/revenue/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /reports/revenue -- Museum Manager/Platform Admin only
+         *     (Phase 7b). Gross/refunds/net by period and category, individual vs.
+         *     institutional -- see `services.get_revenue_report`.
+         */
+        get: operations["getRevenueReport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -769,7 +1020,10 @@ export interface paths {
         /**
          * @description GET /settlement/my-balance/ -- Cashier only. Her own outstanding
          *     balance (unreconciled Visited bookings minus unreconciled completed
-         *     refunds) -- never a platform-wide total (IFMIS decision).
+         *     refunds) -- never a platform-wide total (IFMIS decision). Also
+         *     surfaces `pendingVoucherCount` (Phase 6, UAT round 1) -- how many of
+         *     those outstanding bookings still need their IFMIS Document No/Ref No
+         *     recorded, so nothing is silently left pending at end of shift.
          */
         get: operations["getMyOutstandingBalance"];
         put?: never;
@@ -818,6 +1072,34 @@ export interface paths {
          *     ownership-scoping pattern).
          */
         get: operations["listReconciliations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settlement/reconciliations/{id}/transfer-receipt/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /settlement/reconciliations/{id}/transfer-receipt/download/ --
+         *     same ownership scoping as ReconciliationListView (a Cashier may only
+         *     download her own; Museum Manager/Platform Admin may download any).
+         *
+         *     See BookingReceiptDownloadView (apps.bookings.views) for why this
+         *     exists alongside `transfer_receipt_url`: that field points straight
+         *     at storage for *viewing* the PDF in a new tab, but isn't reliable
+         *     for a forced download triggered from frontend JS (CORS/mixed-content
+         *     depending on how storage is served). Streaming the same bytes back
+         *     through this API host, with `as_attachment=True`, sidesteps that.
+         */
+        get: operations["v1_settlement_reconciliations_transfer_receipt_download_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -902,6 +1184,12 @@ export interface components {
         /**
          * @description `UserProfile` (Document 04) -- Visitor and Staff share one shape; a
          *     Visitor's password-adjacent fields are simply never populated.
+         *
+         *     `email_verified_at`/`phone_verified_at` are exposed (read-only) so the
+         *     frontend can gate a Visitor's flow -- e.g. requiring email verification
+         *     right after OTP confirmation (FR-ACC-003) -- without having to guess at
+         *     verification state or discover it only when a later action (like
+         *     `create_booking`) rejects it.
          */
         Account: {
             /** Format: uuid */
@@ -935,6 +1223,33 @@ export interface components {
             full_name?: string;
             phone?: string | null;
             language_preference?: components["schemas"]["LanguagePreferenceEnum"];
+        };
+        AttendanceByCategory: {
+            category: string;
+            bookedTotal: number;
+            attendedTotal: number;
+            shortfallTotal: number;
+            /** Format: double */
+            shortfallRatePct: number | null;
+        };
+        /** @description `GET /reports/attendance` response shape (Phase 7b). */
+        AttendanceReport: {
+            /** Format: date */
+            to: string;
+            bookedTotal: number;
+            attendedTotal: number;
+            shortfallTotal: number;
+            /** Format: double */
+            shortfallRatePct: number | null;
+            byCategory: components["schemas"]["AttendanceByCategory"][];
+            noShowBookingCount: number;
+            noShowHeadcount: number;
+            /** Format: double */
+            noShowRatePct: number | null;
+            correctedBookingCount: number;
+            currentlyFlaggedCount: number;
+            /** Format: date */
+            from: string;
         };
         AuthResponse: {
             access_token: string;
@@ -986,6 +1301,20 @@ export interface components {
             readonly totalAmountEtb: string;
             /** Format: date-time */
             readonly createdAt: string;
+        };
+        /**
+         * @description One line of a `BookingCategoryCorrectionBatchSerializer` -- same
+         *     field shape as `BookingCategoryCorrectionSerializer` (edit) or
+         *     `BookingItemAddSerializer` (add), disambiguated by whether `itemId` is
+         *     given. See `services.apply_booking_corrections`'s own docstring for
+         *     why a batch of these exists at all.
+         */
+        BookingCorrectionOp: {
+            /** Format: uuid */
+            itemId?: string | null;
+            /** Format: uuid */
+            categoryId?: string;
+            quantity?: number;
         };
         /**
          * @description `BookingCreateRequest` -- FR-BOOK-001 (individual), FR-BOOK-003
@@ -1042,6 +1371,23 @@ export interface components {
             /** Format: decimal */
             readonly subtotalEtb: string;
         };
+        /**
+         * @description `BookingItemAddRequest` -- Museum Manager only (walk-up addendum
+         *     to the ID-verification correction flow, re-permissioned from the
+         *     Cashier in UAT round 1). Adds a brand-new line for a
+         *     category that isn't already on the booking -- see
+         *     `services.add_booking_item`'s own docstring for why this is a
+         *     separate operation from `BookingCategoryCorrectionSerializer`, which
+         *     only ever edits an existing line.
+         *
+         *     Both fields are required, unlike the correction serializer above: an
+         *     added item has no existing category/quantity to leave unchanged.
+         */
+        BookingItemAdd: {
+            /** Format: uuid */
+            categoryId: string;
+            quantity: number;
+        };
         /** @description `BookingRescheduleRequest` -- FR-BOOK-007. */
         BookingReschedule: {
             /** Format: date */
@@ -1093,6 +1439,17 @@ export interface components {
          */
         BookingTypeEnum: "individual" | "group";
         /**
+         * @description One `{categoryId, quantity}` entry of a `BookingUpdateRequest`'s
+         *     `items` list -- same shape as `BookingCreateItemSerializer`, kept as
+         *     a separate class since the two requests' fields are otherwise
+         *     unrelated (this one has no `bookingType`/group fields at all).
+         */
+        BookingUpdateItem: {
+            /** Format: uuid */
+            categoryId: string;
+            quantity: number;
+        };
+        /**
          * @description One row of `GET /reports/cashier-balances`'s `cashiers` list --
          *     see `services.get_cashier_balances`.
          */
@@ -1143,6 +1500,16 @@ export interface components {
             /** Format: date-time */
             readonly createdAt: string;
         };
+        /** @description `GET /reports/categories` response shape (Phase 7b). */
+        CategoriesReport: {
+            /** Format: date */
+            to: string;
+            granularity: components["schemas"]["GranularityEnum"];
+            categories: components["schemas"]["CategoryReportRow"][];
+            periodBuckets: components["schemas"]["CategoryPeriodBucket"][];
+            /** Format: date */
+            from: string;
+        };
         /**
          * @description `Category` (Document 04) -- FR-CAT-001. Read-only: every mutation
          *     goes through Create/Update below and services.py, never through this
@@ -1165,6 +1532,22 @@ export interface components {
             /** Format: decimal */
             price_etb: string;
             is_free?: boolean;
+        };
+        CategoryPeriodBucket: {
+            /** Format: date */
+            bucketStart: string;
+            countsByCategory: {
+                [key: string]: number;
+            };
+        };
+        CategoryReportRow: {
+            category: string;
+            bookedTotal: number;
+            attendedTotal: number;
+            /** Format: decimal */
+            revenueEtb: string;
+            /** Format: double */
+            revenueSharePct: number | null;
         };
         /**
          * @description `CategoryUpdateRequest` -- Museum Manager only (FR-CAT-002). Every
@@ -1280,6 +1663,26 @@ export interface components {
             readonly createdAt: string;
             readonly voucher: components["schemas"]["Voucher"];
         };
+        ComparisonDeltas: {
+            /** Format: double */
+            revenueEtbPct: number | null;
+            /** Format: double */
+            bookingCountPct: number | null;
+            /** Format: double */
+            attendedTotalPct: number | null;
+        };
+        ComparisonFigure: {
+            /** Format: date */
+            to: string;
+            /** Format: decimal */
+            revenueEtb: string;
+            bookingCount: number;
+            attendedTotal: number;
+            /** Format: double */
+            shortfallRatePct: number | null;
+            /** Format: date */
+            from: string;
+        };
         /** @description `GET /reports/dashboard` response shape (FR-REPORT-001). */
         Dashboard: {
             /** Format: decimal */
@@ -1295,12 +1698,11 @@ export interface components {
          *     through `DateAvailabilityUpdateSerializer` and services.py.
          *
          *     `closedReason` distinguishes the weekly Sunday closure from a
-         *     one-off Manager closure (UAT round 1) so the calendar can label
-         *     them differently. Computed here via
-         *     `services.is_recurring_closed_day` rather than read off a
-         *     `closed_reason` attribute, so this serializer works the same
-         *     whether it's serializing `list_date_availability`'s materialized
-         *     results or a single freshly-saved row from
+         *     one-off Manager closure (UAT round 1) so the calendar can label them
+         *     differently. Computed here via `services.is_recurring_closed_day`
+         *     rather than read off a `closed_reason` attribute, so this serializer
+         *     works the same whether it's serializing `list_date_availability`'s
+         *     materialized results or a single freshly-saved row from
          *     `set_date_availability`.
          */
         DateAvailability: {
@@ -1311,8 +1713,7 @@ export interface components {
             closedByUserId: string | null;
             /** Format: date-time */
             closedAt: string | null;
-            /** @enum {string|null} */
-            closedReason: "weekly_closure" | "manager_closed" | null;
+            readonly closedReason: string;
         };
         /** @description `DateAvailabilityUpdateRequest` -- Museum Manager only (FR-BOOK-008). */
         DateAvailabilityUpdate: {
@@ -1336,6 +1737,13 @@ export interface components {
             /** Format: email */
             email: string;
         };
+        /**
+         * @description * `daily` - daily
+         *     * `weekly` - weekly
+         *     * `monthly` - monthly
+         * @enum {string}
+         */
+        GranularityEnum: "daily" | "weekly" | "monthly";
         GroupVsIndividualSplit: {
             group: number;
             individual: number;
@@ -1353,9 +1761,69 @@ export interface components {
             readonly nameAm: string | null;
             readonly tin: string;
         };
-        /** @description Response envelope for `GET /institutions/?tin=...`. `institution` is null for a TIN that isn't on file yet -- the expected, common case for a school's first-ever booking, not an error. */
-        InstitutionLookupResponse: {
-            institution: components["schemas"]["Institution"] | null;
+        InstitutionBrief: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            nameAm: string | null;
+            tin: string | null;
+        };
+        /** @description `GET /reports/institutions/{id}` response shape (Phase 7b). */
+        InstitutionDetail: {
+            institution: components["schemas"]["InstitutionBrief"];
+            /** Format: date */
+            to: string | null;
+            visits: components["schemas"]["InstitutionVisit"][];
+            /** Format: date */
+            from: string | null;
+        };
+        InstitutionVisit: {
+            /** Format: uuid */
+            bookingId: string;
+            reference: string;
+            /** Format: date */
+            visitDate: string;
+            /** Format: date-time */
+            checkedInAt: string | null;
+            headcountByCategory: {
+                [key: string]: number;
+            };
+            bookedQuantity: number;
+            attendedQuantity: number | null;
+            /** Format: decimal */
+            amountEtb: string;
+            ifmisDocumentNo: string | null;
+            ifmisVoucherReference: string | null;
+        };
+        /** @description `GET /reports/institutions` response shape (Phase 7b). */
+        InstitutionsReport: {
+            /** Format: date */
+            to: string;
+            data: components["schemas"]["InstitutionsReportRow"][];
+            meta: components["schemas"]["InstitutionsReportMeta"];
+            /** Format: date */
+            from: string;
+        };
+        InstitutionsReportMeta: {
+            limit: number;
+            offset: number;
+            total: number;
+        };
+        InstitutionsReportRow: {
+            /** Format: uuid */
+            institutionId: string | null;
+            name: string;
+            tin: string | null;
+            visitCount: number;
+            distinctVisitDates: number;
+            bookedTotal: number;
+            attendedTotal: number;
+            /** Format: decimal */
+            revenueEtb: string;
+            /** Format: date */
+            firstVisit: string;
+            /** Format: date */
+            lastVisit: string;
         };
         /**
          * @description * `en` - English
@@ -1421,15 +1889,16 @@ export interface components {
             };
         };
         /**
-         * @description `BookingCategoryCorrectionRequest` -- Cashier only (ID-verification
-         *     addendum to Document 02 Sec 2.2). `itemId` identifies which of the
+         * @description `BookingCategoryCorrectionRequest` -- Museum Manager only
+         *     (ID-verification addendum to Document 02 Sec 2.2, re-permissioned
+         *     from the Cashier in UAT round 1). `itemId` identifies which of the
          *     booking's `BookingItem` line items to correct -- see
          *     `services.correct_booking_category`'s own docstring for why a
          *     mixed-category booking needs this instead of assuming there's only
          *     ever one category to correct.
          *
          *     `categoryId`/`quantity` are each optional at this field-shape layer
-         *     -- a Cashier may be fixing just the category (bad ID), just the
+         *     -- the Manager may be fixing just the category (bad ID), just the
          *     headcount for that item (e.g. 3 tickets bought under it but only 2
          *     people showed up), or both together. Requiring at least one of them
          *     is a cross-field rule, not a per-field one, so it's enforced in
@@ -1443,6 +1912,35 @@ export interface components {
             quantity?: number;
         };
         /**
+         * @description `BookingCategoryCorrectionBatchRequest` -- Museum Manager only
+         *     (ID-verification addendum, batch extension; re-permissioned from the
+         *     Cashier in UAT round 1). Wraps a list of
+         *     `BookingCorrectionOpSerializer` lines and applies all of them as one
+         *     atomic correction with a single combined delta -- see
+         *     `services.apply_booking_corrections`'s own docstring for the full
+         *     rationale (in short: the single-item `category-correction`/`items`
+         *     endpoints can each only carry one undercharging change per Pending
+         *     booking before the next call 409s).
+         */
+        PatchedBookingCategoryCorrectionBatch: {
+            ops?: components["schemas"]["BookingCorrectionOp"][];
+        };
+        /**
+         * @description `BookingUpdateRequest` -- Visitor-only edit of their own still-
+         *     unpaid (`AwaitingPayment`) booking (see
+         *     `services.update_awaiting_payment_booking`). Both `items` and
+         *     `visitDate` are optional here, unlike `BookingCreateSerializer`: a
+         *     Visitor may only be fixing one of the two. There is no
+         *     `bookingType`/`groupName`/`groupTin` here -- Document 02 has no
+         *     notion of changing what *kind* of booking this is after the fact,
+         *     only its ticket mix and date.
+         */
+        PatchedBookingUpdate: {
+            /** Format: date */
+            visitDate?: string;
+            items?: components["schemas"]["BookingUpdateItem"][];
+        };
+        /**
          * @description `IfmisVoucherUpdateRequest` -- Cashier only. The real Document No
          *     *and* Ref No she gets back from IFMIS after keying the check-in
          *     transaction in herself -- both required together (Section 8's
@@ -1454,6 +1952,17 @@ export interface components {
         PatchedIfmisVoucherUpdate: {
             documentNo?: string;
             refNo?: string;
+        };
+        /**
+         * @description `GET /reports/comparison` response shape (Phase 7b) -- powers the
+         *     Overview tab's "+12% vs previous period" KPI deltas. See
+         *     `services.get_period_comparison`'s own docstring for why this is
+         *     separate from `DashboardSerializer` above.
+         */
+        PeriodComparison: {
+            current: components["schemas"]["ComparisonFigure"];
+            previous: components["schemas"]["ComparisonFigure"];
+            deltas: components["schemas"]["ComparisonDeltas"];
         };
         /**
          * @description * `daily` - daily
@@ -1527,6 +2036,38 @@ export interface components {
         ResetPassword: {
             token: string;
             new_password: string;
+        };
+        RevenuePeriodBucket: {
+            /** Format: date */
+            bucketStart: string;
+            /** Format: decimal */
+            grossEtb: string;
+            /** Format: decimal */
+            refundsEtb: string;
+            /** Format: decimal */
+            netEtb: string;
+        };
+        /** @description `GET /reports/revenue` response shape (Phase 7b). */
+        RevenueReport: {
+            /** Format: date */
+            to: string;
+            granularity: components["schemas"]["GranularityEnum"];
+            /** Format: decimal */
+            grossEtb: string;
+            /** Format: decimal */
+            refundsEtb: string;
+            /** Format: decimal */
+            netEtb: string;
+            revenueByCategory: {
+                [key: string]: string;
+            };
+            /** Format: decimal */
+            individualEtb: string;
+            /** Format: decimal */
+            institutionalEtb: string;
+            periodBuckets: components["schemas"]["RevenuePeriodBucket"][];
+            /** Format: date */
+            from: string;
         };
         /**
          * @description `StaffCreateRequest` (Document 04) -- FR-ACC-002, Platform Admin
@@ -1637,27 +2178,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    lookupInstitution: {
-        parameters: {
-            query: {
-                tin: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InstitutionLookupResponse"];
-                };
-            };
-        };
-    };
     v1_admin_staff_list: {
         parameters: {
             query?: {
@@ -2057,6 +2577,33 @@ export interface operations {
             };
         };
     };
+    updateBooking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedBookingUpdate"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedBookingUpdate"];
+                "multipart/form-data": components["schemas"]["PatchedBookingUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Booking"];
+                };
+            };
+        };
+    };
     v1_bookings_cancel_create: {
         parameters: {
             query?: never;
@@ -2092,6 +2639,33 @@ export interface operations {
                 "application/json": components["schemas"]["PatchedBookingCategoryCorrection"];
                 "application/x-www-form-urlencoded": components["schemas"]["PatchedBookingCategoryCorrection"];
                 "multipart/form-data": components["schemas"]["PatchedBookingCategoryCorrection"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Booking"];
+                };
+            };
+        };
+    };
+    v1_bookings_category_corrections_batch_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedBookingCategoryCorrectionBatch"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedBookingCategoryCorrectionBatch"];
+                "multipart/form-data": components["schemas"]["PatchedBookingCategoryCorrectionBatch"];
             };
         };
         responses: {
@@ -2198,6 +2772,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Booking"];
                 };
+            };
+        };
+    };
+    v1_bookings_items_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingItemAdd"];
+                "application/x-www-form-urlencoded": components["schemas"]["BookingItemAdd"];
+                "multipart/form-data": components["schemas"]["BookingItemAdd"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Booking"];
+                };
+            };
+        };
+    };
+    v1_bookings_receipt_download_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2372,6 +2993,27 @@ export interface operations {
             };
         };
     };
+    lookupInstitution: {
+        parameters: {
+            query: {
+                tin: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Institution"];
+                };
+            };
+        };
+    };
     handleChapaWebhook: {
         parameters: {
             query?: never;
@@ -2434,6 +3076,25 @@ export interface operations {
             };
         };
     };
+    getAttendanceReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceReport"];
+                };
+            };
+        };
+    };
     getBookingTimeline: {
         parameters: {
             query?: never;
@@ -2472,6 +3133,44 @@ export interface operations {
             };
         };
     };
+    getCategoriesReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoriesReport"];
+                };
+            };
+        };
+    };
+    getPeriodComparison: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodComparison"];
+                };
+            };
+        };
+    };
     getDashboard: {
         parameters: {
             query?: never;
@@ -2487,6 +3186,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+        };
+    };
+    getInstitutionsReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionsReport"];
+                };
+            };
+        };
+    };
+    getInstitutionDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionDetail"];
+                };
+            };
+        };
+    };
+    getRevenueReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevenueReport"];
                 };
             };
         };
@@ -2569,6 +3327,26 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PaginatedCashierReconciliationList"];
                 };
+            };
+        };
+    };
+    v1_settlement_reconciliations_transfer_receipt_download_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

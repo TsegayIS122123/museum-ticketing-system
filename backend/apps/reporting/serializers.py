@@ -275,6 +275,9 @@ class AttendanceReportSerializer(serializers.Serializer):
     shortfallTotal = serializers.IntegerField(source="shortfall_total")
     shortfallRatePct = serializers.FloatField(source="shortfall_rate_pct", allow_null=True)
     byCategory = AttendanceByCategorySerializer(source="by_category", many=True)
+    noShowBookingCount = serializers.IntegerField(source="no_show_booking_count")
+    noShowHeadcount = serializers.IntegerField(source="no_show_headcount")
+    noShowRatePct = serializers.FloatField(source="no_show_rate_pct", allow_null=True)
     correctedBookingCount = serializers.IntegerField(source="corrected_booking_count")
     currentlyFlaggedCount = serializers.IntegerField(source="currently_flagged_count")
 

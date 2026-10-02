@@ -458,3 +458,31 @@ def test_period_comparison_previous_range_is_immediately_preceding():
     )
     assert comparison["previous"]["to"] == TODAY - timedelta(days=7)
     assert comparison["previous"]["from"] == TODAY - timedelta(days=13)
+
+
+def test_attendance_report_no_show_counts_past_pending_bookings_only():
+    from datetime import timedelta
+
+    category = _make_category()
+    _make_visited_booking(category=category, booked_quantity=8, visit_date=TODAY - timedelta(days=2))
+    past = _make_visited_booking(category=category, booked_quantity=2, visit_date=TODAY - timedelta(days=2))
+    future = _make_visited_booking(category=category, booked_quantity=5, visit_date=TODAY + timedelta(days=3))
+    Booking.objects.filter(id__in=[past.id, future.id]).update(status=Booking.Status.PENDING)
+
+    report = services.get_attendance_report(
+        date_from=TODAY - timedelta(days=2), date_to=TODAY + timedelta(days=3)
+    )
+
+    # Only the past-dated Pending booking is a no-show; the future one is not yet.
+    assert report["no_show_booking_count"] == 1
+    assert report["no_show_headcount"] == 2
+    # 2 / (8 attended-or-booked + 2 no-show) = 20%
+    assert report["no_show_rate_pct"] == 20.0
+    # shortfall stays a separate figure about checked-in bookings only
+    assert report["shortfall_total"] == 0
+
+
+def test_attendance_report_no_show_rate_none_without_data():
+    report = services.get_attendance_report(date_from=TODAY, date_to=TODAY)
+    assert report["no_show_rate_pct"] is None
+    assert report["no_show_booking_count"] == 0

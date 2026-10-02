@@ -75,12 +75,16 @@ def test_date_with_no_row_is_open_by_default():
 
 
 def test_list_date_availability_materializes_defaults_for_untouched_dates():
-    results = services.list_date_availability(date_from=TOMORROW, date_to=TOMORROW + timedelta(days=2))
+    # Start on a Monday so the 3-day window never contains a Sunday
+    # (always closed since UAT round 1) -- keeps this test independent of
+    # the weekday it runs on.
+    monday = TOMORROW + timedelta(days=(7 - TOMORROW.weekday()) % 7)
+    results = services.list_date_availability(date_from=monday, date_to=monday + timedelta(days=2))
 
     assert [r.visit_date for r in results] == [
-        TOMORROW,
-        TOMORROW + timedelta(days=1),
-        TOMORROW + timedelta(days=2),
+        monday,
+        monday + timedelta(days=1),
+        monday + timedelta(days=2),
     ]
     assert all(r.is_open_for_booking for r in results)
 
@@ -1106,7 +1110,7 @@ def test_list_bookings_for_staff_flagged_only_returns_flagged():
     from apps.entrance.services import flag_booking_mismatch
 
     flagged, _visitor = _make_pending_booking()
-    _unflagged, _visitor2 = _make_pending_booking()
+    _unflagged, _visitor2 = _make_pending_booking(_make_visitor(email="other@example.com"))
     cashier = _make_cashier()
     flag_booking_mismatch(booking=flagged, actor=cashier)
 
@@ -1122,7 +1126,7 @@ def test_list_bookings_for_staff_flagged_prioritizes_todays_visit_date():
     later, _v1 = _make_pending_booking()
     flag_booking_mismatch(booking=later, actor=cashier)
 
-    today_booking, _v2 = _make_pending_booking()
+    today_booking, _v2 = _make_pending_booking(_make_visitor(email="other@example.com"))
     Booking.objects.filter(id=today_booking.id).update(visit_date=date.today())
     today_booking.refresh_from_db()
     flag_booking_mismatch(booking=today_booking, actor=cashier)

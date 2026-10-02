@@ -61,20 +61,24 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
   // docstring for how a booker overriding the name is still handled at
   // submit time (last-typed-name-wins, audit-logged), not blocked here.
   const [autofilledName, setAutofilledName] = useState<string | null>(null);
-  const [institutionMatch, setInstitutionMatch] = useState<{ name: string } | null>(null);
+  // The lookup result is stored with the TIN it answered, and the match
+  // shown is *derived*: it only applies while the field still holds that
+  // exact TIN. So editing the TIN away from a matched one drops the
+  // "Recognised" confirmation immediately, with no setState in the effect.
+  const [lookup, setLookup] = useState<{ tin: string; name: string } | null>(null);
+  const cleanedTin = groupTin.replace(/[\s-]/g, '');
+  const institutionMatch =
+    /^\d{10}$/.test(cleanedTin) && lookup?.tin === cleanedTin ? { name: lookup.name } : null;
 
   useEffect(() => {
     const cleaned = groupTin.replace(/[\s-]/g, '');
-    if (!/^\d{10}$/.test(cleaned)) {
-      setInstitutionMatch(null);
-      return;
-    }
+    if (!/^\d{10}$/.test(cleaned)) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
         const institution = await lookupInstitutionByTin(cleaned);
         if (cancelled) return;
-        setInstitutionMatch(institution ? { name: institution.name } : null);
+        setLookup(institution ? { tin: cleaned, name: institution.name } : null);
         if (institution && (groupName.trim() === '' || groupName === autofilledName)) {
           setGroupName(institution.name);
           setAutofilledName(institution.name);
@@ -83,7 +87,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
         // A failed lookup just means no autofill this time -- the
         // booker can still type the name themselves and submit
         // normally; this is a convenience, not a required step.
-        if (!cancelled) setInstitutionMatch(null);
+        if (!cancelled) setLookup(null);
       }
     }, 400);
     return () => {

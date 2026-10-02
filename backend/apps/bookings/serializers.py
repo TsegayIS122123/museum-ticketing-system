@@ -205,6 +205,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "groupContactPhone",
             "groupTin",
             "institutionId",
+            "visitorName",
             "visitorEmail",
             "visitorPhone",
             "bookedQuantity",

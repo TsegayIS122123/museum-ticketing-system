@@ -100,6 +100,9 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('bookings', '0010_booking_institution'),
+        # Reads/writes core.AuditLogEntry via apps.get_model("core", ...) --
+        # must be declared, or a fresh DB (CI, new dev) can't resolve it.
+        ('core', '0001_initial'),
     ]
 
     operations = [

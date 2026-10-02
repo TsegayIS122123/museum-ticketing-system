@@ -279,3 +279,43 @@ html[lang="am"] {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-stone-400);
 }
+
+/* ------------------------------------------------------------------
+   Print (UAT round 1, Phase 7c): the Manager's quarterly report is
+   printed / saved as PDF for the ministry. Hide site + staff chrome and
+   every interactive control (anything marked `.no-print`), drop card
+   shadows, and keep charts/rows from splitting across pages.
+   ------------------------------------------------------------------ */
+@media print {
+  header,
+  footer,
+  aside,
+  nav,
+  .no-print,
+  [data-surface="staff"] > header {
+    display: none !important;
+  }
+  body,
+  [data-surface="staff"] {
+    background: #fff !important;
+  }
+  [data-slot="card"] {
+    box-shadow: none !important;
+    border-color: #d6d0c8 !important;
+    break-inside: avoid;
+  }
+  .reports-root {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  tr,
+  svg {
+    break-inside: avoid;
+  }
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+  @page {
+    margin: 14mm;
+  }
+}

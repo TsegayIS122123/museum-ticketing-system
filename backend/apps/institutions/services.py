@@ -83,19 +83,23 @@ def resolve_institution(*, name, tin, name_am=None, actor=None):
             "created_by_user_id": actor,
         },
     )
-    if not created and institution.name != name:
+    if not created:
+        update_fields = []
         old_name = institution.name
-        institution.name = name
-        update_fields = ["name", "updated_at"]
+        if institution.name != name:
+            institution.name = name
+            update_fields.append("name")
         if name_am and not institution.name_am:
             institution.name_am = name_am
             update_fields.append("name_am")
-        institution.save(update_fields=update_fields)
-        write_audit_log(
-            actor_id=actor.id if actor else None,
-            action="institution.name_corrected",
-            target_type="institution",
-            target_id=institution.id,
-            metadata={"old_name": old_name, "new_name": name, "tin": normalized_tin},
-        )
+        if update_fields:
+            institution.save(update_fields=update_fields + ["updated_at"])
+        if old_name != name:
+            write_audit_log(
+                actor_id=actor.id if actor else None,
+                action="institution.name_corrected",
+                target_type="institution",
+                target_id=institution.id,
+                metadata={"old_name": old_name, "new_name": name, "tin": normalized_tin},
+            )
     return institution

@@ -28,22 +28,35 @@ export default function AttendanceQueuePage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const load = useCallback(async () => {
+  const fetchQueue = useCallback(
+    () =>
+      getFlaggedBookings({ limit: 100 })
+        .then((response) => {
+          setBookings(response.data);
+          setError(null);
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : '';
+          setError(message || t('failed_to_load') || 'Failed to load flagged bookings.');
+        })
+        .finally(() => setIsLoading(false)),
+    [t]
+  );
+
+  // First load: `isLoading` starts true and `error` null, so nothing needs
+  // setting synchronously here -- state is only written when the request
+  // settles (the rule against synchronous setState in an effect is right:
+  // it caused a cascading re-render on mount).
+  useEffect(() => {
+    void fetchQueue();
+  }, [fetchQueue]);
+
+  // Manual refresh: show the spinner state, then re-run the same fetch.
+  const load = () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const response = await getFlaggedBookings({ limit: 100 });
-      setBookings(response.data);
-    } catch (err: any) {
-      setError(err.message || t('failed_to_load') || 'Failed to load flagged bookings.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+    void fetchQueue();
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);

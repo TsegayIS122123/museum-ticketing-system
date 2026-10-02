@@ -38,3 +38,82 @@ export async function getBookingTimeline(range?: { from: string; to: string }): 
   return apiClient.get<BookingTimelineResponse>(`/reports/booking-timeline${query}`);
 }
 
+
+// ---------------------------------------------------------------------
+// Phase 7b/7c (UAT round 1): range-driven reports. Every endpoint below
+// takes either a `preset` or an explicit `from`/`to` pair -- see
+// backend/apps/reporting/services.py::resolve_report_range. The page
+// always sends an explicit `from`/`to` (resolved client-side from the
+// URL), so one range value drives every tab identically.
+// ---------------------------------------------------------------------
+
+export type InstitutionsReportResponse = components['schemas']['InstitutionsReport'];
+export type InstitutionsReportRow = components['schemas']['InstitutionsReportRow'];
+export type InstitutionDetailResponse = components['schemas']['InstitutionDetail'];
+export type CategoriesReportResponse = components['schemas']['CategoriesReport'];
+export type AttendanceReportResponse = components['schemas']['AttendanceReport'];
+export type RevenueReportResponse = components['schemas']['RevenueReport'];
+export type PeriodComparisonResponse = components['schemas']['PeriodComparison'];
+
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+export type InstitutionSort =
+  | 'name'
+  | '-name'
+  | 'visit_count'
+  | '-visit_count'
+  | 'attended_total'
+  | '-attended_total'
+  | 'revenue_etb'
+  | '-revenue_etb';
+
+const rangeQuery = (range: DateRange) => `from=${range.from}&to=${range.to}`;
+
+export async function getInstitutionsReport(
+  range: DateRange,
+  opts: { sort?: InstitutionSort; limit?: number; offset?: number } = {}
+): Promise<InstitutionsReportResponse> {
+  const { sort = '-revenue_etb', limit = 25, offset = 0 } = opts;
+  return apiClient.get<InstitutionsReportResponse>(
+    `/reports/institutions?${rangeQuery(range)}&sort=${sort}&limit=${limit}&offset=${offset}`
+  );
+}
+
+// Unbounded-by-the-UI fetch used only for the CSV export, so the file
+// holds every institution in the range rather than just the visible page.
+export async function getAllInstitutions(range: DateRange): Promise<InstitutionsReportRow[]> {
+  const pageSize = 200;
+  const rows: InstitutionsReportRow[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await getInstitutionsReport(range, { limit: pageSize, offset });
+    rows.push(...page.data);
+    if (rows.length >= page.meta.total || page.data.length === 0) break;
+  }
+  return rows;
+}
+
+export async function getInstitutionDetail(
+  id: string,
+  range: DateRange
+): Promise<InstitutionDetailResponse> {
+  return apiClient.get<InstitutionDetailResponse>(`/reports/institutions/${id}?${rangeQuery(range)}`);
+}
+
+export async function getCategoriesReport(range: DateRange): Promise<CategoriesReportResponse> {
+  return apiClient.get<CategoriesReportResponse>(`/reports/categories?${rangeQuery(range)}`);
+}
+
+export async function getAttendanceReport(range: DateRange): Promise<AttendanceReportResponse> {
+  return apiClient.get<AttendanceReportResponse>(`/reports/attendance?${rangeQuery(range)}`);
+}
+
+export async function getRevenueReport(range: DateRange): Promise<RevenueReportResponse> {
+  return apiClient.get<RevenueReportResponse>(`/reports/revenue?${rangeQuery(range)}`);
+}
+
+export async function getPeriodComparison(range: DateRange): Promise<PeriodComparisonResponse> {
+  return apiClient.get<PeriodComparisonResponse>(`/reports/comparison?${rangeQuery(range)}`);
+}

@@ -1022,11 +1022,31 @@ def get_attendance_report(*, date_from, date_to):
     predating that change, not something new bookings can still produce.
     Kept anyway, not assumed zero, so this report still tells the truth
     about older data.
+
+    **No-shows are a separate figure** (`no_show_*`): a paid booking
+    (status `Pending`) whose visit date is already in the past -- the
+    party never came through the gate, so nothing was ever checked in. It
+    is deliberately NOT part of `shortfall_*` above (which only looks at
+    bookings that *were* checked in) so the two never get conflated.
+    `no_show_rate_pct` = no-show headcount / (headcount of past-dated
+    bookings that were either checked in or never showed). Future-dated
+    `Pending` bookings are not no-shows yet and are excluded; "past" is
+    judged against `timezone.localdate()` (Africa/Addis_Ababa).
     """
     if date_from > date_to:
         raise ValidationError({"from": "Must not be after `to`."})
 
     visited = _visited_bookings_queryset().filter(visit_date__gte=date_from, visit_date__lte=date_to)
+
+    no_show_qs = Booking.objects.filter(
+        status=Booking.Status.PENDING,
+        visit_date__gte=date_from,
+        visit_date__lte=date_to,
+        visit_date__lt=timezone.localdate(),
+    )
+    no_show_agg = no_show_qs.aggregate(headcount=Coalesce(Sum("booked_quantity"), 0))
+    no_show_booking_count = no_show_qs.count()
+    no_show_headcount = no_show_agg["headcount"]
 
     overall = visited.aggregate(
         booked=Coalesce(Sum("booked_quantity"), 0),
@@ -1050,6 +1070,11 @@ def get_attendance_report(*, date_from, date_to):
         .annotate(booked=Sum("quantity"), attended=Coalesce(Sum("attended_quantity"), 0))
     ]
 
+    expected_headcount = booked_total + no_show_headcount
+    no_show_rate_pct = (
+        float(no_show_headcount / expected_headcount * 100) if expected_headcount else None
+    )
+
     corrected_booking_count = visited.filter(category_corrected_at__isnull=False).count()
     currently_flagged_count = Booking.objects.filter(flagged_mismatch_at__isnull=False).count()
 
@@ -1061,6 +1086,9 @@ def get_attendance_report(*, date_from, date_to):
         "shortfall_total": shortfall_total,
         "shortfall_rate_pct": shortfall_rate_pct,
         "by_category": by_category,
+        "no_show_booking_count": no_show_booking_count,
+        "no_show_headcount": no_show_headcount,
+        "no_show_rate_pct": no_show_rate_pct,
         "corrected_booking_count": corrected_booking_count,
         "currently_flagged_count": currently_flagged_count,
     }
