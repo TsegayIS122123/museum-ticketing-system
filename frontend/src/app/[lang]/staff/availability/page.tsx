@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Check, X, Calendar } from 'lucide-react';
+import { parseLocalIsoDate, toLocalIsoDate } from '@/lib/utils/dates';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -37,7 +38,7 @@ const buildMonthDates = (): string[] => {
 
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(startYear, startMonth, day);
-    dates.push(date.toISOString().split('T')[0]);
+    dates.push(toLocalIsoDate(date));
   }
 
   return dates;
@@ -138,7 +139,7 @@ export default function AvailabilityPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalIsoDate(dateStr);
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
       weekday: 'short',
       year: 'numeric',
@@ -147,7 +148,7 @@ export default function AvailabilityPage() {
     });
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalIsoDate(new Date());
   const currentMonth = new Date().toLocaleString(locale === 'en' ? 'en-US' : 'am-ET', {
     month: 'long',
     year: 'numeric',
@@ -170,7 +171,7 @@ export default function AvailabilityPage() {
         <p className="text-stone-500 mt-1">
           {t('availability_description') || 'Open and close visiting dates for online booking'}
         </p>
-        <p className="text-xs text-stone-400 mt-1">
+        <p className="text-xs text-stone-500 mt-1">
           {t('availability_note') || 'The system does not calculate capacity automatically. Dates are open for booking by default.'}
         </p>
       </div>
@@ -185,7 +186,7 @@ export default function AvailabilityPage() {
             <div className="text-lg font-semibold text-stone-900 mb-4">{currentMonth}</div>
             <div className="grid grid-cols-7 gap-1 text-center mb-1">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-                <div key={d} className="text-xs font-semibold text-stone-400 py-1">
+                <div key={d} className="text-xs font-semibold text-stone-500 py-1">
                   {d}
                 </div>
               ))}
@@ -196,7 +197,7 @@ export default function AvailabilityPage() {
                 const isPast = date < today;
                 const isLocked = isPast || isWeeklyClosure;
                 const cellStyle = isPast
-                  ? 'bg-stone-50 text-stone-300 cursor-not-allowed'
+                  ? 'bg-stone-50 text-stone-500 cursor-not-allowed'
                   : isWeeklyClosure
                   ? 'bg-stone-200 text-stone-500 cursor-not-allowed'
                   : getStatusColor(status);
@@ -214,7 +215,7 @@ export default function AvailabilityPage() {
                       ${isPast ? 'line-through' : ''}
                     `}
                   >
-                    {new Date(date).getDate()}
+                    {parseLocalIsoDate(date).getDate()}
                   </button>
                 );
               })}
@@ -279,13 +280,13 @@ export default function AvailabilityPage() {
             </Card>
           ) : (
             <Card className="bg-stone-50 border-stone-200 text-center">
-              <div className="mb-3 flex justify-center text-stone-400">
+              <div className="mb-3 flex justify-center text-stone-500">
                 <Calendar className="w-7 h-7" />
               </div>
               <div className="font-semibold text-stone-700">
                 {t('select_a_date') || 'Select a date'}
               </div>
-              <div className="text-xs text-stone-400 mt-1">
+              <div className="text-xs text-stone-500 mt-1">
                 {t('select_date_instruction') || 'Click any date on the calendar to manage its availability'}
               </div>
             </Card>

@@ -151,7 +151,7 @@ export default function CategoriesPage() {
               {t('active') || 'Active'}: <span className="font-semibold text-green-600">{activeCount}</span>
             </span>
             <span className="text-stone-500">
-              {t('inactive') || 'Inactive'}: <span className="font-semibold text-stone-400">{inactiveCount}</span>
+              {t('inactive') || 'Inactive'}: <span className="font-semibold text-stone-500">{inactiveCount}</span>
             </span>
           </div>
         </div>

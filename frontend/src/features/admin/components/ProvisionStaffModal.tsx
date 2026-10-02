@@ -201,10 +201,11 @@ export function ProvisionStaffModal({
         />
 
         <div>
-          <label className="text-sm font-medium text-stone-700">
+          <label htmlFor="staff-role" className="text-sm font-medium text-stone-700">
             {t('role') || 'Role'}
           </label>
           <select
+            id="staff-role"
             value={isEditing ? editRole : formData.role}
             onChange={(e) =>
               isEditing

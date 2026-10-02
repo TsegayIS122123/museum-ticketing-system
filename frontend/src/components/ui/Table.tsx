@@ -46,7 +46,7 @@ export function Table({ headers, rows, className, emptyMessage, dense, numericCo
             <tr>
               <td
                 colSpan={headers.length}
-                className="py-8 text-center text-stone-400 text-sm"
+                className="py-8 text-center text-stone-500 text-sm"
               >
                 {emptyMessage || t('no_data_available') || 'No data available'}
               </td>

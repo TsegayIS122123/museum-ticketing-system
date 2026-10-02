@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toast } from '@/components/ui/Toast';
 import { cancelBooking, rescheduleBooking } from '@/features/booking/api';
 import { AvailabilityDatePicker } from '@/features/booking/components/AvailabilityDatePicker';
+import { parseLocalIsoDate } from '@/lib/utils/dates';
 
 interface CancelRescheduleControlsProps {
   bookingId: string;
@@ -91,7 +92,7 @@ export function CancelRescheduleControls({
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalIsoDate(dateStr);
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
       weekday: 'long',
       year: 'numeric',
@@ -102,7 +103,7 @@ export function CancelRescheduleControls({
 
   if (!canCancel && !canReschedule) {
     return (
-      <div className="text-sm text-stone-400">
+      <div className="text-sm text-stone-500">
         {status === 'visited' && (t('already_visited') || 'This booking has already been visited.')}
         {status === 'cancelled' && (t('already_cancelled') || 'This booking has been cancelled.')}
         {status === 'refunded' && (t('already_refunded') || 'This booking has been refunded.')}
@@ -169,10 +170,10 @@ export function CancelRescheduleControls({
             <div className="font-semibold text-stone-900">{formatDate(currentVisitDate)}</div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-stone-700">
+          <div role="group" aria-labelledby="reschedule-date-label">
+            <span id="reschedule-date-label" className="text-sm font-medium text-stone-700">
               {t('new_date') || 'New Date'}
-            </label>
+            </span>
             {/* Same AvailabilityDatePicker the booking wizard and
                 group-visit form use (features/booking/components/
                 AvailabilityDatePicker), not a bare input[type=date] --
@@ -187,7 +188,7 @@ export function CancelRescheduleControls({
             <div className="mt-1">
               <AvailabilityDatePicker value={newVisitDate} onChange={setNewVisitDate} />
             </div>
-            <p className="text-xs text-stone-400 mt-1">
+            <p className="text-xs text-stone-500 mt-1">
               {t('reschedule_note') || 'You can only reschedule once. Please choose a new available date.'}
             </p>
           </div>

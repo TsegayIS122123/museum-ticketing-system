@@ -22,7 +22,7 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
                   ? "bg-brand-primary border-brand-primary text-white"
                   : index === current
                   ? "bg-white border-brand-primary text-brand-primary ring-4 ring-primary-100"
-                  : "bg-white border-stone-300 text-stone-400"
+                  : "bg-white border-stone-300 text-stone-500"
               )}
             >
               {index < current ? <Check className="w-4 h-4" /> : index + 1}
@@ -30,7 +30,7 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
             <div
               className={cn(
                 "text-xs mt-1.5 font-medium text-center whitespace-nowrap",
-                index <= current ? "text-brand-primary" : "text-stone-400"
+                index <= current ? "text-brand-primary" : "text-stone-500"
               )}
             >
               {step}

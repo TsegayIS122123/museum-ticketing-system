@@ -440,6 +440,7 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Museum Ticketing <no-rep
 # surface (and reach Sentry in production). PII is never logged by our own
 # code -- IDs only.
 # --------------------------------------------------------------------------
+ENABLE_API_DOCS = env.bool("ENABLE_API_DOCS", default=False)
 LOG_LEVEL = env("LOG_LEVEL", default="INFO")
 
 LOGGING = {

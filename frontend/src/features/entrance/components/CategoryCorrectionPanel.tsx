@@ -371,7 +371,7 @@ export function CategoryCorrectionPanel({
                     <button
                       type="button"
                       onClick={() => removeLine(line.key)}
-                      className="text-stone-400 hover:text-stone-600 p-1"
+                      className="text-stone-500 hover:text-stone-600 p-1"
                       aria-label={t('remove') || 'Remove'}
                     >
                       <X className="w-4 h-4" />
@@ -393,7 +393,7 @@ export function CategoryCorrectionPanel({
                   </div>
                 )}
                 {line.itemId !== null && line.quantity === 1 && (
-                  <div className="text-xs text-stone-400 mt-1">
+                  <div className="text-xs text-stone-500 mt-1">
                     {t('cannot_zero_out') ||
                       "Can't go below 1 -- there's no way to fully remove a category line yet."}
                   </div>
@@ -415,7 +415,7 @@ export function CategoryCorrectionPanel({
           + {t('add_new_category_tab') || 'Add a walk-up category'}
         </Button>
         {!isLoadingCategories && !addableCategoriesExist && (
-          <span className="text-xs text-stone-400 ml-2">
+          <span className="text-xs text-stone-500 ml-2">
             {t('no_addable_categories') || 'Every active category is already on this booking.'}
           </span>
         )}
@@ -450,7 +450,7 @@ export function CategoryCorrectionPanel({
         </Button>
       </div>
       {hasReopeningChange && !plan.blocked && (
-        <div className="text-xs text-stone-400 mt-2">
+        <div className="text-xs text-stone-500 mt-2">
           {t('one_reopening_note') ||
             'One or more of the queued changes increases the total, so confirming will reopen payment for the combined difference.'}
         </div>

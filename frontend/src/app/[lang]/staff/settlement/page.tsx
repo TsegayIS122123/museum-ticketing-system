@@ -99,7 +99,7 @@ export default function SettlementPage() {
           {t('settlement_description') || 'Reconcile your outstanding digital revenue with the Finance Office'}
         </p>
         {user && (
-          <div className="text-sm text-stone-400 mt-1">
+          <div className="text-sm text-stone-500 mt-1">
             {t('cashier')}: {user.full_name || user.email} · {new Date().toLocaleDateString()}
           </div>
         )}

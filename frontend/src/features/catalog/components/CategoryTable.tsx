@@ -59,7 +59,7 @@ export function CategoryTable({
       <div className="font-medium text-stone-900">
         {locale === 'en' ? category.name_en : category.name_am}
       </div>
-      <div className="text-xs text-stone-400">
+      <div className="text-xs text-stone-500">
         {locale === 'en' ? category.name_am : category.name_en}
       </div>
     </div>,

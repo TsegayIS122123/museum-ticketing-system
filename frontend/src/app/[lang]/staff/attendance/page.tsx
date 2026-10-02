@@ -13,6 +13,7 @@ import { getFlaggedBookings } from '@/features/attendance/api';
 import type { Booking } from '@/features/attendance/api';
 import { CategoryCorrectionPanel } from '@/features/entrance/components/CategoryCorrectionPanel';
 import type { BookingLookupResponse } from '@/features/entrance/api';
+import { parseLocalIsoDate } from '@/lib/utils/dates';
 
 // UAT round 1: the Museum Manager's queue for the Cashier's
 // flag-mismatch signal (POST /bookings/{id}/flag-mismatch/). A booking
@@ -59,7 +60,7 @@ export default function AttendanceQueuePage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalIsoDate(dateStr);
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
       month: 'short',
       day: 'numeric',

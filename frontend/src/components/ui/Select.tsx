@@ -66,7 +66,7 @@ export function Select({ id, value, onChange, options, placeholder, className }:
         <span className="truncate">{selected ? selected.label : placeholder}</span>
         <ChevronDown
           className={cn(
-            'h-4 w-4 flex-shrink-0 text-stone-400 transition-transform',
+            'h-4 w-4 flex-shrink-0 text-stone-500 transition-transform',
             isOpen && 'rotate-180'
           )}
         />

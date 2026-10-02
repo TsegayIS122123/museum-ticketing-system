@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import { format } from 'date-fns';
+import { parseLocalIsoDate } from '@/lib/utils/dates';
 
 interface BookingDetailCardProps {
   booking: {
@@ -44,7 +45,7 @@ export function BookingDetailCard({
     booking.attendedQuantity != null && booking.attendedQuantity < booking.bookedQuantity;
 
   const formatDate = (dateStr: string) => {
-    return format(new Date(dateStr), 'PPP', {
+    return format(parseLocalIsoDate(dateStr), 'PPP', {
       locale: locale === 'en' ? undefined : require('date-fns/locale/am'),
     });
   };

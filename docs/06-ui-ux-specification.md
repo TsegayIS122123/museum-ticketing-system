@@ -59,6 +59,9 @@ Colors are specified as semantic roles, not literal hex values, since final bran
 | `color-success` / `color-warning` / `color-danger` | `StatusBadge` colors for the booking lifecycle (`Pending` amber, `Visited` green, `Cancelled`/`Refunded` neutral/red) and form validation states. |
 | `color-focus` | Focus ring, distinct from `color-primary`, so keyboard-only staff (e.g., a Cashier tabbing through the check-in form without a mouse) always have a visible indicator independent of whichever brand color is ultimately chosen. |
 
+
+**Contrast of the implemented neutrals (Phase 8).** The warm-neutral text tones were darkened so every text role clears 4.5:1 on every surface it is used on (white, `stone-50`, `stone-100`, `stone-200`, `primary-50`): `stone-500` `#6e6455` (>=4.6:1 on all), `stone-600` `#5f5547`, `stone-700` `#4c4337`, `stone-800` `#3a312a`. `stone-400` and lighter are reserved for borders, dividers and decorative fills and are never used for text; placeholder text uses `stone-500`. These are the same palette family as before, adjusted in place -- not a second palette.
+
 ### 3.3 Spacing and layout grid
 
 - Spacing scale: 4px base unit, steps of 4/8/12/16/24/32/48/64.

@@ -97,7 +97,7 @@ export default function StaffDashboardPage() {
   return (
     <PageContainer>
       <div className="mb-8">
-        <div className="text-xs text-stone-400 uppercase tracking-wider mb-1">
+        <div className="text-xs text-stone-500 uppercase tracking-wider mb-1">
           {t('welcome_back') || 'Welcome back'}
         </div>
         <h1 className="font-serif font-semibold text-2xl text-stone-900">
@@ -131,7 +131,7 @@ export default function StaffDashboardPage() {
                   what those two numbers alone would suggest. "Checked
                   In" isn't scoped to today at all, hence its own label
                   saying so. */}
-              <p className="text-xs text-stone-400 mb-3">
+              <p className="text-xs text-stone-500 mb-3">
                 {t('dashboard_stats_note') ||
                   "Revenue only counts visitors who've checked in. Bookings and visitors cover everyone booked for today, arrived or not. Checked-in reflects all-time attendance."}
               </p>

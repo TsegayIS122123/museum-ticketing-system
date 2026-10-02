@@ -69,7 +69,7 @@ export function StatCard({
         {value}
       </div>
       {sub && (
-        <div className="text-xs text-stone-400 mt-0.5">{sub}</div>
+        <div className="text-xs text-stone-500 mt-0.5">{sub}</div>
       )}
     </Card>
   );

@@ -66,7 +66,7 @@ export function ReferenceLookupField({
             className="font-mono text-lg tracking-wider"
             autoFocus
           />
-          <div className="mt-1 text-xs text-stone-400">
+          <div className="mt-1 text-xs text-stone-500">
             {t('scan_or_type') || 'Type the reference or scan the QR code (keyboard wedge scanner works here)'}
           </div>
         </div>

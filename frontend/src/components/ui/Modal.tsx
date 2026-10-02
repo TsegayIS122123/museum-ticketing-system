@@ -99,7 +99,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
           </h3>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-700 transition-colors"
             aria-label={t('close_modal') || 'Close modal'}
           >
             <X className="w-4 h-4" />

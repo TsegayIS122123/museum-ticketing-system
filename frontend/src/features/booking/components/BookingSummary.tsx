@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { getCategories } from '@/features/catalog/api';
 import type { Category } from '@/features/catalog/schemas';
 import type { BookingItemInput } from './DateCategoryPicker';
+import { parseLocalIsoDate } from '@/lib/utils/dates';
 
 interface BookingSummaryProps {
   // One row per category with a quantity against it -- e.g. a father's
@@ -70,7 +71,7 @@ export function BookingSummary({
   const totalAmount = rows.reduce((sum, row) => sum + row.subtotal, 0).toFixed(2);
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalIsoDate(dateStr);
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
       weekday: 'long',
       year: 'numeric',

@@ -17,6 +17,7 @@ import { requestPartialRefund, getRefunds } from '@/features/refunds/api';
 import { ApiError } from '@/lib/api/errors';
 import { Toast } from '@/components/ui/Toast';
 import { downloadReceipt } from '@/lib/utils/download';
+import { parseLocalIsoDate } from '@/lib/utils/dates';
 
 export default function BookingDetailPage() {
   const { t, locale } = useTranslation();
@@ -150,7 +151,7 @@ export default function BookingDetailPage() {
         <PublicHeader />
         <main className="flex-1 flex items-center justify-center px-4">
           <Card className="max-w-md w-full text-center">
-            <div className="mb-4 flex justify-center text-stone-400">
+            <div className="mb-4 flex justify-center text-stone-500">
               <SearchX className="w-10 h-10" />
             </div>
             <h2 className="text-xl font-bold text-stone-900 mb-2">
@@ -170,7 +171,7 @@ export default function BookingDetailPage() {
   }
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalIsoDate(dateStr);
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
       weekday: 'long',
       year: 'numeric',
@@ -211,7 +212,7 @@ export default function BookingDetailPage() {
             <h1 className="text-3xl font-serif font-semibold text-stone-900">
               {t('booking_details') || 'Booking Details'}
             </h1>
-            <p className="font-mono text-sm text-stone-400 mt-1">
+            <p className="font-mono text-sm text-stone-500 mt-1">
               #{booking.reference}
             </p>
           </div>

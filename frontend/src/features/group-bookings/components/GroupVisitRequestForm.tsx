@@ -280,9 +280,9 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
           </h3>
 
           <div>
-            <label className="text-sm font-medium text-stone-700">
+            <span id="group-visit-date-label" className="text-sm font-medium text-stone-700">
               {t('visit_date') || 'Visit Date'} *
-            </label>
+            </span>
             {/* Same AvailabilityDatePicker used by the individual booking
                 flow (features/booking/components/AvailabilityDatePicker)
                 instead of a bare input[type=date] -- this is the only
@@ -291,7 +291,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
                 group/school visit now sees the same closed-date
                 grid-cells the individual flow does, rather than being
                 able to pick a date that would later 409. */}
-            <div className="mt-1">
+            <div className="mt-1" role="group" aria-labelledby="group-visit-date-label">
               <AvailabilityDatePicker
                 value={visitDate}
                 onChange={(date) => {
@@ -310,10 +310,10 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
               the same group booking, rather than one category for the
               whole party. */}
           <div>
-            <label className="text-sm font-medium text-stone-700">
+            <span id="group-size-label" className="text-sm font-medium text-stone-700">
               {t('group_size_by_category') || 'Group Size by Category'} *
-            </label>
-            <div className="space-y-3 mt-2">
+            </span>
+            <div className="space-y-3 mt-2" role="group" aria-labelledby="group-size-label">
               {categories.map((category) => (
                 <div
                   key={category.id}

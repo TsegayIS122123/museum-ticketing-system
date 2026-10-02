@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { getBooking, type BookingResponse } from '@/features/booking/api';
+import { parseLocalIsoDate } from '@/lib/utils/dates';
 
 // `useSearchParams()` opts a page out of static prerendering unless it's
 // wrapped in a Suspense boundary (Next.js requires this so it can render
@@ -118,7 +119,7 @@ function ConfirmationPageContent() {
   }
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalIsoDate(dateStr);
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
       weekday: 'long',
       year: 'numeric',

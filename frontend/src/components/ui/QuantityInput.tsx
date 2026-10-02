@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useId } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -79,10 +79,12 @@ export function QuantityInput({
     onChange(clamped);
   }, [inputValue, min, max, onChange]);
 
+  const inputId = useId();
+
   return (
     <div className={cn("flex flex-col gap-1", className)}>
       {label && (
-        <label className="text-sm font-medium text-stone-700">
+        <label htmlFor={inputId} className="text-sm font-medium text-stone-700">
           {label}
         </label>
       )}
@@ -97,6 +99,7 @@ export function QuantityInput({
           <Minus className="w-4 h-4" />
         </button>
         <input
+          id={inputId}
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -105,7 +108,7 @@ export function QuantityInput({
           onBlur={handleBlur}
           disabled={disabled}
           className="w-16 h-10 text-center text-lg font-semibold border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent disabled:bg-stone-100 disabled:cursor-not-allowed"
-          aria-label={t('quantity_input') || 'Quantity input'}
+          aria-label={label ? undefined : t('quantity_input') || 'Quantity input'}
         />
         <button
           type="button"

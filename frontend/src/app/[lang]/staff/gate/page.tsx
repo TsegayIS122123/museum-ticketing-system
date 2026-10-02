@@ -79,7 +79,7 @@ export default function GatePage() {
         <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-stone-500 mt-0.5">
           <span>{t('gate_check_in_description') || 'Look up bookings and record visitor attendance'}</span>
           {user && (
-            <span className="text-stone-400">
+            <span className="text-stone-500">
               · {t('cashier')}: {user.full_name || user.email} · {new Date().toLocaleDateString()}
             </span>
           )}
@@ -102,16 +102,16 @@ export default function GatePage() {
           />
           <Card className="bg-stone-50 border-dashed border border-stone-200">
             <div className="text-center py-5">
-              <div className="mb-2 flex justify-center text-stone-400">
+              <div className="mb-2 flex justify-center text-stone-500">
                 <DoorOpen className="w-8 h-8" />
               </div>
               <h3 className="text-sm font-semibold text-stone-700">
                 {t('ready_to_check_in') || 'Ready to Check In Visitors'}
               </h3>
-              <p className="text-xs text-stone-400 max-w-sm mx-auto mt-1">
+              <p className="text-xs text-stone-500 max-w-sm mx-auto mt-1">
                 {t('ready_to_check_in_description') || 'Type or scan a booking reference to start the check-in process.'}
               </p>
-              <div className="mt-3 text-xs text-stone-400 flex items-center justify-center gap-1.5">
+              <div className="mt-3 text-xs text-stone-500 flex items-center justify-center gap-1.5">
                 <Lightbulb className="w-3.5 h-3.5" /> {t('keyboard_wedge_hint') || 'Keyboard wedge QR scanners work in the reference field'}
               </div>
             </div>

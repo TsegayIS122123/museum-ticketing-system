@@ -164,11 +164,12 @@ export function CategoryFormModal({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-stone-700">
+            <label htmlFor="category-price" className="text-sm font-medium text-stone-700">
               {t('price_etb') || 'Price (ETB)'}
             </label>
             <div className="flex items-center gap-3 mt-1">
               <input
+                id="category-price"
                 type="number"
                 value={formData.price_etb}
                 onChange={(e) => handleChange('price_etb', e.target.value)}

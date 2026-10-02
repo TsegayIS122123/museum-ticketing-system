@@ -338,7 +338,7 @@ export function VisitorVerifyForm() {
           {isLoading ? t('loading') : t('continue')}
         </Button>
 
-        <div className="text-xs text-stone-400 text-center mt-2">
+        <div className="text-xs text-stone-500 text-center mt-2">
           {t('no_password_required') || 'No password needed. A one-time code will be sent to your phone.'}
         </div>
       </form>

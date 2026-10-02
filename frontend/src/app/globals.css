@@ -11,10 +11,10 @@
   --color-stone-200: #e8e4de;
   --color-stone-300: #d6d0c8;
   --color-stone-400: #b8b0a4;
-  --color-stone-500: #9a9082;
-  --color-stone-600: #7c7264;
-  --color-stone-700: #5e5446;
-  --color-stone-800: #40362e;
+  --color-stone-500: #6e6455;
+  --color-stone-600: #5f5547;
+  --color-stone-700: #4c4337;
+  --color-stone-800: #3a312a;
   --color-stone-900: #1c1917;
 
   /* AAU brand primary — blue (#015484). Drives every Book/Pay/Approve
@@ -135,6 +135,13 @@ html[lang="am"] {
    and doesn't apply to a sans-serif face. */
 .font-serif {
   line-height: 1.3;
+}
+
+/* Placeholder text must meet 4.5:1 like any other text (WCAG 1.4.3);
+   the browser/Tailwind default is a faint tint of the text colour. */
+::placeholder {
+  color: var(--color-stone-500);
+  opacity: 1;
 }
 
 /* Focus states for accessibility */

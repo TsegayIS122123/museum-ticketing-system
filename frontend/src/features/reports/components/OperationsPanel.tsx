@@ -176,7 +176,7 @@ export function OperationsPanel() {
             <div className="font-semibold text-stone-900">
               {t('booking_timeline') || 'Booking Timeline'}
             </div>
-            <p className="text-xs text-stone-400 mt-1">
+            <p className="text-xs text-stone-500 mt-1">
               {t('booking_timeline_note') ||
                 'Awaiting payment, pending, and visited bookings for the next two weeks. A crowded day is a candidate to close in Availability.'}
             </p>

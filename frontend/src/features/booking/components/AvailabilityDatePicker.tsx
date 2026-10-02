@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { getAvailability } from '@/features/availability/api';
+import { parseLocalIsoDate, toLocalIsoDate } from '@/lib/utils/dates';
 
 interface AvailabilityDatePickerProps {
   value: string;
@@ -14,7 +15,7 @@ interface AvailabilityDatePickerProps {
 // same "no row = open by default" contract from the backend
 // (services.is_date_open_for_booking), just read-only here and with
 // closed/past cells disabled instead of clickable for editing.
-const toIsoDate = (date: Date): string => date.toISOString().split('T')[0];
+const toIsoDate = toLocalIsoDate;
 
 const buildMonthDates = (year: number, month: number): string[] => {
   const dates: string[] = [];
@@ -37,6 +38,12 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const todayIso = toIsoDate(today);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const intlLocale = locale === 'en' ? 'en-US' : 'am-ET';
+  // Weekday headers in the page language, Sunday first (matches the grid).
+  const weekdayLabels = Array.from({ length: 7 }, (_, i) =>
+    new Date(2024, 0, 7 + i).toLocaleDateString(intlLocale, { weekday: 'short' })
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +111,31 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
   const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
   const leadingBlanks = Array.from({ length: firstWeekday });
 
+  const onGridKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+    const buttons = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>('button[data-date]') ?? []);
+    const enabled = buttons.filter((b) => !b.disabled);
+    if (enabled.length === 0) return;
+    const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    let target: HTMLButtonElement | undefined;
+    if (e.key === 'Home') target = enabled[0];
+    else if (e.key === 'End') target = enabled[enabled.length - 1];
+    else if (e.key in step && current >= 0) {
+      // Walk in the arrow's direction to the next *enabled* day.
+      const dir = Math.sign(step[e.key]);
+      for (let i = current + step[e.key]; i >= 0 && i < buttons.length; i += dir) {
+        if (!buttons[i].disabled) {
+          target = buttons[i];
+          break;
+        }
+      }
+    } else return;
+    if (target) {
+      e.preventDefault();
+      target.focus();
+    }
+  };
+
   const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleString(
     locale === 'en' ? 'en-US' : 'am-ET',
     { month: 'long', year: 'numeric' }
@@ -137,14 +169,23 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
       )}
 
       <div className="grid grid-cols-7 gap-1 text-center mb-1">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-          <div key={d} className="text-xs font-semibold text-stone-400 py-1">
+        {weekdayLabels.map((d, i) => (
+          <div key={i} className="text-xs font-semibold text-stone-500 py-1" aria-hidden="true">
             {d}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      {/* Arrow keys move between enabled days (Left/Right = +-1 day, Up/Down
+          = +-1 week, Home/End = first/last enabled day of the month); Tab
+          still reaches every enabled day, so nothing depends on the arrows. */}
+      <div
+        ref={gridRef}
+        role="group"
+        aria-label={monthLabel}
+        className="grid grid-cols-7 gap-1"
+        onKeyDown={onGridKeyDown}
+      >
         {leadingBlanks.map((_, i) => (
           <div key={`blank-${i}`} />
         ))}
@@ -158,15 +199,23 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
           const isSelected = value === date;
 
           const cellStyle = isPast
-            ? 'bg-stone-50 text-stone-300 cursor-not-allowed line-through'
+            ? 'bg-stone-50 text-stone-500 cursor-not-allowed line-through'
             : isClosed
-            ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
+            ? 'bg-stone-100 text-stone-500 cursor-not-allowed'
             : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 cursor-pointer';
 
           return (
             <button
               key={date}
               type="button"
+              data-date={date}
+              aria-pressed={isSelected}
+              aria-label={parseLocalIsoDate(date).toLocaleDateString(intlLocale, {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
               onClick={() => !isDisabled && onChange(date)}
               disabled={isDisabled}
               title={
@@ -184,7 +233,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
                 ${isSelected ? 'ring-2 ring-inset ring-secondary-500 border-secondary-600' : 'border-transparent'}
               `}
             >
-              {new Date(date).getDate()}
+              {parseLocalIsoDate(date).getDate()}
             </button>
           );
         })}
@@ -194,7 +243,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
         <span className="flex items-center gap-1.5 px-2 py-1 rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
           {t('available') || 'Available'}
         </span>
-        <span className="flex items-center gap-1.5 px-2 py-1 rounded-full border bg-stone-100 text-stone-400 border-stone-300">
+        <span className="flex items-center gap-1.5 px-2 py-1 rounded-full border bg-stone-100 text-stone-500 border-stone-300">
           {t('closed') || 'Closed'}
         </span>
       </div>

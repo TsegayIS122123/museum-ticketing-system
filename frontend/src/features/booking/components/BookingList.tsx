@@ -7,6 +7,7 @@ import { StatusBadge, type BookingStatus } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import Link from 'next/link';
+import { parseLocalIsoDate } from '@/lib/utils/dates';
 
 interface BookingListItem {
   id: string;
@@ -31,7 +32,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
   const { t, locale } = useTranslation();
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalIsoDate(dateStr);
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
       weekday: 'short',
       year: 'numeric',
@@ -101,7 +102,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
                     ETB {booking.totalAmountEtb}
                   </span>
                 </div>
-                <div className="text-sm text-stone-400 mt-0.5">
+                <div className="text-sm text-stone-500 mt-0.5">
                   {booking.items
                     .map((item) =>
                       `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`

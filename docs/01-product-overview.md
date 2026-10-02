@@ -8,7 +8,7 @@
 
 ## 1. Vision
 
-The **Museum Ticketing & Booking Platform** gives visitors to the Zoological Natural History Museum a digital way to book, pay for, and receive a ticket online — bilingually, in Amharic and English — as an option that sits **alongside** the museum's existing counter process, not a replacement for it.
+The **Museum Ticketing & Booking Platform** gives visitors to the Zoological Natural History Museum (an Addis Ababa University museum, credited on the home page but not part of the brand name) a digital way to book, pay for, and receive a ticket online — bilingually, in Amharic and English — as an option that sits **alongside** the museum's existing counter process, not a replacement for it.
 
 The product exists on a simple premise: the museum already runs a working ticketing operation — cashiers, categories, group bookings, government-receipted reconciliation — it just has no digital path for a visitor who would rather book ahead and pay by phone than queue in person with cash. The MVP's job is to add that path cleanly, without disturbing the manual process the museum, its cashiers, and its Finance Office already depend on.
 
@@ -72,6 +72,8 @@ flowchart LR
     F --> H[Cashier settles revenue<br/>to Finance Office]
 ```
 
+**Gate flow after UAT round 1.** The Cashier checks a booking in, reads the voucher, keys the IFMIS *Document No* and *Ref No*, and hands the voucher over; she does not enter or correct headcounts. A matching headcount checks straight in and counts as revenue immediately. A mismatch blocks check-in and is flagged for the Museum Manager, who alone corrects headcount and category (and any resulting payment or refund is settled) before the Cashier can complete the check-in. The museum is closed every Sunday, enforced server-side and not openable by the Manager.
+
 Every functional requirement in Document 02 exists to make one stage of this journey work correctly for one of the four roles above; Document 03 specifies how each stage is implemented.
 
 ## 6. MVP scope boundary
@@ -87,7 +89,8 @@ The MVP is scoped to make the digital booking-and-payment path above work correc
 - Batched Cashier-to-Finance settlement, producing its own Transfer Receipt, kept entirely separate from the manual cash track.
 - Bilingual (Amharic/English) interface and generated documents, from the first release.
 - A responsive web app and a native mobile app for Visitors; a web dashboard for staff.
-- Reporting for Museum Manager and Platform Admin (revenue, category/group breakdowns, booking status mix), aligned to the museum's budget/fiscal calendar.
+- Reporting for Museum Manager and Platform Admin (revenue, category/group breakdowns, booking status mix), aligned to the museum's budget/fiscal calendar. Since UAT round 1 this is one date-range-driven report set -- Overview, Schools, Categories, Attendance, Revenue -- with per-school visit history, no-show and shortfall figures, CSV export and print/PDF output, all counting people who actually attended rather than only people who booked.
+- A school/institution registry keyed on the 10-digit TIN, so a school is one record across all its group bookings and can be reported on over time.
 
 ### Explicitly out of scope for this phase (see Document 02, §4 for the authoritative list)
 

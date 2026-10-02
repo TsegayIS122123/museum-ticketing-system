@@ -139,7 +139,7 @@ export default function RefundsPage() {
       {getReasonLabel(refund.reason)}
     </div>,
     getStatusBadge(refund.status),
-    <div key="date" className="text-sm text-stone-400">
+    <div key="date" className="text-sm text-stone-500">
       {formatDateTime(refund.createdAt)}
     </div>,
   ]);

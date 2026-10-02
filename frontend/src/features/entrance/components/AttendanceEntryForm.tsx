@@ -18,6 +18,7 @@ import {
   type CheckInResponse,
   type Voucher,
 } from '../api';
+import { parseLocalIsoDate } from '@/lib/utils/dates';
 
 // A row of the voucher panel below: the label/value IFMIS itself prints,
 // plus a one-tap copy so the Cashier doesn't have to hand-retype every
@@ -45,7 +46,7 @@ function VoucherRow({ label, value }: { label: string; value: string }) {
         <button
           type="button"
           onClick={handleCopy}
-          className="text-stone-400 hover:text-stone-700 flex-shrink-0"
+          className="text-stone-500 hover:text-stone-700 flex-shrink-0"
           aria-label="Copy"
         >
           {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -109,7 +110,7 @@ export function AttendanceEntryForm({
   const canCheckIn = booking.status === 'pending' && !isFlagged;
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseLocalIsoDate(dateStr);
     return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'am-ET', {
       weekday: 'long',
       year: 'numeric',

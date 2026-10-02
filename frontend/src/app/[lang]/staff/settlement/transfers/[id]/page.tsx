@@ -68,7 +68,7 @@ export default function TransferDetailPage() {
     return (
       <PageContainer>
         <Card className="text-center py-12">
-          <div className="mb-4 flex justify-center text-stone-400">
+          <div className="mb-4 flex justify-center text-stone-500">
             <SearchX className="w-10 h-10" />
           </div>
           <h2 className="font-serif font-semibold text-2xl text-stone-900">
@@ -104,7 +104,7 @@ export default function TransferDetailPage() {
           <h1 className="font-serif font-semibold text-2xl text-stone-900">
             {t('transfer_details') || 'Reconciliation Details'}
           </h1>
-          <p className="font-mono text-sm text-stone-400 mt-1">
+          <p className="font-mono text-sm text-stone-500 mt-1">
             {transfer.chapaTransferReference || transfer.id}
           </p>
         </div>
