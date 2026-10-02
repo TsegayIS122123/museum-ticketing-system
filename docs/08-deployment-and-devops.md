@@ -149,6 +149,24 @@ Alerts route to on-call per Section 8.
 
 ---
 
+### 5.3 Health checks, logging and rate limits (Phase 8)
+
+**Probes.** `GET /healthz` is liveness (process is up; no dependencies). `GET /readyz` is readiness: it checks Postgres and Redis and returns `503` with per-dependency detail (`{"checks": {"database": "ok", "redis": "error"}}`) when either is down. Point the orchestrator's liveness probe at `/healthz` and the load balancer's health check at `/readyz`. Both are unauthenticated, uncached, exempt from the HTTPS redirect (probes are plain HTTP), and deliberately not part of the OpenAPI contract.
+
+**Logging.** Application logs go to stdout; the container runtime or log shipper owns retention. `LOG_LEVEL` (default `INFO`) sets the level for the project's own `apps.*` loggers, so an incident can be debugged with `LOG_LEVEL=DEBUG` and no code change. Django itself stays at `WARNING`, and `django.request` 5xx responses always surface (and reach Sentry when `SENTRY_DSN` is set). Application code logs identifiers only, never visitor PII.
+
+**Rate limits** (per IP, Redis-backed; Document 03 §6.7): `login` 5/15m, `otp-request` 5/15m, `password-reset-request` 5/15m, `booking-create` 10/15m, and, added in Phase 8, `otp-verify` 10/15m (OTP and magic-link verification), `password-reset-confirm` 10/15m and `institution-lookup` 30/15m (TIN autofill, to stop TIN enumeration). `apps/core/tests/test_throttle_scopes.py` fails if any of these endpoints loses its scope.
+
+**Production security posture** (`config/settings/production.py`): HTTPS redirect and HSTS (preload deliberately off until every subdomain is HTTPS), secure/HttpOnly/SameSite=Lax cookies, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, and `CSRF_TRUSTED_ORIGINS` mirroring `CORS_ALLOWED_ORIGINS`. Verify with `python manage.py check --deploy` against the production settings before each release; the only remaining expected warnings are `SECRET_KEY` strength when a throwaway key is used.
+
+**Additional environment variables**
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `LOG_LEVEL` | backend | Level for `apps.*` loggers (default `INFO`). |
+| `NEXT_PUBLIC_SITE_URL` | frontend | Canonical origin for the sitemap, Open Graph tags and hreflang alternates. Required in every deployed environment. |
+| `NEXT_PUBLIC_FISCAL_YEAR_START_MONTH` / `_DAY` | frontend | Seeds the "This year" preset in Manager reports. Must match the backend's `FISCAL_YEAR_START_MONTH` / `_DAY`; the report figures themselves always come from the backend. |
+
 ## 6. Backup and Disaster Recovery
 
 Document 02 does not define a numbered backup RPO/RTO requirement the way it does for, say, retention (NFR-RETENTION-001). This section defines targets as sound operational practice for a system of record that a government Finance Office ultimately relies on, not as fulfillment of a requirement ID that doesn't exist in this project.

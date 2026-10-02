@@ -212,6 +212,15 @@ REST_FRAMEWORK = {
         # FR-BOOK-001/003: capped per account/IP against fraudulent
         # AwaitingPayment/PendingApproval bookings (Sec 6.7).
         "booking-create": "10/15m",
+        # Phase 8: guessing endpoints. A 6-digit OTP / reset token is only
+        # as strong as the number of tries an attacker gets, so verifying
+        # one is limited per IP just like requesting one is.
+        "otp-verify": "10/15m",
+        "password-reset-confirm": "10/15m",
+        # TIN autofill: only fires on a full 10-digit TIN after a debounce,
+        # so a person typing never gets near this; a script enumerating
+        # TINs to harvest school names does.
+        "institution-lookup": "30/15m",
     },
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -421,3 +430,30 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Museum Ticketing <no-reply@museum.example>")
+
+
+# --------------------------------------------------------------------------
+# Logging (Phase 8). Everything to stdout so the container runtime / log
+# shipper owns retention (Doc 08). Level is an env var so an incident can
+# be debugged without a code change: LOG_LEVEL=DEBUG for our own apps,
+# while Django itself stays at WARNING and `django.request` 5xx always
+# surface (and reach Sentry in production). PII is never logged by our own
+# code -- IDs only.
+# --------------------------------------------------------------------------
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "apps": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+    },
+}

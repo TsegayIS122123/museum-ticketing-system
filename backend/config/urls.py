@@ -13,10 +13,14 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from apps.accounts.views import CookieTokenRefreshView, CurrentUserView
 from apps.bookings.urls import availability_urlpatterns
 from apps.bookings.views import MyBookingsView
+from apps.core import health
 from apps.entrance.urls import entrance_urlpatterns
 from apps.refunds.urls import refund_request_urlpatterns
 
 urlpatterns = [
+    # Phase 8: probes live outside /api/v1 and outside the contract.
+    path("healthz", health.liveness, name="healthz"),
+    path("readyz", health.readiness, name="readyz"),
     path("admin/", admin.site.urls),
 
     # Contract-first: this endpoint is introspected live from the actual

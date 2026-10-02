@@ -324,7 +324,6 @@ def test_categories_report_granularity_daily_for_short_range():
 
 
 def test_categories_report_granularity_monthly_for_long_range():
-    category = _make_category()
     report = services.get_categories_report(
         date_from=TODAY - timedelta(days=400), date_to=TODAY
     )

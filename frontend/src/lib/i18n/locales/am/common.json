@@ -592,5 +592,10 @@
   "rpt_rev_split": "ግለሰብ ከተቋም",
   "rpt_rev_split_cap": "ከግለሰብ ጉብኝቶች እና ከትምህርት ቤት/ተቋም ጉብኝቶች የተገኘ ገቢ።",
   "rpt_rev_individual": "ግለሰብ",
-  "rpt_rev_institutional": "ትምህርት ቤት / ተቋም"
+  "rpt_rev_institutional": "ትምህርት ቤት / ተቋም",
+  "error_title": "የሆነ ችግር ተፈጥሯል",
+  "error_body": "ያልተጠበቀ ችግር አጋጥሞናል። የቦታ ማስያዣ መረጃዎ ደህና ነው። እባክዎ እንደገና ይሞክሩ፣ ወይም ወደ መነሻ ገጽ ይመለሱ።",
+  "error_reference": "ማጣቀሻ፦ {{id}}",
+  "not_found_title": "ገጹ አልተገኘም",
+  "not_found_body": "የሚፈልጉት ገጽ የለም ወይም ተንቀሳቅሷል።"
 }

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { ReactNode } from 'react';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { AuthProvider } from '@/lib/auth/auth-context';
+import { SITE_URL } from '@/lib/site';
 import '../globals.css';
 
 // The browser tab title carries the museum's own wordmark only. Addis
@@ -9,10 +10,49 @@ import '../globals.css';
 // brand name (UAT round 1) -- the affiliation is credited once on the
 // landing page instead, so it never reads as a compound institution name
 // here, in `museum_name`, or in `landing_title`.
-export const metadata: Metadata = {
-  title: 'Zoological Natural History Museum - Ticketing & Booking',
-  description: 'Book and manage your museum visit online.',
-};
+const COPY = {
+  en: {
+    title: 'Zoological Natural History Museum - Ticketing & Booking',
+    description:
+      "Book your visit to the Zoological Natural History Museum: Ethiopia's indigenous wildlife, preserved in a research collection built by AAU zoologists.",
+    locale: 'en_US',
+  },
+  am: {
+    title: 'የእንስሳት የተፈጥሮ ቅርስ መዘክር - የትኬት እና ቦታ ማስያዣ',
+    description:
+      'የኢትዮጵያን ብርቅዬ የዱር እንስሳት በአዲስ አበባ ዩኒቨርሲቲ የእንስሳት ተመራማሪዎች በተገነባ የምርምር ስብስብ ውስጥ ለማየት ጉብኝትዎን ያስይዙ።',
+    locale: 'am_ET',
+  },
+} as const;
+
+// Per-locale metadata (Phase 8 SEO): title/description in the page's own
+// language, absolute Open Graph image, and hreflang alternates. The
+// affiliation with AAU stays a credit line on the landing page, not part
+// of the brand name here (UAT round 1).
+export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }): Promise<Metadata> {
+  const { lang: rawLang } = await params;
+  const lang = rawLang === 'am' ? 'am' : 'en';
+  const copy = COPY[lang];
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: copy.title,
+    description: copy.description,
+    alternates: {
+      canonical: `/${lang}`,
+      languages: { en: '/en', am: '/am' },
+    },
+    openGraph: {
+      type: 'website',
+      siteName: COPY.en.title.split(' - ')[0],
+      title: copy.title,
+      description: copy.description,
+      locale: copy.locale,
+      url: `/${lang}`,
+      images: [{ url: '/gallery/walia-ibex.jpg', width: 1280, height: 1004, alt: lang === 'am' ? 'ዋልያ' : 'Walia Ibex' }],
+    },
+    twitter: { card: 'summary_large_image', title: copy.title, description: copy.description, images: ['/gallery/walia-ibex.jpg'] },
+  };
+}
 
 export async function generateStaticParams() {
   return [{ lang: 'en' }, { lang: 'am' }];

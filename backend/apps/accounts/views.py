@@ -98,6 +98,7 @@ class VerifyOTPView(APIView):
     and issues the same token pair Staff login does (Sec 4.1)."""
 
     permission_classes = [permissions.AllowAny]
+    throttle_scope = "otp-verify"
 
     @extend_schema(request=VisitorVerifyConfirmSerializer, responses=AuthResponseSerializer)
     def post(self, request):
@@ -114,6 +115,7 @@ class VerifyMagicLinkView(APIView):
     OTP path above does that."""
 
     permission_classes = [permissions.AllowAny]
+    throttle_scope = "otp-verify"
 
     @extend_schema(responses=DetailResponseSerializer)
     def get(self, request, token):
@@ -176,6 +178,7 @@ class ConfirmPasswordResetView(APIView):
     """POST /auth/reset-password -- Staff only (FR-ACC-006)."""
 
     permission_classes = [permissions.AllowAny]
+    throttle_scope = "password-reset-confirm"
 
     @extend_schema(request=ResetPasswordSerializer, responses=DetailResponseSerializer)
     def post(self, request):

@@ -158,6 +158,10 @@ Implements FR-BOOK-001 – FR-BOOK-008 and the lifecycle mechanics of FR-PAY-002
 | `checked_in_by_user_id` | UUID | `FK → account.id` | The Cashier who recorded attendance (NFR-AUDIT-001). |
 | `category_corrected_at` | TIMESTAMPTZ | | Set only if a Cashier corrected this booking's category at the gate before check-in (FR-TICKET-006, ID-verification addendum). Null on every booking that was never corrected. |
 | `category_corrected_by_user_id` | UUID | `FK → account.id` | The Cashier who made the correction. The *previous* category/price aren't kept as their own columns -- only ever needed for an audit trail, and the audit log already records the before/after values for `booking.category_corrected`, matching this schema's existing convention of using the audit log for "what changed" rather than a column per change. |
+| `group_tin` | TEXT | `NULLABLE` | UAT round 1: the institutional payer's 10-digit Tax Identification Number, as typed on the group-visit request. Group bookings only. |
+| `institution_id` | UUID | `NULLABLE, FK → institution.id ON DELETE SET NULL` | UAT round 1: the canonical institution this group booking resolved to (Section 3.8). Null on individual bookings and on group bookings created before the institution registry existed -- the historical `group_name`/`group_tin` text is kept as the record of what was typed, never overwritten by the registry. |
+| `flagged_mismatch_at` / `flagged_mismatch_by_user_id` / `flagged_mismatch_note` | TIMESTAMPTZ / UUID FK → account.id / TEXT | `NULLABLE` | UAT round 1 (Phase 3): the Cashier found fewer or different people at the gate than the booking says and flagged it for a Museum Manager instead of checking in. "Currently flagged" = `flagged_mismatch_at IS NOT NULL`; cleared by the Manager's correction, which is also what writes `category_corrected_at`. |
+| `ifmis_document_no` | TEXT | `NULLABLE` | UAT round 1: the IFMIS *Document No*, entered alongside `ifmis_voucher_reference` (the *Ref No*) once the Cashier has keyed the check-in into IFMIS. |
 | `chapa_checkout_url` | TEXT | | Present only while `awaiting_payment`; cleared once payment is confirmed. A category correction that finds an undercharge (FR-TICKET-006) reopens this exactly like a brand-new booking's first payment -- `status` goes back to `awaiting_payment` and this is repopulated -- except the amount charged is only the outstanding difference, not the full (now higher) `total_amount_etb`. |
 | `receipt_url` | TEXT | | Pointer into object storage (`receipts/temporary/{booking_id}.pdf`, Document 03 §6.3). Populated once, at payment confirmation, and never regenerated (ADR-009). |
 | `ifmis_voucher_reference` | TEXT | `NULLABLE` | The real Document No/Ref No the Cashier gets back from IFMIS after keying this check-in's transaction into IFMIS herself. Not known at the instant check-in happens — she reports it back separately (`PATCH /bookings/{id}/ifmis-voucher`, `apps.entrance`); the platform never generates or calls IFMIS for this value (FR-GOV-001). |
@@ -308,6 +312,23 @@ Implements NFR-AUDIT-001, backing [Document 03, Section 6.6](03-software-design-
 **Indexes:** (`entity_type`, `entity_id`) for "show the history of this booking/transfer"; (`actor_user_id`, `created_at`) for "show what this Cashier did"; (`created_at`) for NFR-RETENTION-001 windowed queries.
 
 ---
+
+### 3.8 `institutions` app (UAT round 1)
+
+#### `institution`
+
+The canonical record of a school or other institutional payer, so the same school is one row however its name was spelled on each group booking, and so reports can aggregate visits per school (Phase 7).
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `name` | TEXT | `NOT NULL` | Latest accepted English name. A TIN match with a different name updates this and writes an `institution.name_corrected` audit entry. |
+| `name_am` | TEXT | `NULLABLE` | Amharic name; filled in the first time one is supplied, never overwritten. |
+| `tin` | TEXT | `UNIQUE NULLABLE, CHECK (tin IS NULL OR tin ~ '^\d{10}$')` | Ten digits. Unique so one TIN is one institution; nullable because legacy group bookings predate the TIN field (`NULL`s do not collide). |
+| `created_by_user_id` | UUID | `NULLABLE, FK → account.id` | |
+| `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
+
+**Referenced by:** `booking.institution_id` (Section 3.3).
 
 ## 4. Indexing Strategy Summary
 

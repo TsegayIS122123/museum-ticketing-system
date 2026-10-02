@@ -251,6 +251,14 @@ mirroring how the existing cash track already works.
 - **FR-REPORT-002**: Reports are available at daily, weekly, monthly, and yearly granularity,
   broken down by category and by school/group. "Yearly" follows the organization's budget/fiscal
   calendar (see NFR-RETENTION-001).
+  *UAT round 1 clarification:* every report takes one date range (a preset such as today, this
+  week, this month, this/last quarter, this fiscal year, last 30 days, or a custom from-to), and
+  the granularity of its time series is chosen from the range length. Figures count only
+  checked-in (`Visited`) bookings by visit date in Africa/Addis_Ababa time; "visitors" means people
+  who actually attended, shown beside the number booked. Revenue is completed payments minus
+  completed refunds. No-shows (paid, visit date passed, never checked in) are reported separately
+  from shortfall (checked in with fewer people than booked). Each report states these definitions
+  on screen, exports to CSV, and prints cleanly for the ministry's quarterly submission.
 - **FR-REPORT-003**: The Cashier can see which `Visited` bookings have and haven't yet been
   included in a settlement transfer, so nothing is missed or double-transferred.
 

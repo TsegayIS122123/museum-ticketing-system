@@ -592,5 +592,10 @@
   "rpt_rev_split": "Individual vs institutional",
   "rpt_rev_split_cap": "Revenue from personal visits compared with school/institution visits.",
   "rpt_rev_individual": "Individual",
-  "rpt_rev_institutional": "School / institution"
+  "rpt_rev_institutional": "School / institution",
+  "error_title": "Something went wrong",
+  "error_body": "We hit an unexpected problem. Your booking data is safe. Please try again, or return to the home page.",
+  "error_reference": "Reference: {{id}}",
+  "not_found_title": "Page not found",
+  "not_found_body": "The page you are looking for does not exist or may have moved."
 }

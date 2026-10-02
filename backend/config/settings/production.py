@@ -21,6 +21,24 @@ CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# Load-balancer probes are plain HTTP -- don't 301 them (apps/core/health.py).
+SECURE_REDIRECT_EXEMPT = [r"^healthz$", r"^readyz$"]
+SECURE_HSTS_PRELOAD = False  # opt in deliberately once every subdomain is HTTPS
+
+# Phase 8 security review. Django's defaults already set most of these in
+# recent versions; they are pinned here so the production posture is
+# explicit and a Django upgrade can't silently loosen it.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+# The browser app is a separate origin (Next.js) -- Django's CSRF check
+# for any cookie-authenticated POST (admin, refresh cookie) only passes for
+# origins listed here. Same list as CORS: one source of truth.
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS  # noqa: F405
 
 # Error tracking -- no-op unless SENTRY_DSN is set (e.g. still unset the
 # first time this image runs in a fresh environment). send_default_pii is

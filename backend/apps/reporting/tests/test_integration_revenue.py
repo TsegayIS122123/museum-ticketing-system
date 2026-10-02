@@ -38,7 +38,7 @@ actually delivered -- an infrastructure/configuration question, not
 something a unit test can diagnose).
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from unittest import mock
 
