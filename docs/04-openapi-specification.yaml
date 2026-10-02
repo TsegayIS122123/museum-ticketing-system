@@ -1,3 +1,8 @@
+# STATUS: hand-authored starting point, superseded by ../contracts/openapi.yaml.
+# The implemented API is generated from the real views/serializers and checked
+# for drift in CI; where this file and the contract disagree, the contract wins.
+# See 04a-api-changes-since-doc-04.md for what differs (new endpoints from
+# UAT round 1, paths that were implemented under different names, conventions).
 openapi: 3.0.3
 info:
   title: Museum Ticketing & Booking Platform API
