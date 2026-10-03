@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Pin } from 'lucide-react';
+import { ArrowRight, Pin, GraduationCap, CalendarDays } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
@@ -216,7 +216,8 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
 
       <Card>
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-stone-900">
+          <h3 className="flex items-center gap-3 text-lg font-bold text-stone-900">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sun-400 to-sun-600 text-white shadow" aria-hidden="true"><GraduationCap className="h-5 w-5" /></span>
             {t('group_details') || 'Group Details'}
           </h3>
 
@@ -275,7 +276,8 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
 
       <Card>
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-stone-900">
+          <h3 className="flex items-center gap-3 text-lg font-bold text-stone-900">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-primary-500 text-white shadow" aria-hidden="true"><CalendarDays className="h-5 w-5" /></span>
             {t('visit_details') || 'Visit Details'}
           </h3>
 
@@ -314,16 +316,17 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
               {t('group_size_by_category') || 'Group Size by Category'} *
             </span>
             <div className="space-y-3 mt-2" role="group" aria-labelledby="group-size-label">
-              {categories.map((category) => (
+              {categories.map((category, ci) => (
                 <div
                   key={category.id}
                   className={`
-                    p-4 rounded-lg border-2 flex flex-wrap items-center justify-between gap-4 transition-all
+                    lift p-4 rounded-2xl border-2 border-l-8 flex flex-wrap items-center justify-between gap-4 transition-all bg-white/80
                     ${quantityFor(category.id) > 0
                       ? 'border-secondary-600 bg-secondary-50 ring-2 ring-secondary-200'
                       : 'border-stone-200'
                     }
                   `}
+                  style={quantityFor(category.id) > 0 ? undefined : { borderLeftColor: ['#29c3f5', '#ffbe0b', '#2fd29a', '#ff6b6b', '#9b6bff'][ci % 5] }}
                 >
                   <div>
                     <div className="font-semibold text-stone-900">
@@ -358,7 +361,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
             </div>
           )}
 
-          <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-3 text-sm text-secondary-700">
+          <div className="rounded-2xl border border-sun-400/60 bg-gradient-to-r from-sun-300/25 to-sun-300/5 p-4 text-sm text-amber-950">
             <span className="font-semibold inline-flex items-center gap-1.5"><Pin className="w-3.5 h-3.5" /> {t('group_booking_note') || 'Important Information'}</span>
             <ul className="mt-1 list-disc list-inside space-y-0.5 text-xs">
               <li>{t('group_booking_note_1') || 'You will pay for the whole group in one transaction.'}</li>

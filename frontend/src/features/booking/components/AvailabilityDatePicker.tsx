@@ -202,7 +202,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
             ? 'bg-stone-50 text-stone-500 cursor-not-allowed line-through'
             : isClosed
             ? 'bg-stone-100 text-stone-500 cursor-not-allowed'
-            : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 cursor-pointer';
+            : 'bg-gradient-to-br from-leaf-300/40 to-leaf-300/15 text-leaf-600 font-semibold border-leaf-300 hover:from-leaf-300/70 hover:to-leaf-300/40 hover:-translate-y-0.5 hover:shadow-md cursor-pointer transition-all';
 
           return (
             <button
@@ -229,8 +229,8 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
               }
               className={`
                 text-sm py-2.5 rounded-lg font-medium border-2 transition-all
-                ${cellStyle}
-                ${isSelected ? 'ring-2 ring-inset ring-secondary-500 border-secondary-600' : 'border-transparent'}
+                ${isSelected ? 'bg-gradient-to-br from-primary-600 to-sky-400 text-white font-bold shadow-lg ring-2 ring-white scale-105 border-transparent' : cellStyle}
+                ${isSelected ? '' : isDisabled ? 'border-transparent' : ''}
               `}
             >
               {parseLocalIsoDate(date).getDate()}

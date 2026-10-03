@@ -28,6 +28,16 @@ interface BookingListProps {
   onRefresh?: () => void;
 }
 
+// Left-edge colour matches the status badge so the list scans at a glance.
+const accentFor = (status: string) =>
+  status === 'awaiting_payment'
+    ? 'border-l-sun-400'
+    : status === 'visited'
+      ? 'border-l-leaf-400'
+      : status === 'cancelled' || status === 'refunded'
+        ? 'border-l-coral-400'
+        : 'border-l-sky-400';
+
 export function BookingList({ bookings, isLoading = false, onRefresh }: BookingListProps) {
   const { t, locale } = useTranslation();
 
@@ -82,7 +92,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
 
       {bookings.map((booking) => (
         <Link key={booking.id} href={`/${locale}/bookings/${booking.id}`}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-primary-600">
+          <Card className={`lift cursor-pointer border-l-8 ${accentFor(booking.status)}`}>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-3 flex-wrap">

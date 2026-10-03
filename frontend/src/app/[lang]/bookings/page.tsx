@@ -10,6 +10,7 @@ import { BookingList } from '@/features/booking/components/BookingList';
 import { getMyBookings } from '@/features/booking/api';
 import { Toast } from '@/components/ui/Toast';
 import { useRouter } from 'next/navigation';
+import { CalendarClock, CheckCircle2, Ticket, Undo2 } from 'lucide-react';
 
 export default function MyBookingsPage() {
   const { t, locale } = useTranslation();
@@ -105,10 +106,10 @@ export default function MyBookingsPage() {
       <div className="flex flex-col flex-1">
         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-stone-900">
+          <h1 className="text-3xl font-extrabold text-stone-900">
             {t('my_bookings') || 'My Bookings'}
           </h1>
-          <p className="text-stone-500 mt-1">
+          <p className="text-stone-700 mt-1">
             {t('my_bookings_description') || 'Manage your museum visit bookings'}
           </p>
         </div>
@@ -117,12 +118,16 @@ export default function MyBookingsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard
             label={t('total') || 'Total'}
+            accent="sky"
+            icon={<Ticket className="h-5 w-5" />}
             value={totalBookings}
             onClick={() => toggleFilter('all')}
             selected={statusFilter === 'all'}
           />
           <StatCard
             label={t('upcoming') || 'Upcoming'}
+            accent="sun"
+            icon={<CalendarClock className="h-5 w-5" />}
             value={upcomingBookings}
             color="primary"
             onClick={() => toggleFilter('pending')}
@@ -130,6 +135,8 @@ export default function MyBookingsPage() {
           />
           <StatCard
             label={t('completed') || 'Completed'}
+            accent="leaf"
+            icon={<CheckCircle2 className="h-5 w-5" />}
             value={completedBookings}
             color="green"
             onClick={() => toggleFilter('visited')}
@@ -137,6 +144,8 @@ export default function MyBookingsPage() {
           />
           <StatCard
             label={t('refunded') || 'Refunded'}
+            accent="coral"
+            icon={<Undo2 className="h-5 w-5" />}
             value={cancelledBookings}
             color="red"
             onClick={() => toggleFilter('cancelled')}
