@@ -527,3 +527,36 @@ body:has([data-surface="staff"]) .ground-scene {
 @media print {
   .ambient-bg, .ground-scene, .header-accent { display: none !important; }
 }
+
+/* ---- celebration (booking confirmation) ---------------------------- */
+.ticket-sheen {
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.28) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: sheen 5.5s ease-in-out 1.2s infinite;
+}
+@keyframes sheen { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+
+.confetti-piece {
+  position: absolute;
+  top: -16px;
+  opacity: 0;
+  animation: confetti-fall 3.4s cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) translateX(var(--drift, 0px)) rotate(var(--spin, 540deg)); opacity: 0; }
+}
+.check-draw { stroke-dasharray: 48; stroke-dashoffset: 48; animation: check-draw 0.7s ease-out 0.5s forwards; }
+@keyframes check-draw { to { stroke-dashoffset: 0; } }
+.pop-in { animation: pop-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes pop-in { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.ring-pulse { animation: ring-pulse 2.4s ease-out infinite; }
+@keyframes ring-pulse { 0% { box-shadow: 0 0 0 0 rgb(15 178 127 / 0.45); } 100% { box-shadow: 0 0 0 26px rgb(15 178 127 / 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-sheen, .confetti-piece, .ring-pulse { animation: none !important; }
+  .confetti-piece { display: none; }
+  .check-draw { animation: none; stroke-dashoffset: 0; }
+  .pop-in { animation: none; }
+}
+@media print { .confetti-piece { display: none !important; } }

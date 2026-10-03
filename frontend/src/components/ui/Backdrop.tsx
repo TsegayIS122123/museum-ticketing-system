@@ -243,3 +243,37 @@ export function WaveDivider({ className = 'text-white', flip = false }: { classN
     </svg>
   );
 }
+
+const CONFETTI_COLORS = ['#ffbe0b', '#29c3f5', '#2fd29a', '#ff6b6b', '#9b6bff', '#015484'];
+
+/** One-shot confetti burst for the booking confirmation. Deterministic
+ *  (no Math.random) so server and client markup match. */
+export function Confetti() {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-40 h-0" aria-hidden="true">
+      {Array.from({ length: 44 }, (_, i) => {
+        const w = 7 + ((i * 5) % 7);
+        const round = i % 3 === 0;
+        return (
+          <span
+            key={i}
+            className="confetti-piece"
+            style={
+              {
+                left: `${(i * 23 + 5) % 100}%`,
+                width: w,
+                height: round ? w : w * 1.7,
+                borderRadius: round ? 9999 : 2,
+                background: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+                animationDelay: `${(i % 11) * 0.12}s`,
+                animationDuration: `${2.8 + (i % 6) * 0.35}s`,
+                '--drift': `${((i % 7) - 3) * 28}px`,
+                '--spin': `${360 + (i % 5) * 140}deg`,
+              } as React.CSSProperties
+            }
+          />
+        );
+      })}
+    </div>
+  );
+}

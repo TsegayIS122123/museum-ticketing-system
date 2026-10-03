@@ -13,15 +13,15 @@ export type BookingStatus =
 
 const statusConfig: Record<BookingStatus, { color: string; labelKey: string }> = {
   awaiting_payment: { 
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
+    color: 'bg-sun-300/40 text-amber-900 border-sun-400/70', 
     labelKey: 'awaiting_payment' 
   },
   pending: { 
-    color: 'bg-blue-100 text-blue-800 border-blue-200', 
+    color: 'bg-sky-400/20 text-primary-800 border-sky-400/70', 
     labelKey: 'pending' 
   },
   visited: { 
-    color: 'bg-green-100 text-green-800 border-green-200', 
+    color: 'bg-leaf-300/40 text-leaf-600 border-leaf-400/70', 
     labelKey: 'visited' 
   },
   cancelled: { 
@@ -29,7 +29,7 @@ const statusConfig: Record<BookingStatus, { color: string; labelKey: string }> =
     labelKey: 'cancelled' 
   },
   refunded: { 
-    color: 'bg-red-100 text-red-800 border-red-200', 
+    color: 'bg-coral-300/30 text-red-800 border-coral-400/70', 
     labelKey: 'refunded' 
   },
   // Category active/inactive -- distinct from the booking-lifecycle
@@ -56,7 +56,7 @@ export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${config.color} ${className}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border ${config.color} ${className}`}
     >
       <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-current opacity-50" />
       {t(config.labelKey)}

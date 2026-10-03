@@ -100,16 +100,17 @@ export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategor
           {t('category')}
         </h3>
         <div className="space-y-3">
-          {categories.map((category) => (
+          {categories.map((category, ci) => (
             <div
               key={category.id}
               className={`
-                p-4 rounded-lg border-2 flex flex-wrap items-center justify-between gap-4 transition-all
+                lift p-4 rounded-2xl border-2 border-l-8 flex flex-wrap items-center justify-between gap-4 transition-all bg-white/80
                 ${quantityFor(category.id) > 0
                   ? 'border-secondary-600 bg-secondary-50 ring-2 ring-secondary-200'
                   : 'border-stone-200'
                 }
               `}
+              style={quantityFor(category.id) > 0 ? undefined : { borderLeftColor: ['#29c3f5', '#ffbe0b', '#2fd29a', '#ff6b6b', '#9b6bff'][ci % 5] }}
             >
               <div>
                 <div className="font-semibold text-stone-900">
