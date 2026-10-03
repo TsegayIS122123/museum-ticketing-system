@@ -62,6 +62,16 @@ Colors are specified as semantic roles, not literal hex values, since final bran
 
 **Contrast of the implemented neutrals (Phase 8).** The warm-neutral text tones were darkened so every text role clears 4.5:1 on every surface it is used on (white, `stone-50`, `stone-100`, `stone-200`, `primary-50`): `stone-500` `#6e6455` (>=4.6:1 on all), `stone-600` `#5f5547`, `stone-700` `#4c4337`, `stone-800` `#3a312a`. `stone-400` and lighter are reserved for borders, dividers and decorative fills and are never used for text; placeholder text uses `stone-500`. These are the same palette family as before, adjusted in place -- not a second palette.
 
+**Vibrant visitor surface (UI polish round).** The brand stays blue, and blue still carries every action (Book, Pay, Continue). On top of it the visitor product gained decorative accents -- `sun` (amber), `leaf` (green), `coral`, `sky` and `grape` -- used only for atmosphere: backgrounds, highlights, icon chips and illustration, never for status or required-field meaning, and never for body text. This supersedes the earlier "two colours, blue and white" rule for the *visitor* surface; the staff surface is unchanged (calm, flat, no backgrounds).
+
+Backgrounds and motion (`components/ui/Backdrop.tsx` + `globals.css`; pure SVG/CSS, no image downloads):
+- `AmbientBackground`: a fixed sky-to-sand wash with slow drifting colour blobs, rising specks, and paw-print/ring/leaf motifs in the side gutters (wide screens only). It fills every empty area on every visitor page.
+- `SavannaScene`: the landing hero -- pulsing sun, drifting clouds, flapping birds, layered hills with acacias, grazing walia ibex, swaying grass.
+- `GroundScene`: a low strip of hills and grass above the footer on every visitor page, so short pages never end in dead space.
+- `WaveDivider`, `.glass` surfaces, `.btn-vibrant` / `.btn-sun` buttons, `.lift` hover cards, `.reveal` entrance, and a multicolour header accent line.
+
+Rules: only `transform` and `opacity` are animated; everything is `aria-hidden` and non-interactive; all motion is disabled under `prefers-reduced-motion`; the ambient layer and ground scene are hidden for staff pages and print; text over any background must still meet 4.5:1 (hence the dark blue-to-green headline gradient rather than a light one).
+
 ### 3.3 Spacing and layout grid
 
 - Spacing scale: 4px base unit, steps of 4/8/12/16/24/32/48/64.

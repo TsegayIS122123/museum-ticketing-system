@@ -48,6 +48,26 @@
   --color-secondary-800: var(--color-primary-800);
   --color-secondary-900: var(--color-primary-900);
 
+  /* Vibrant accents (UI polish round). The blue stays the brand and the
+     meaning-carrying colour for actions; these are for atmosphere --
+     backgrounds, highlights, illustrations, icon chips -- never for
+     status or required-field meaning. All are used decoratively, so the
+     4.5:1 text rule applies only where a text role is noted. */
+  --color-sun-300: #ffd166;
+  --color-sun-400: #ffbe0b;
+  --color-sun-500: #fb9f0b;
+  --color-sun-600: #e07a00;
+  --color-leaf-300: #7ee2b8;
+  --color-leaf-400: #2fd29a;
+  --color-leaf-500: #0fb27f;
+  --color-leaf-600: #078a62;
+  --color-coral-300: #ff9e9e;
+  --color-coral-400: #ff6b6b;
+  --color-coral-500: #f2465a;
+  --color-sky-300: #7fdcff;
+  --color-sky-400: #29c3f5;
+  --color-grape-400: #9b6bff;
+
   --color-slate-50: #f8fafc;
   --color-slate-100: #f1f5f9;
   --color-slate-200: #e2e8f0;
@@ -106,6 +126,8 @@ body {
   font-family: var(--font-sans);
   color: var(--color-text);
   background-color: var(--color-surface-alt);
+  background-image: linear-gradient(180deg, #eaf6ff 0%, #fffaf0 45%, #eefbf4 100%);
+  background-attachment: scroll;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -325,4 +347,183 @@ html[lang="am"] {
   @page {
     margin: 14mm;
   }
+}
+
+
+/* ==================================================================
+   Vibrant visitor surface (UI polish round)
+   Everything below is decorative: it sits behind content, ignores the
+   pointer, and is switched off for staff pages, print, and anyone with
+   prefers-reduced-motion. Only transform/opacity are animated.
+   ================================================================== */
+
+/* Page-wide ambient layer: a bright sky-to-sand wash with slow-drifting
+   colour blobs. Fixed, so it fills every "empty" area on every visitor
+   page without each page having to draw its own background. */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #d9f1ff 0%, transparent 60%),
+    radial-gradient(900px 600px at 100% 10%, #fff0c2 0%, transparent 55%),
+    radial-gradient(900px 700px at 0% 100%, #d8f8e9 0%, transparent 55%),
+    linear-gradient(180deg, #f3f9ff 0%, #fffaf0 55%, #f1fbf5 100%);
+}
+.ambient-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.38;
+  will-change: transform;
+}
+.ambient-blob.b1 { width: 38rem; height: 38rem; left: -10rem; top: -8rem;  background: var(--color-sky-400);  animation: drift-a 26s ease-in-out infinite; }
+.ambient-blob.b2 { width: 32rem; height: 32rem; right: -8rem; top: 10%;    background: var(--color-sun-400);  animation: drift-b 32s ease-in-out infinite; }
+.ambient-blob.b3 { width: 34rem; height: 34rem; left: 20%;   bottom: -14rem; background: var(--color-leaf-400); animation: drift-c 36s ease-in-out infinite; }
+.ambient-blob.b4 { width: 22rem; height: 22rem; right: 12%;  bottom: 8%;   background: var(--color-coral-400); opacity: 0.22; animation: drift-a 40s ease-in-out infinite reverse; }
+
+@keyframes drift-a { 0%,100% { transform: translate(0,0) scale(1); }   50% { transform: translate(8rem, 5rem) scale(1.12); } }
+@keyframes drift-b { 0%,100% { transform: translate(0,0) scale(1.05);} 50% { transform: translate(-7rem, 6rem) scale(0.95); } }
+@keyframes drift-c { 0%,100% { transform: translate(0,0) scale(1); }   50% { transform: translate(6rem, -5rem) scale(1.1); } }
+
+/* Soft rising specks (pollen / dust in the sun) over the ambient wash. */
+.ambient-speck {
+  position: absolute;
+  bottom: -20px;
+  border-radius: 9999px;
+  background: #fff;
+  opacity: 0;
+  animation: speck-rise linear infinite;
+}
+@keyframes speck-rise {
+  0%   { transform: translateY(0) translateX(0);        opacity: 0; }
+  10%  { opacity: 0.9; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(-105vh) translateX(40px); opacity: 0; }
+}
+
+/* Staff pages and print stay calm and flat. */
+body:has([data-surface="staff"]) .ambient-bg,
+body:has([data-surface="staff"]) .ground-scene {
+  display: none;
+}
+
+/* ---- hero scene (SavannaScene.tsx) ------------------------------ */
+.sun-core { transform-origin: center; transform-box: fill-box; animation: sun-pulse 5s ease-in-out infinite; }
+.sun-rays { transform-origin: center; transform-box: fill-box; animation: ray-spin 60s linear infinite; }
+@keyframes sun-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+@keyframes ray-spin  { to { transform: rotate(360deg); } }
+
+.cloud { animation: cloud-move linear infinite; will-change: transform; }
+.cloud.c1 { animation-duration: 70s; }
+.cloud.c2 { animation-duration: 95s; animation-delay: -30s; }
+.cloud.c3 { animation-duration: 120s; animation-delay: -70s; }
+@keyframes cloud-move { from { transform: translateX(-20%); } to { transform: translateX(120vw); } }
+
+.bird { animation: bird-fly linear infinite; will-change: transform; }
+.bird.k1 { animation-duration: 28s; }
+.bird.k2 { animation-duration: 36s; animation-delay: -12s; }
+.bird.k3 { animation-duration: 44s; animation-delay: -24s; }
+@keyframes bird-fly {
+  0%   { transform: translate(-10vw, 0); }
+  50%  { transform: translate(55vw, -30px); }
+  100% { transform: translate(115vw, 10px); }
+}
+.bird-wing { transform-origin: 50% 100%; animation: flap 0.9s ease-in-out infinite; }
+@keyframes flap { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(0.45); } }
+
+.hill-far  { animation: hill-sway 18s ease-in-out infinite; }
+.hill-near { animation: hill-sway 14s ease-in-out infinite reverse; }
+@keyframes hill-sway { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-14px); } }
+
+.grass { transform-origin: bottom center; transform-box: fill-box; animation: grass-sway 3.6s ease-in-out infinite; }
+.grass:nth-child(2n) { animation-duration: 4.4s; animation-delay: -1.2s; }
+.grass:nth-child(3n) { animation-duration: 3.1s; animation-delay: -2.1s; }
+@keyframes grass-sway { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }
+
+.graze { transform-origin: 20% 80%; transform-box: fill-box; animation: graze 6s ease-in-out infinite; }
+@keyframes graze { 0%,100% { transform: rotate(0); } 45%,60% { transform: rotate(7deg); } }
+
+.float-y { animation: float-y 6s ease-in-out infinite; }
+.float-y.slow { animation-duration: 9s; }
+.float-y.late { animation-delay: -3s; }
+@keyframes float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+
+/* ---- reveal-on-load ------------------------------------------------ */
+.reveal { opacity: 0; animation: reveal-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.reveal.d1 { animation-delay: 0.08s; }
+.reveal.d2 { animation-delay: 0.18s; }
+.reveal.d3 { animation-delay: 0.3s; }
+.reveal.d4 { animation-delay: 0.45s; }
+@keyframes reveal-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ---- bright text + buttons ----------------------------------------- */
+.text-gradient {
+  background: linear-gradient(100deg, var(--color-primary-700) 0%, var(--color-primary-500) 50%, var(--color-leaf-600) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-size: 200% auto;
+  animation: gradient-pan 8s ease-in-out infinite alternate;
+}
+@keyframes gradient-pan { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+
+.btn-vibrant {
+  background-image: linear-gradient(120deg, var(--color-primary-600), var(--color-primary-500) 55%, var(--color-sky-400));
+  background-size: 160% 100%;
+  box-shadow: 0 10px 24px -8px rgb(1 84 132 / 0.55);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-position 0.4s ease;
+}
+.btn-vibrant:hover { transform: translateY(-2px); background-position: 100% 0; box-shadow: 0 16px 30px -8px rgb(1 84 132 / 0.6); }
+.btn-vibrant:active { transform: translateY(0); }
+
+.btn-sun {
+  background-image: linear-gradient(120deg, var(--color-sun-400), var(--color-sun-500));
+  color: #3a2300;
+  box-shadow: 0 10px 24px -8px rgb(251 159 11 / 0.7);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-sun:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 16px 30px -8px rgb(251 159 11 / 0.8); }
+
+/* Soft glassy surface used by cards and forms on the bright background. */
+.glass {
+  background: rgb(255 255 255 / 0.82);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgb(255 255 255 / 0.7);
+  box-shadow: 0 18px 40px -22px rgb(1 50 78 / 0.35), 0 2px 6px rgb(1 50 78 / 0.05);
+}
+
+/* Header accent line: the day's palette in one thin stripe. */
+.header-accent {
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-sky-400), var(--color-leaf-400), var(--color-sun-400), var(--color-coral-400), var(--color-grape-400), var(--color-sky-400));
+  background-size: 200% 100%;
+  animation: gradient-pan 10s linear infinite alternate;
+}
+
+/* Photo frame: coloured offset blocks behind the specimen photo. */
+.photo-frame { position: relative; }
+.photo-frame::before,
+.photo-frame::after { content: ""; position: absolute; border-radius: 1.5rem; z-index: 0; }
+.photo-frame::before { inset: 14px -14px -14px 14px; background: linear-gradient(135deg, var(--color-sun-400), var(--color-coral-400)); transform: rotate(2deg); opacity: 0.9; }
+.photo-frame::after  { inset: -12px 12px 12px -12px; background: linear-gradient(135deg, var(--color-sky-400), var(--color-leaf-400)); transform: rotate(-2deg); opacity: 0.85; }
+.photo-frame > * { position: relative; z-index: 1; }
+
+/* Hover lift for any card-like tile. */
+.lift { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.lift:hover { transform: translateY(-4px); box-shadow: 0 22px 40px -20px rgb(1 50 78 / 0.4); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-blob, .ambient-speck, .sun-core, .sun-rays, .cloud, .bird, .bird-wing,
+  .hill-far, .hill-near, .grass, .graze, .float-y, .text-gradient, .header-accent {
+    animation: none !important;
+  }
+  .reveal { opacity: 1; animation: none; }
+  .btn-vibrant, .btn-sun, .lift { transition: none; }
+}
+@media print {
+  .ambient-bg, .ground-scene, .header-accent { display: none !important; }
 }

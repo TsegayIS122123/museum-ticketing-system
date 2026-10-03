@@ -3,6 +3,7 @@ import { ReactNode } from 'react';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { SITE_URL } from '@/lib/site';
+import { AmbientBackground, GroundScene } from '@/components/ui/Backdrop';
 import '../globals.css';
 
 // The browser tab title carries the museum's own wordmark only. Addis
@@ -79,10 +80,12 @@ export default async function LangLayout({
 
   return (
     <html lang={lang}>
-      <body className="antialiased min-h-screen flex flex-col bg-stone-50">
+      <body className="antialiased min-h-screen flex flex-col bg-sky-50/40">
         <AuthProvider>
-          <div className="flex min-h-screen flex-col">
+          <AmbientBackground />
+          <div className="relative z-10 flex min-h-screen flex-col">
             <div className="flex-1">{children}</div>
+            <GroundScene />
             <SiteFooter locale={lang} />
           </div>
         </AuthProvider>

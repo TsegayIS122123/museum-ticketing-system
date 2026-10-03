@@ -93,7 +93,8 @@ export function SiteHeader() {
     pathname === href || pathname?.startsWith(`${href}/`);
 
   return (
-    <header className="relative z-50 border-b border-brand-primary/15 bg-white">
+    <header className="relative z-50 border-b border-brand-primary/10 bg-white/90 shadow-sm backdrop-blur">
+      <div className="header-accent" aria-hidden="true" />
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
         <Link href={`/${locale}`} className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Image src="/aau-logo.png" alt={t('aau_logo_alt') || 'Addis Ababa University'} width={40} height={40} priority className="shrink-0" />

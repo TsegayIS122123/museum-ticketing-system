@@ -597,5 +597,13 @@
   "error_body": "We hit an unexpected problem. Your booking data is safe. Please try again, or return to the home page.",
   "error_reference": "Reference: {{id}}",
   "not_found_title": "Page not found",
-  "not_found_body": "The page you are looking for does not exist or may have moved."
+  "not_found_body": "The page you are looking for does not exist or may have moved.",
+  "how_title": "How it works",
+  "how_subtitle": "Three quick steps from your sofa to the gallery floor.",
+  "how_step1_title": "Choose your day",
+  "how_step1_body": "Pick an open date on the calendar. The museum is closed on Sundays.",
+  "how_step2_title": "Pay securely online",
+  "how_step2_body": "Pay through Chapa and your booking is confirmed straight away.",
+  "how_step3_title": "Show your QR ticket",
+  "how_step3_body": "Show your digital ticket at the gate and walk right in."
 }

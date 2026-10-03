@@ -32,7 +32,7 @@ export function BookVisitCTA({ lang, labels }: BookVisitCTAProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-6 py-3 text-sm font-medium text-white transition-all hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-1"
+        className="btn-sun inline-flex min-h-[52px] cursor-pointer items-center gap-2 rounded-full px-8 py-3 text-base font-bold focus:outline-none focus:ring-4 focus:ring-sun-300 focus:ring-offset-2"
       >
         {labels.bookNow}
       </button>
@@ -45,10 +45,10 @@ export function BookVisitCTA({ lang, labels }: BookVisitCTAProps) {
           <Link
             href={`/${lang}/group-visits/new`}
             onClick={() => setOpen(false)}
-            className="flex flex-col gap-1.5 rounded-xl border border-stone-200 p-4 min-h-[44px] transition-colors hover:border-brand-primary hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            className="lift flex flex-col gap-1.5 rounded-2xl border-2 border-stone-200 bg-white p-5 min-h-[44px] hover:border-brand-primary hover:bg-primary-50/60 focus:outline-none focus:ring-2 focus:ring-brand-primary"
           >
             <span className="flex items-center gap-2 font-semibold text-stone-900">
-              <GraduationCap className="w-5 h-5 text-brand-primary flex-shrink-0" />
+              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sun-400 to-sun-600 text-white shadow"><GraduationCap className="w-5 h-5" /></span>
               {labels.schoolTitle}
             </span>
             <span className="text-sm text-stone-500">{labels.schoolDescription}</span>
@@ -56,10 +56,10 @@ export function BookVisitCTA({ lang, labels }: BookVisitCTAProps) {
           <Link
             href={`/${lang}/book`}
             onClick={() => setOpen(false)}
-            className="flex flex-col gap-1.5 rounded-xl border border-stone-200 p-4 min-h-[44px] transition-colors hover:border-brand-primary hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            className="lift flex flex-col gap-1.5 rounded-2xl border-2 border-stone-200 bg-white p-5 min-h-[44px] hover:border-brand-primary hover:bg-primary-50/60 focus:outline-none focus:ring-2 focus:ring-brand-primary"
           >
             <span className="flex items-center gap-2 font-semibold text-stone-900">
-              <User className="w-5 h-5 text-brand-primary flex-shrink-0" />
+              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-primary-500 text-white shadow"><User className="w-5 h-5" /></span>
               {labels.personalTitle}
             </span>
             <span className="text-sm text-stone-500">{labels.personalDescription}</span>
