@@ -748,6 +748,9 @@ export interface paths {
          *     Returns `{"institution": null}` for a TIN that isn't on file yet --
          *     that's the expected, common case for a school's first-ever booking,
          *     not an error -- rather than 404.
+         *
+         *     Throttled (`institution-lookup`) so the endpoint can't be used to
+         *     enumerate TINs and harvest school names.
          */
         get: operations["lookupInstitution"];
         put?: never;
