@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { ReactNode } from 'react';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { AuthProvider } from '@/lib/auth/auth-context';
@@ -55,6 +55,16 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
   };
 }
 
+// Mobile-first viewport: scale to the device width, extend under notches
+// (safe-area insets are handled in globals.css), and tint the browser
+// chrome with the brand blue. Zoom is NOT disabled (accessibility).
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#015484',
+};
+
 export async function generateStaticParams() {
   return [{ lang: 'en' }, { lang: 'am' }];
 }
@@ -80,7 +90,7 @@ export default async function LangLayout({
 
   return (
     <html lang={lang}>
-      <body className="antialiased min-h-screen flex flex-col bg-sky-50/40">
+      <body className="antialiased min-h-screen flex flex-col overflow-x-clip bg-sky-50/40">
         <AuthProvider>
           <AmbientBackground />
           <div className="relative z-10 flex min-h-screen flex-col">

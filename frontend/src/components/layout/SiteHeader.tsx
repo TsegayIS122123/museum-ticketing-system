@@ -3,8 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, LogOut, Menu, User, X } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isStaff } from '@/lib/auth/roles';
@@ -49,6 +49,27 @@ export function SiteHeader() {
   // collapses into this single toggle-able panel instead of wrapping,
   // overflowing, or squeezing the museum name into a truncated stub.
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Close the profile dropdown on an outside click or Escape --
+  // previously it stayed open until the trigger was clicked again.
+  useEffect(() => {
+    if (!isProfileOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsProfileOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isProfileOpen]);
 
   // Lock background scroll while the mobile overlay is open, same
   // approach as components/ui/Modal.tsx -- this now opens as a modal-like
@@ -93,12 +114,17 @@ export function SiteHeader() {
     pathname === href || pathname?.startsWith(`${href}/`);
 
   return (
-    <header className="relative z-50 border-b border-brand-primary/10 bg-white/90 shadow-sm backdrop-blur">
+    <header className="site-header relative z-50 pt-[env(safe-area-inset-top)]">
       <div className="header-accent" aria-hidden="true" />
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
-        <Link href={`/${locale}`} className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <Image src="/aau-logo.png" alt={t('aau_logo_alt') || 'Addis Ababa University'} width={40} height={40} priority className="shrink-0" />
-          <span className="truncate font-serif font-semibold text-base text-brand-primary sm:text-lg lg:text-xl">{t('museum_name')}</span>
+        <Link
+          href={`/${locale}`}
+          className="group flex min-w-0 items-center gap-2.5 rounded-xl py-1 pr-2 sm:gap-3"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-2 sm:h-11 sm:w-11 ring-sky-400/40 transition-shadow group-hover:ring-sky-400/80">
+            <Image src="/aau-logo.png" alt={t('aau_logo_alt') || 'Addis Ababa University'} width={36} height={36} priority className="h-9 w-9 object-contain" />
+          </span>
+          <span className="truncate font-serif text-base font-bold tracking-tight text-brand-primary sm:text-lg lg:text-xl">{t('museum_name')}</span>
         </Link>
 
         {/* The expanded row (nav links + language toggle + profile menu)
@@ -121,7 +147,7 @@ export function SiteHeader() {
             height and centering *within* that removes the ambiguity. */}
         <div className="flex h-full shrink-0 items-center gap-2 lg:gap-6">
           {navLinks.length > 0 && (
-            <nav aria-label={t('primary_navigation') || 'Primary'} className="hidden h-full items-center gap-5 text-sm font-semibold leading-none text-brand-primary lg:flex ">
+            <nav aria-label={t('primary_navigation') || 'Primary'} className="hidden h-full items-center gap-1.5 text-sm font-semibold leading-none text-brand-primary lg:flex">
               {navLinks.map((link) => {
                 const active = isActiveLink(link.href);
                 return (
@@ -130,10 +156,10 @@ export function SiteHeader() {
                     href={link.href}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'rounded-md px-1 py-1 leading-none transition-colors hover:text-brand-primary',
+                      'inline-flex items-center rounded-full px-4 py-2 leading-none transition-colors',
                       active
-                        ? 'text-brand-primary underline decoration-2 underline-offset-8'
-                        : 'text-brand-primary/70 hover:underline'
+                        ? 'bg-brand-primary text-white shadow-sm'
+                        : 'text-brand-primary/80 hover:bg-brand-primary/10 hover:text-brand-primary'
                     )}
                   >
                     {link.label}
@@ -152,26 +178,27 @@ export function SiteHeader() {
               them here is redundant, so this global header drops the
               profile trigger entirely on /staff/* routes. */}
           {isAuthenticated && user && !isStaffArea && (
-            <div className="relative hidden h-full items-center lg:flex">
+            <div ref={profileRef} className="relative hidden h-full items-center lg:flex">
               <button
                 type="button"
                 onClick={() => setIsProfileOpen((open) => !open)}
                 aria-expanded={isProfileOpen}
                 aria-haspopup="menu"
-                className="flex max-w-[10rem] items-center gap-2 text-sm font-semibold text-brand-primary"
+                className="flex max-w-[12rem] items-center gap-2 rounded-full border border-brand-primary/15 bg-white/80 py-1 pl-1 pr-3 text-sm font-semibold text-brand-primary shadow-sm transition-colors hover:border-brand-primary/30 hover:bg-white"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-primary text-xs text-white">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-xs font-bold text-white">
                   {displayName.charAt(0).toUpperCase()}
                 </span>
                 <span className="truncate">{displayName}</span>
+                <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', isProfileOpen && 'rotate-180')} aria-hidden="true" />
               </button>
               {isProfileOpen && (
-                <div role="menu" className="absolute right-0 z-20 mt-2 min-w-44 rounded-lg border border-stone-200 bg-white p-1 shadow-lg">
-                  <Link href={profilePath} role="menuitem" onClick={() => setIsProfileOpen(false)} className="block rounded px-3 py-2 text-sm text-stone-700 hover:bg-stone-100">
-                    {t('profile') || 'Profile'}
+                <div role="menu" className="absolute right-0 top-full z-20 mt-1 min-w-48 rounded-xl border border-stone-200 bg-white p-1.5 shadow-xl shadow-primary-900/10">
+                  <Link href={profilePath} role="menuitem" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-stone-700 hover:bg-primary-50">
+                    <User className="h-4 w-4 text-brand-primary" aria-hidden="true" /> {t('profile') || 'Profile'}
                   </Link>
-                  <button type="button" role="menuitem" onClick={handleSignOut} className="block w-full rounded px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
-                    {t('logout') || 'Logout'}
+                  <button type="button" role="menuitem" onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50">
+                    <LogOut className="h-4 w-4" aria-hidden="true" /> {t('logout') || 'Logout'}
                   </button>
                 </div>
               )}
@@ -204,14 +231,14 @@ export function SiteHeader() {
         // flow), so opening it no longer pushes the rest of the page
         // down. The backdrop blurs/dims everything below the header,
         // same modal pattern as VisitorSidebar's old mobile drawer.
-        <div className="fixed inset-x-0 top-16 bottom-0 z-40 lg:hidden">
+        <div className="fixed inset-x-0 top-[calc(68px+env(safe-area-inset-top))] bottom-0 z-40 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/40"
             onClick={() => setIsMobileMenuOpen(false)}
           />
           <div
             id="mobile-primary-nav"
-            className="relative max-h-full overflow-y-auto border-t border-brand-primary/15 bg-white px-4 py-3 shadow-xl"
+            className="relative max-h-full overflow-y-auto overscroll-contain rounded-b-2xl border-t border-brand-primary/15 bg-white px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-xl"
           >
             {navLinks.length > 0 && (
               <nav aria-label={t('primary_navigation') || 'Primary'} className="flex flex-col gap-1 text-sm font-semibold text-brand-primary">
@@ -224,8 +251,8 @@ export function SiteHeader() {
                       aria-current={active ? 'page' : undefined}
                       onClick={() => setIsMobileMenuOpen(false)}
                       className={cn(
-                        'rounded-lg px-2 py-2',
-                        active ? 'bg-brand-primary/10 text-brand-primary' : 'hover:bg-brand-primary/5'
+                        'flex min-h-12 items-center rounded-xl px-3 text-base',
+                        active ? 'bg-brand-primary text-white' : 'active:bg-brand-primary/10 hover:bg-brand-primary/5'
                       )}
                     >
                       {link.label}
@@ -245,16 +272,16 @@ export function SiteHeader() {
                 <Link
                   href={profilePath}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="block rounded-lg px-2 py-2 text-sm font-semibold text-brand-primary hover:bg-brand-primary/5"
+                  className="flex min-h-12 items-center gap-2 rounded-xl px-3 text-base font-semibold text-brand-primary hover:bg-brand-primary/5"
                 >
-                  {t('profile') || 'Profile'}
+                  <User className="h-5 w-5" aria-hidden="true" /> {t('profile') || 'Profile'}
                 </Link>
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="block w-full rounded-lg px-2 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
+                  className="flex min-h-12 w-full items-center gap-2 rounded-xl px-3 text-left text-base font-semibold text-red-600 hover:bg-red-50"
                 >
-                  {t('logout') || 'Logout'}
+                  <LogOut className="h-5 w-5" aria-hidden="true" /> {t('logout') || 'Logout'}
                 </button>
               </div>
             )}

@@ -43,7 +43,7 @@ export function Toast({
   const Icon = icons[type];
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-sm animate-in slide-in-from-bottom-5 sm:bottom-6 sm:left-auto sm:right-6 sm:mx-0">
+    <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 right-4 z-50 mx-auto max-w-sm animate-in slide-in-from-bottom-5 sm:bottom-6 sm:left-auto sm:right-6 sm:mx-0">
       <div
         className={cn(
           'flex items-center gap-3 px-5 py-3 rounded-xl border shadow-lg',
@@ -52,10 +52,10 @@ export function Toast({
         role="alert"
       >
         <Icon className="w-5 h-5 flex-shrink-0" />
-        <span className="text-sm font-medium">{message}</span>
+        <span className="min-w-0 flex-1 break-words text-sm font-medium">{message}</span>
         <button
           onClick={onClose}
-          className="ml-2 opacity-60 hover:opacity-100 transition-opacity"
+          className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center opacity-60 transition-opacity hover:opacity-100"
           aria-label={t('dismiss_notification') || 'Dismiss notification'}
         >
           <X className="w-4 h-4" />

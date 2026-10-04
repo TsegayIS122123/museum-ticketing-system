@@ -91,7 +91,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
       )}
 
       {bookings.map((booking) => (
-        <Link key={booking.id} href={`/${locale}/bookings/${booking.id}`}>
+        <Link key={booking.id} href={`/${locale}/bookings/${booking.id}`} className="block">
           <Card className={`lift cursor-pointer border-l-8 ${accentFor(booking.status)}`}>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -101,7 +101,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
                   </span>
                   <StatusBadge status={booking.status} />
                 </div>
-                <div className="mt-1 flex flex-wrap gap-4 text-sm text-stone-500">
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-stone-500">
                   <span>
                     {t('date') || 'Date'}: {formatDate(booking.visitDate)}
                   </span>
@@ -112,7 +112,7 @@ export function BookingList({ bookings, isLoading = false, onRefresh }: BookingL
                     ETB {booking.totalAmountEtb}
                   </span>
                 </div>
-                <div className="text-sm text-stone-500 mt-0.5">
+                <div className="text-sm text-stone-500 mt-0.5 break-words">
                   {booking.items
                     .map((item) =>
                       `${locale === 'en' ? item.categoryNameEn : item.categoryNameAm} x${item.quantity}`

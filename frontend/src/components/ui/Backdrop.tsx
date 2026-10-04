@@ -3,13 +3,14 @@
  *
  * Everything here is `aria-hidden`, ignores the pointer, and is plain
  * SVG/CSS (no images to download, nothing to lazy-load). Motion lives in
- * globals.css, only animates transform/opacity, and is switched off for
- * `prefers-reduced-motion`, staff pages and print.
+ * globals.css, only animates transform/opacity on whole elements (never on
+ * shapes inside an SVG, which would repaint the entire SVG each frame), and
+ * is switched off for `prefers-reduced-motion`, phones, staff pages and print.
  */
 
 // Deterministic specks so server and client render identically (no
 // Math.random, which would cause a hydration mismatch).
-const SPECKS = Array.from({ length: 16 }, (_, i) => ({
+const SPECKS = Array.from({ length: 6 }, (_, i) => ({
   left: `${(i * 37 + 7) % 100}%`,
   size: 3 + ((i * 5) % 6),
   duration: 14 + ((i * 7) % 16),

@@ -29,7 +29,7 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
             </div>
             <div
               className={cn(
-                "text-xs mt-1.5 font-medium text-center whitespace-nowrap",
+                "mt-1.5 max-w-[5.5rem] text-center text-[11px] font-medium leading-tight sm:max-w-none sm:whitespace-nowrap sm:text-xs",
                 index <= current ? "text-primary-700 font-semibold" : "text-stone-600"
               )}
             >
@@ -39,7 +39,7 @@ export function StepIndicator({ steps, current, className }: StepIndicatorProps)
           {index < steps.length - 1 && (
             <div
               className={cn(
-                "flex-1 h-1 rounded-full mx-1 mb-5 transition-colors",
+                "flex-1 h-1 rounded-full mx-1 mb-7 sm:mb-5 transition-colors",
                 index < current ? "bg-gradient-to-r from-leaf-400 to-leaf-500" : "bg-stone-300/80"
               )}
             />

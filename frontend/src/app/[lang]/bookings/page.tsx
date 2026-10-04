@@ -104,9 +104,9 @@ export default function MyBookingsPage() {
     <div className="min-h-screen flex flex-col" data-surface="visitor">
       <PublicHeader />
       <div className="flex flex-col flex-1">
-        <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-stone-900">
+        <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 w-full">
+        <div className="mb-5 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900">
             {t('my_bookings') || 'My Bookings'}
           </h1>
           <p className="text-stone-700 mt-1">
@@ -115,7 +115,7 @@ export default function MyBookingsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <StatCard
             label={t('total') || 'Total'}
             accent="sky"

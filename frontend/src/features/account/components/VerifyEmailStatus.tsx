@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { confirmEmailVerification } from '../api';
 import { ApiError } from '@/lib/api/errors';
+import { clearRememberedRedirect, peekRememberedRedirect, safeRedirectPath } from '@/lib/utils/redirect';
 
 type Status = 'verifying' | 'success' | 'error';
 
@@ -19,6 +20,9 @@ export function VerifyEmailStatus() {
 
   const [status, setStatus] = useState<Status>('verifying');
   const [error, setError] = useState<string | null>(null);
+  // If the visitor came here mid-booking (see VisitorVerifyForm), offer to
+  // carry on to that booking page instead of the generic bookings list.
+  const [continuePath, setContinuePath] = useState<string | null>(null);
   // The link can only be safely consumed once (StrictMode/dev double-render
   // guard) -- the backend endpoint isn't necessarily idempotent for an
   // already-consumed token, so this avoids firing the request twice.
@@ -37,6 +41,7 @@ export function VerifyEmailStatus() {
 
       try {
         await confirmEmailVerification(token);
+        setContinuePath(safeRedirectPath(peekRememberedRedirect(), locale));
         setStatus('success');
       } catch (err: unknown) {
         setStatus('error');
@@ -47,7 +52,7 @@ export function VerifyEmailStatus() {
         );
       }
     })();
-  }, [token, t]);
+  }, [token, t, locale]);
 
   return (
     <Card className="max-w-md mx-auto text-center">
@@ -71,9 +76,16 @@ export function VerifyEmailStatus() {
             {t('verify_email_success_body') ||
               'Your email address has been confirmed. You can close this page.'}
           </p>
-          <Link href={`/${locale}/bookings`}>
+          <Link
+            href={continuePath ?? `/${locale}/bookings`}
+            onClick={() => {
+              if (continuePath) clearRememberedRedirect();
+            }}
+          >
             <Button size="lg" className="w-full bg-brand-primary hover:bg-primary-700">
-              {t('view_bookings') || 'View my bookings'}
+              {continuePath
+                ? t('continue_booking') || 'Continue booking'
+                : t('view_bookings') || 'View my bookings'}
             </Button>
           </Link>
         </>

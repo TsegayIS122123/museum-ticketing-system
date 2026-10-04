@@ -156,12 +156,12 @@ export default function BookPage() {
                   Conflict, "This date is closed to online booking."). */}
               <AvailabilityDatePicker value={visitDate} onChange={setVisitDate} />
             </Card>
-            <div className="flex justify-between">
-              <Button variant="secondary" onClick={() => setCurrentStep('category')}>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+              <Button variant="secondary" className="justify-center" onClick={() => setCurrentStep('category')}>
                 <ArrowLeft className="w-4 h-4" /> {t('back') || 'Back'}
               </Button>
               <Button
-                className="bg-brand-primary hover:bg-primary-700"
+                className="justify-center bg-brand-primary hover:bg-primary-700"
                 disabled={!visitDate}
                 onClick={handleDateTimeNext}
               >
@@ -202,9 +202,9 @@ export default function BookPage() {
     <div className="min-h-screen flex flex-col" data-surface="visitor">
       <PublicHeader />
       <div className="flex flex-col flex-1">
-        <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-stone-900">
+        <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 w-full">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-stone-900">
             {t('book_a_visit') || 'Book a Visit'}
           </h1>
           <StepIndicator

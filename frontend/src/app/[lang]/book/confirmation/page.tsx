@@ -133,7 +133,7 @@ function ConfirmationPageContent() {
     <div className="min-h-screen flex flex-col" data-surface="visitor">
       <PublicHeader />
       <Confetti />
-      <main className="flex-1 flex items-center justify-center px-4 py-10">
+      <main className="flex-1 flex items-center justify-center px-4 py-6 sm:py-10">
         <div className="w-full max-w-lg">
           <div className="text-center">
             <div className="pop-in ring-pulse mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-leaf-400 to-leaf-600 text-white shadow-xl">
@@ -141,7 +141,7 @@ function ConfirmationPageContent() {
                 <path className="check-draw" d="M5 12.5l4.5 4.5L19 7.5" />
               </svg>
             </div>
-            <h1 className="reveal d1 mt-5 text-3xl font-extrabold text-stone-900 sm:text-4xl">
+            <h1 className="reveal d1 mt-5 text-2xl font-extrabold text-stone-900 min-[400px]:text-3xl sm:text-4xl">
               <span className="text-gradient">{t('confirm_party_title')}</span>
             </h1>
             <p className="reveal d2 mt-2 text-stone-700">{t('confirm_party_sub')}</p>
@@ -153,7 +153,7 @@ function ConfirmationPageContent() {
               <div className="text-stone-600">{t('reference')}</div>
               <div className="text-right font-mono text-base font-bold tracking-widest text-stone-900">{booking.reference}</div>
               <div className="text-stone-600">{t('date') || 'Date'}</div>
-              <div className="text-right font-semibold text-stone-900">{formatDate(booking.visitDate)}</div>
+              <div className="min-w-0 break-words text-right font-semibold text-stone-900">{formatDate(booking.visitDate)}</div>
               <div className="text-stone-600">{t('quantity')}</div>
               <div className="text-right font-semibold text-stone-900">{booking.bookedQuantity}</div>
               <div className="text-stone-600">{t('total')}</div>

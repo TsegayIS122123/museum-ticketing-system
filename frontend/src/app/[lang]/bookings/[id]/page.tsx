@@ -195,7 +195,7 @@ export default function BookingDetailPage() {
   return (
     <div className="min-h-screen flex flex-col" data-surface="visitor">
       <PublicHeader />
-      <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 w-full">
         {/* Back Button */}
         <Button
           variant="ghost"
@@ -209,7 +209,7 @@ export default function BookingDetailPage() {
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-serif font-semibold text-stone-900">
+            <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-stone-900">
               {t('booking_details') || 'Booking Details'}
             </h1>
             <p className="font-mono text-sm text-stone-500 mt-1">

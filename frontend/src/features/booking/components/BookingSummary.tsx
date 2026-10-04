@@ -92,11 +92,11 @@ export function BookingSummary({
           <div className="space-y-2 pb-3">
             <div className="text-stone-500">{t('category')}</div>
             {rows.map((row) => (
-              <div key={row.categoryId} className="grid grid-cols-3 gap-2 text-sm">
-                <div className="font-medium text-stone-900 col-span-2">
+              <div key={row.categoryId} className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+                <div className="min-w-0 font-medium text-stone-900">
                   {locale === 'en' ? row.category?.name_en : row.category?.name_am}
                 </div>
-                <div className="font-medium text-stone-900 text-right">
+                <div className="ml-auto whitespace-nowrap font-medium text-stone-900 text-right tabular-nums">
                   x{row.quantity} = ETB {row.subtotal.toFixed(2)}
                 </div>
               </div>
@@ -110,7 +110,7 @@ export function BookingSummary({
           {/* Date */}
           <div className="grid grid-cols-2 gap-2 py-3">
             <div className="text-stone-500">{t('date') || 'Date'}</div>
-            <div className="font-medium text-stone-900 text-right">{formatDate(visitDate)}</div>
+            <div className="min-w-0 break-words font-medium text-stone-900 text-right">{formatDate(visitDate)}</div>
           </div>
 
           {/* Visitor identity, read-only from the account -- not part of
@@ -138,11 +138,11 @@ export function BookingSummary({
         </div>
       </Card>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:gap-4">
         <Button
           variant="secondary"
           size="lg"
-          className="flex-1"
+          className="flex-1 justify-center"
           onClick={onBack}
           disabled={isProcessing}
         >
@@ -150,7 +150,7 @@ export function BookingSummary({
         </Button>
         <Button
           size="lg"
-          className="flex-1 bg-brand-primary hover:bg-primary-700"
+          className="flex-1 justify-center bg-brand-primary hover:bg-primary-700"
           onClick={onConfirm}
           disabled={isProcessing}
         >

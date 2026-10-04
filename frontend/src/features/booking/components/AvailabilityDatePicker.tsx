@@ -148,7 +148,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
           type="button"
           onClick={goToPrevMonth}
           disabled={isPrevDisabled}
-          className="shrink-0 px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           aria-label={t('previous_month') || 'Previous month'}
         >
           <ChevronLeft className="w-4 h-4" />
@@ -157,7 +157,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
         <button
           type="button"
           onClick={goToNextMonth}
-          className="shrink-0 px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100 cursor-pointer"
+          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100 cursor-pointer"
           aria-label={t('next_month') || 'Next month'}
         >
           <ChevronRight className="w-4 h-4" />
@@ -183,7 +183,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
         ref={gridRef}
         role="group"
         aria-label={monthLabel}
-        className="grid grid-cols-7 gap-1"
+        className="grid grid-cols-7 gap-1 sm:gap-1.5"
         onKeyDown={onGridKeyDown}
       >
         {leadingBlanks.map((_, i) => (
@@ -228,7 +228,7 @@ export function AvailabilityDatePicker({ value, onChange }: AvailabilityDatePick
                   : undefined
               }
               className={`
-                text-sm py-2.5 rounded-lg font-medium border-2 transition-all
+                min-h-11 text-sm py-2 sm:py-2.5 rounded-lg font-medium border-2 transition-all tabular-nums
                 ${isSelected ? 'bg-gradient-to-br from-primary-600 to-sky-400 text-white font-bold shadow-lg ring-2 ring-white scale-105 border-transparent' : cellStyle}
                 ${isSelected ? '' : isDisabled ? 'border-transparent' : ''}
               `}

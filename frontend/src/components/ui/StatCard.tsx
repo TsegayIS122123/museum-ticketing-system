@@ -78,7 +78,7 @@ export function StatCard({
           {icon}
         </span>
       )}
-      <div className="text-xs text-stone-600 font-medium uppercase tracking-wider mb-1">
+      <div className="text-[11px] sm:text-xs text-stone-600 font-medium uppercase tracking-wide sm:tracking-wider mb-1 break-words">
         {label}
       </div>
       <div

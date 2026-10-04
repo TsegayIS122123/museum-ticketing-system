@@ -47,9 +47,9 @@ export default function NewGroupVisitPage() {
   return (
     <div className="min-h-screen flex flex-col" data-surface="visitor">
       <PublicHeader />
-      <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <div className="mb-8">
-          <h1 className="text-3xl font-serif font-semibold text-stone-900">
+      <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 w-full">
+        <div className="mb-5 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-stone-900">
             {t('group_visit_request') || 'Group / School Visit Request'}
           </h1>
         </div>

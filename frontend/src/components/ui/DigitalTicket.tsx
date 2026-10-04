@@ -52,16 +52,16 @@ export function DigitalTicket({
           className="relative overflow-hidden rounded-t-2xl text-white"
           style={{ WebkitMask: notchTop, mask: notchTop }}
         >
-          <div className="bg-gradient-to-br from-primary-700 via-primary-500 to-sky-400 px-6 pb-14 pt-5">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-semibold uppercase tracking-wider text-white/80">
+          <div className="bg-gradient-to-br from-primary-700 via-primary-500 to-sky-400 px-4 pb-14 pt-5 sm:px-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 text-[11px] font-semibold uppercase tracking-wide text-white/80 sm:text-xs sm:tracking-wider">
                 {t("museum_name") || "Zoological Natural History Museum"}
               </div>
-              <span className="rounded-full bg-sun-400 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-amber-950">
+              <span className="shrink-0 rounded-full bg-sun-400 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-amber-950">
                 {t("digital_ticket") || "Digital Ticket"}
               </span>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm [&>div]:min-w-0 [&>div]:break-words">
               <div>
                 <div className="text-xs uppercase tracking-wide text-white/70">
                   {t("date") || "Date"}
@@ -113,10 +113,10 @@ export function DigitalTicket({
 
       <div style={{ filter: "drop-shadow(0 14px 16px rgb(1 50 78 / 0.16))" }}>
         <div
-          className="rounded-b-2xl bg-white px-6 pb-6 pt-5 text-center"
+          className="rounded-b-2xl bg-white px-4 pb-6 pt-5 text-center sm:px-6"
           style={{ WebkitMask: notchBottom, mask: notchBottom }}
         >
-          <div className="font-mono text-2xl font-extrabold tracking-[0.25em] text-stone-900">
+          <div className="break-all font-mono text-xl font-extrabold tracking-[0.18em] text-stone-900 sm:text-2xl sm:tracking-[0.25em]">
             {reference}
           </div>
           <div

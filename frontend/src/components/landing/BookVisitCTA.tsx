@@ -32,12 +32,12 @@ export function BookVisitCTA({ lang, labels }: BookVisitCTAProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn-sun inline-flex min-h-[52px] cursor-pointer items-center gap-2 rounded-full px-8 py-3 text-base font-bold focus:outline-none focus:ring-4 focus:ring-sun-300 focus:ring-offset-2"
+        className="btn-sun inline-flex min-h-[52px] w-full max-w-xs cursor-pointer items-center justify-center gap-2 rounded-full px-8 py-3 text-base font-bold sm:w-auto sm:max-w-none focus:outline-none focus:ring-4 focus:ring-sun-300 focus:ring-offset-2"
       >
         {labels.bookNow}
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={labels.modalTitle}>
+      <Modal open={open} onClose={() => setOpen(false)} title={labels.modalTitle} className="sm:max-w-2xl">
         {/* `sm:grid-cols-2` stacks the two choices on mobile (Phase 4's
             "stack on mobile, tap targets >= 44px" requirement) and sits
             them side by side, visually equal, from `sm` up. */}

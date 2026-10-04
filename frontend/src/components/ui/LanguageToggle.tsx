@@ -18,17 +18,17 @@ export function LanguageToggle() {
   };
 
   return (
-    <div className="inline-flex rounded-lg shadow-sm border border-stone-200 bg-white p-0.5">
+    <div className="inline-flex rounded-full border border-brand-primary/15 bg-white/80 p-0.5 shadow-sm">
       {(['en', 'am'] as const).map((lang) => (
         <button
           key={lang}
           type="button"
           onClick={() => switchLanguage(lang)}
           className={cn(
-            'px-3 py-1.5 text-xs font-medium leading-none rounded-md transition-colors',
+            'rounded-full px-3.5 py-1.5 text-xs font-semibold leading-none transition-colors',
             currentLang === lang
-              ? 'bg-brand-primary text-white'
-              : 'text-stone-700 hover:text-stone-900 hover:bg-stone-50'
+              ? 'bg-brand-primary text-white shadow-sm'
+              : 'text-brand-primary/80 hover:bg-brand-primary/10 hover:text-brand-primary'
           )}
           aria-label={lang === 'en' ? (t('switch_to_english') || 'Switch to English') : (t('switch_to_amharic') || 'Switch to Amharic')}
         >

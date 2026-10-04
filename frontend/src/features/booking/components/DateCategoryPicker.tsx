@@ -104,7 +104,7 @@ export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategor
             <div
               key={category.id}
               className={`
-                lift p-4 rounded-2xl border-2 border-l-8 flex flex-wrap items-center justify-between gap-4 transition-all bg-white/80
+                lift p-3 sm:p-4 rounded-2xl border-2 border-l-8 flex flex-wrap items-center justify-between gap-3 sm:gap-4 transition-all bg-white/80
                 ${quantityFor(category.id) > 0
                   ? 'border-secondary-600 bg-secondary-50 ring-2 ring-secondary-200'
                   : 'border-stone-200'
@@ -112,8 +112,8 @@ export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategor
               `}
               style={quantityFor(category.id) > 0 ? undefined : { borderLeftColor: ['#29c3f5', '#ffbe0b', '#2fd29a', '#ff6b6b', '#9b6bff'][ci % 5] }}
             >
-              <div>
-                <div className="font-semibold text-stone-900">
+              <div className="min-w-0">
+                <div className="font-semibold text-stone-900 break-words">
                   {locale === 'en' ? category.name_en : category.name_am}
                 </div>
                 <div className="text-sm text-stone-500 mt-1">
@@ -155,7 +155,7 @@ export function DateCategoryPicker({ items, onItemsChange, onNext }: DateCategor
       <div className="flex justify-end">
         <Button
           size="lg"
-          className="bg-brand-primary hover:bg-primary-700"
+          className="w-full justify-center bg-brand-primary hover:bg-primary-700 sm:w-auto"
           disabled={items.length === 0}
           onClick={onNext}
         >

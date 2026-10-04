@@ -73,7 +73,10 @@ export default function AvailabilityPage() {
         const merged = buildMonthDates().map((date) => ({
           date,
           status: (byDate.get(date) ?? true ? 'available' : 'closed') as AvailabilityStatus,
-          isWeeklyClosure: weeklyClosed.has(date),
+          // Sundays are always closed (UAT round 1). Trust the backend's
+          // `weekly_closure` marker, but also derive it from the weekday
+          // so the calendar can never show a Sunday as bookable.
+          isWeeklyClosure: weeklyClosed.has(date) || parseLocalIsoDate(date).getDay() === 0,
         }));
         setDates(merged);
       })
@@ -149,6 +152,12 @@ export default function AvailabilityPage() {
   };
 
   const today = toLocalIsoDate(new Date());
+  // The grid has seven fixed columns (Sun..Sat), so day 1 must be pushed
+  // right by however many weekdays precede it. Without these leading
+  // blanks the 1st always landed in the Sunday column, which shifted
+  // every date one-or-more columns left -- the "Closed every Sunday"
+  // cells showed up under Wed (etc.) instead of under Sun.
+  const leadingBlanks = dates.length > 0 ? parseLocalIsoDate(dates[0].date).getDay() : 0;
   const currentMonth = new Date().toLocaleString(locale === 'en' ? 'en-US' : 'am-ET', {
     month: 'long',
     year: 'numeric',
@@ -192,30 +201,43 @@ export default function AvailabilityPage() {
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: leadingBlanks }, (_, i) => (
+                <div key={`blank-${i}`} aria-hidden="true" />
+              ))}
               {dates.map(({ date, status, isWeeklyClosure }) => {
                 const isSelected = selectedDate === date;
                 const isPast = date < today;
+                const isToday = date === today;
                 const isLocked = isPast || isWeeklyClosure;
                 const cellStyle = isPast
                   ? 'bg-stone-50 text-stone-500 cursor-not-allowed'
                   : isWeeklyClosure
                   ? 'bg-stone-200 text-stone-500 cursor-not-allowed'
-                  : getStatusColor(status);
+                  : `${getStatusColor(status)} cursor-pointer hover:-translate-y-0.5 hover:shadow-md`;
 
                 return (
                   <button
                     key={date}
+                    type="button"
                     onClick={() => !isLocked && setSelectedDate(date)}
                     disabled={isLocked}
+                    aria-pressed={isSelected}
+                    aria-current={isToday ? 'date' : undefined}
                     title={isWeeklyClosure ? t('closed_every_sunday') || 'The museum is closed every Sunday' : undefined}
                     className={`
-                      text-sm py-2.5 rounded-lg font-medium border-2 transition-all cursor-pointer
+                      relative text-sm py-2.5 rounded-lg font-medium border-2 transition-all tabular-nums
                       ${cellStyle}
                       ${isSelected ? 'ring-2 ring-secondary-500 ring-offset-1' : ''}
                       ${isPast ? 'line-through' : ''}
                     `}
                   >
                     {parseLocalIsoDate(date).getDate()}
+                    {isToday && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-brand-primary"
+                      />
+                    )}
                   </button>
                 );
               })}

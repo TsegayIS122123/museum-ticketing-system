@@ -1,10 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Mail, RefreshCw } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
+import {
+  clearRememberedRedirect,
+  peekRememberedRedirect,
+  rememberRedirect,
+  safeRedirectPath,
+} from '@/lib/utils/redirect';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { Card } from '@/components/ui/Card';
@@ -32,7 +38,42 @@ function isFullyVerified(user: { email_verified_at: string | null } | null): boo
 export function VisitorVerifyForm() {
   const { t, locale } = useTranslation();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated, login, setUser } = useAuth();
+
+  // Where to send the visitor once she's fully verified. "Book a visit"
+  // (personal) and "School visit" both bounce signed-out visitors here with
+  // `?redirect=/book` or `?redirect=/group-visits/new`; honour it so she
+  // lands straight on the booking page she asked for instead of the generic
+  // bookings list. The target is also remembered, because a first-time
+  // visitor may have to leave for the email-confirmation link (a new tab)
+  // and come back without the query string.
+  const redirectParam = searchParams.get('redirect') ?? searchParams.get('next');
+  const requestedRedirect = safeRedirectPath(redirectParam, locale);
+  useEffect(() => {
+    if (requestedRedirect) {
+      rememberRedirect(requestedRedirect);
+    }
+  }, [requestedRedirect]);
+
+  const getDestination = () => {
+    if (requestedRedirect) return requestedRedirect;
+    const remembered = peekRememberedRedirect();
+    return safeRedirectPath(remembered, locale) ?? `/${locale}/bookings`;
+  };
+  // Navigate at most once: both the OTP/"I've verified" handlers and the
+  // already-verified effect below can fire for the same sign-in, and the
+  // second call must not run after the remembered target was consumed
+  // (it would otherwise fall back to /bookings).
+  const hasNavigated = useRef(false);
+  const goToDestination = (replace = false) => {
+    if (hasNavigated.current) return;
+    hasNavigated.current = true;
+    const destination = getDestination();
+    clearRememberedRedirect();
+    if (replace) router.replace(destination);
+    else router.push(destination);
+  };
 
   // A visitor who already has a session (fresh from the OTP step below,
   // or returning later e.g. via a bookmarked /verify link) but never
@@ -75,9 +116,12 @@ export function VisitorVerifyForm() {
   // instead of re-showing a login form she doesn't need.
   useEffect(() => {
     if (isAuthenticated && user && isFullyVerified(user)) {
-      router.replace(`/${locale}/bookings`);
+      goToDestination(true);
     }
-  }, [isAuthenticated, user, locale, router]);
+    // `goToDestination` is rebuilt every render; the inputs that matter
+    // to it are listed here instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user, locale, router, requestedRedirect]);
 
   const handleStartVerification = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +164,7 @@ export function VisitorVerifyForm() {
       login({ access_token: response.access_token }, response.user);
 
       if (isFullyVerified(response.user)) {
-        router.push(`/${locale}/bookings`);
+        goToDestination();
       } else {
         // Phone's proven, email isn't yet -- stop here instead of
         // dropping her into /bookings and letting a later booking
@@ -166,7 +210,7 @@ export function VisitorVerifyForm() {
       const updated = await getCurrentUser();
       setUser(updated);
       if (isFullyVerified(updated)) {
-        router.push(`/${locale}/bookings`);
+        goToDestination();
       } else {
         setError(
           t('verify_email_pending_still_unverified') ||

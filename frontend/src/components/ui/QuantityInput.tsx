@@ -93,7 +93,7 @@ export function QuantityInput({
           type="button"
           onClick={handleDecrement}
           disabled={disabled || value <= min}
-          className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-11 h-11 rounded-lg border border-stone-300 bg-white flex items-center justify-center hover:bg-stone-50 active:bg-stone-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           aria-label={t('decrease_quantity') || 'Decrease quantity'}
         >
           <Minus className="w-4 h-4" />
@@ -107,19 +107,19 @@ export function QuantityInput({
           onChange={handleInputChange}
           onBlur={handleBlur}
           disabled={disabled}
-          className="w-16 h-10 text-center text-lg font-semibold border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent disabled:bg-stone-100 disabled:cursor-not-allowed"
+          className="w-14 sm:w-16 h-11 text-center text-lg font-semibold border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent disabled:bg-stone-100 disabled:cursor-not-allowed"
           aria-label={label ? undefined : t('quantity_input') || 'Quantity input'}
         />
         <button
           type="button"
           onClick={handleIncrement}
           disabled={disabled || value >= max}
-          className="w-10 h-10 rounded-lg border border-stone-300 flex items-center justify-center hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-11 h-11 rounded-lg border border-stone-300 bg-white flex items-center justify-center hover:bg-stone-50 active:bg-stone-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           aria-label={t('increase_quantity') || 'Increase quantity'}
         >
           <Plus className="w-4 h-4" />
         </button>
-        <span className="text-sm text-stone-500 ml-1">
+        <span className="ml-1 hidden text-sm text-stone-500 min-[400px]:inline">
           {t('max_label') || 'max'} {max}
         </span>
       </div>

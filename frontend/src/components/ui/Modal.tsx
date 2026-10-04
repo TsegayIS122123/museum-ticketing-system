@@ -77,35 +77,35 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/45 transition-opacity"
         onClick={onClose}
       />
       <div
         ref={modalRef}
         tabIndex={-1}
         className={cn(
-          "relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto",
+          "relative bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] max-h-[90dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]",
           className
         )}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
       >
-        <div className="flex items-center justify-between p-6 border-b border-stone-200">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-white p-4 sm:p-6 border-b border-stone-200">
           <h3 id="modal-title" className="font-semibold text-lg text-stone-900">
             {title}
           </h3>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-700 transition-colors"
+            className="w-10 h-10 sm:w-8 sm:h-8 shrink-0 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-700 transition-colors"
             aria-label={t('close_modal') || 'Close modal'}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>
   );

@@ -16,10 +16,10 @@ export function SiteFooter({ locale }: { locale: 'en' | 'am' }) {
         <div>
           <p className="font-semibold">{t.contact}</p>
           <p className="mt-2 text-white/75">+251 900 000 000</p>
-          <p className="text-white/75">info@sciencemuseum.et</p>
+          <p className="break-all text-white/75">info@sciencemuseum.et</p>
         </div>
       </div>
-      <div className="border-t border-white/15 px-4 py-4 text-center text-xs text-white/65">
+      <div className="border-t border-white/15 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-xs text-white/65">
         © {new Date().getFullYear()} {t.footer_copyright}
       </div>
     </footer>

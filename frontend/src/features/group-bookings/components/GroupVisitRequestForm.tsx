@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Pin, GraduationCap, CalendarDays } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
-import { useAuth } from '@/lib/auth/auth-context';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
@@ -23,17 +22,11 @@ interface GroupVisitRequestFormProps {
 export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps) {
   const { t, locale } = useTranslation();
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  // POST /bookings/ requires the visitor to already be logged in/OTP
-  // verified -- there is no anonymous path. Redirect rather than let the
-  // submit silently 401.
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push(`/${locale}/verify?next=/${locale}/group-visits/new`);
-    }
-  }, [authLoading, isAuthenticated, locale, router]);
-
+  // Login gating lives in app/[lang]/group-visits/new/page.tsx (it sends
+  // visitors to /verify?redirect=/group-visits/new and only mounts this
+  // form once they're verified). A second redirect here used a different
+  // query param and could race the page's, so it was removed.
   const [categories, setCategories] = useState<Category[]>([]);
   useEffect(() => {
     getCategories()
@@ -320,7 +313,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
                 <div
                   key={category.id}
                   className={`
-                    lift p-4 rounded-2xl border-2 border-l-8 flex flex-wrap items-center justify-between gap-4 transition-all bg-white/80
+                    lift p-3 sm:p-4 rounded-2xl border-2 border-l-8 flex flex-wrap items-center justify-between gap-3 sm:gap-4 transition-all bg-white/80
                     ${quantityFor(category.id) > 0
                       ? 'border-secondary-600 bg-secondary-50 ring-2 ring-secondary-200'
                       : 'border-stone-200'
@@ -371,12 +364,12 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
         </div>
       </Card>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:gap-4">
         <Button
           type="button"
           variant="secondary"
           size="lg"
-          className="flex-1"
+          className="flex-1 justify-center"
           onClick={() => router.push(`/${locale}`)}
           disabled={isSubmitting}
         >
@@ -385,7 +378,7 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
         <Button
           type="submit"
           size="lg"
-          className="flex-1 bg-brand-primary hover:bg-primary-700"
+          className="flex-1 justify-center bg-brand-primary hover:bg-primary-700"
           disabled={isSubmitting}
         >
           {isSubmitting ? (

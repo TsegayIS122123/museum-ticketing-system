@@ -24,7 +24,7 @@ export function Card({
       data-slot="card"
       data-padding={padding}
       className={cn(
-        'bg-white/90 rounded-2xl border border-stone-200/80 shadow-md shadow-primary-900/5 backdrop-blur-sm',
+        'bg-white/95 rounded-2xl border border-stone-200/80 shadow-md shadow-primary-900/5',
         padding && 'p-4 sm:p-6',
         className
       )}
