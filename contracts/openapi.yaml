@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Museum Ticketing & Booking Platform API
-  version: 1.0.0
+  version: 0.2.0
   description: Bilingual (EN/AM) online booking, payment, and gate check-in for the
     Zoological Natural History Museum's digital ticketing track.
 paths:
@@ -155,6 +155,8 @@ paths:
     post:
       operationId: v1_auth_login_create
       description: POST /auth/login -- Staff only (FR-ACC-002, FR-ACC-005).
+      parameters:
+      - $ref: '#/components/parameters/XClientPlatform'
       tags:
       - v1
       requestBody:
@@ -225,11 +227,24 @@ paths:
         POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py),
         shared by both credential paths (Sec 4.1).
 
-        Reads the refresh token from the httpOnly cookie set by `_auth_response`
-        above instead of requiring it in the request body -- the frontend never
-        holds or sends the refresh token itself (cookies.py). Re-sets the
-        cookie with the rotated token on success, per SIMPLE_JWT's
-        ROTATE_REFRESH_TOKENS.
+        A browser reads the refresh token from the httpOnly cookie set by
+        `_auth_response` and re-sets the cookie with the rotated token on
+        success, per SIMPLE_JWT's ROTATE_REFRESH_TOKENS. A native client that
+        declares itself with `X-Client-Platform: expo` has no cookie jar and
+        instead sends the refresh token in the request body and receives the
+        rotated one in the response body.
+      parameters:
+      - $ref: '#/components/parameters/XClientPlatform'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: "Only used by a non-cookie client (`X-Client-Platform: expo`)."
       tags:
       - v1
       security:
@@ -281,6 +296,8 @@ paths:
       description: |-
         POST /auth/visitor/verify/confirm -- completes Visitor verification
         and issues the same token pair Staff login does (Sec 4.1).
+      parameters:
+      - $ref: '#/components/parameters/XClientPlatform'
       tags:
       - v1
       requestBody:
@@ -366,6 +383,21 @@ paths:
     get:
       operationId: v1_availability_list
       description: GET /availability -- public (FR-BOOK-008).
+      parameters:
+      - name: from
+        required: true
+        in: query
+        description: First date of the range (inclusive), `YYYY-MM-DD`.
+        schema:
+          type: string
+          format: date
+      - name: to
+        required: true
+        in: query
+        description: Last date of the range (inclusive), `YYYY-MM-DD`.
+        schema:
+          type: string
+          format: date
       tags:
       - v1
       security:
@@ -419,6 +451,29 @@ paths:
       description: |-
         GET /bookings (Staff only) and POST /bookings (Visitor only,
         FR-BOOK-001/FR-BOOK-003).
+      parameters:
+      - name: status
+        required: false
+        in: query
+        schema:
+          $ref: '#/components/schemas/BookingStatusEnum'
+      - name: visitDate
+        required: false
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: bookingType
+        required: false
+        in: query
+        schema:
+          type: string
+          enum: [individual, group]
+      - name: flagged
+        required: false
+        in: query
+        schema:
+          type: boolean
       tags:
       - v1
       security:
@@ -1632,7 +1687,170 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedBookingList'
           description: ''
+  /api/v1/admin/audit-log/:
+    get:
+      operationId: listAuditLog
+      description: |-
+        GET /admin/audit-log -- Platform Admin only, read-only (FR-AUDIT-001).
+        Returns the append-only audit trail written across every module,
+        filterable and paginated.
+      parameters:
+      - name: actor
+        required: false
+        in: query
+        description: Filter by acting account UUID.
+        schema:
+          type: string
+          format: uuid
+      - name: action
+        required: false
+        in: query
+        description: Filter by action, e.g. `booking.cancelled`.
+        schema:
+          type: string
+      - name: entityType
+        required: false
+        in: query
+        schema:
+          type: string
+      - name: entityId
+        required: false
+        in: query
+        schema:
+          type: string
+      - name: from
+        required: false
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        required: false
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: limit
+        required: false
+        in: query
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        schema:
+          type: integer
+      tags:
+      - Admin
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  next:
+                    type: string
+                    nullable: true
+                  previous:
+                    type: string
+                    nullable: true
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLogEntry'
+          description: ''
+  /api/v1/notifications/preferences/:
+    get:
+      operationId: getNotificationPreferences
+      description: GET /notifications/preferences -- the caller's notification channels and language (FR-NOTIFY-PREF-001).
+      tags:
+      - Notifications
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreference'
+          description: ''
+    put:
+      operationId: updateNotificationPreferences
+      description: PUT /notifications/preferences -- replaces the caller's preferences (FR-NOTIFY-PREF-001).
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreference'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreference'
+          description: ''
+  /api/v1/notifications/devices/:
+    post:
+      operationId: registerDevice
+      description: POST /notifications/devices -- register a device token for push delivery (FR-NOTIFY-PUSH-001).
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceToken'
+        required: true
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceToken'
+          description: ''
+  /api/v1/notifications/devices/{token}/:
+    delete:
+      operationId: unregisterDevice
+      description: DELETE /notifications/devices/{token} -- deactivate a registered device token.
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - Notifications
+      security:
+      - TokenVersionAuth: []
+      responses:
+        '204':
+          description: ''
 components:
+  parameters:
+    XClientPlatform:
+      name: X-Client-Platform
+      in: header
+      required: false
+      description: |-
+        Declares the calling client platform. Defaults to `web`; a native
+        client sends `expo`, which opts it into refresh-token delivery in the
+        response body instead of an httpOnly cookie (ADR-013).
+      schema:
+        type: string
+        enum: [web, expo]
+        default: web
   schemas:
     Account:
       type: object
@@ -1797,6 +2015,11 @@ components:
       properties:
         access_token:
           type: string
+        refresh_token:
+          type: string
+          description: |-
+            Only populated when the request carried `X-Client-Platform: expo`;
+            a browser receives the refresh token as an httpOnly cookie instead.
         user:
           $ref: '#/components/schemas/Account'
       required:
@@ -1815,6 +2038,14 @@ components:
           readOnly: true
         reference:
           type: string
+          description: |-
+            The 8-character booking reference, drawn from the alphabet
+            `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (ambiguous `0/O/1/I` excluded).
+            The Visitor presents it at the gate, typed or scanned.
+          minLength: 8
+          maxLength: 8
+          pattern: '^[A-HJ-NP-Z2-9]{8}$'
+          example: K7M2QP4A
           readOnly: true
         visitorId:
           type: string
@@ -3590,6 +3821,11 @@ components:
       properties:
         access:
           type: string
+        refresh_token:
+          type: string
+          description: |-
+            Only populated when the request carried `X-Client-Platform: expo`;
+            a browser receives the rotated refresh token as an httpOnly cookie instead.
       required:
       - access
     VisitorVerifyConfirm:
@@ -3689,6 +3925,86 @@ components:
       - receivedFrom
       - refNo
       - voucherRecorded
+    AuditLogEntry:
+      type: object
+      readOnly: true
+      description: One append-only entry of the platform audit trail (FR-AUDIT-001).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        actorUserId:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: Null for system-initiated actions.
+        action:
+          type: string
+          readOnly: true
+          example: booking.cancelled
+        entityType:
+          type: string
+          readOnly: true
+        entityId:
+          type: string
+          format: uuid
+          readOnly: true
+        metadata:
+          type: object
+          additionalProperties: true
+          readOnly: true
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - createdAt
+      - entityId
+      - entityType
+      - id
+    NotificationPreference:
+      type: object
+      description: The caller's notification channels and language (FR-NOTIFY-PREF-001).
+      properties:
+        emailEnabled:
+          type: boolean
+        smsEnabled:
+          type: boolean
+        pushEnabled:
+          type: boolean
+        language:
+          $ref: '#/components/schemas/LanguagePreferenceEnum'
+      required:
+      - emailEnabled
+      - language
+      - pushEnabled
+      - smsEnabled
+    DeviceToken:
+      type: object
+      description: A registered push destination for an account (FR-NOTIFY-PUSH-001).
+      properties:
+        token:
+          type: string
+        platform:
+          type: string
+          enum:
+          - ios
+          - android
+        active:
+          type: boolean
+          readOnly: true
+        lastSeenAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - platform
+      - token
   securitySchemes:
     TokenVersionAuth:
       type: http

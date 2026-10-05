@@ -1,6 +1,14 @@
 # Document 04a — API changes since Document 04
 
-**Status:** companion to `04-openapi-specification.yaml`. Document 04 is the hand-authored *starting point* for the API; the implemented API is whatever `contracts/openapi.yaml` says, because that file is generated from the real views and serializers (`backend/scripts/export_contract.sh`) and CI fails if it drifts. This page records, in prose, where the implemented API differs from Document 04, so a reader of 04 isn't misled. When in doubt, the contract wins.
+**Status:** companion to `04-openapi-specification.yaml`, which is now historical. The implemented API is `contracts/openapi.yaml`, generated from the real views and serializers (`backend/scripts/export_contract.sh`) and checked for drift in CI. This page records, in prose, where the implemented API differs from Document 04, so a reader of 04 isn't misled. When in doubt, the contract wins.
+
+## Decisions reflected in the current contract
+
+- **Mobile auth (`X-Client-Platform`).** `POST /auth/login/`, `POST /auth/visitor/verify/confirm/`, and `POST /auth/refresh/` accept the optional header. With `expo`, the refresh token is returned in the response body and accepted in the refresh request body; otherwise it is an HttpOnly cookie only (Document 03, ADR-013).
+- **Audit log.** `GET /admin/audit-log/` returns a paginated, filterable, read-only trail for Platform Admin (FR-AUDIT-001).
+- **Push notifications.** `GET`/`PUT /notifications/preferences/` manage channels and language (FR-NOTIFY-PREF-001), and `POST`/`DELETE /notifications/devices/` register and deactivate device tokens (FR-NOTIFY-PUSH-001).
+- **QR codes.** Tickets carry a client-rendered QR whose payload is the bare booking reference; there is no server-side QR endpoint, because both the web and mobile clients render it (FR-QR-001, FR-QR-002).
+- **Booking reference format.** References are 8 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, matching `^[A-HJ-NP-Z2-9]{8}$`; the contract now documents this on `Booking.reference`.
 
 ## Conventions that differ from Document 04
 
@@ -13,7 +21,7 @@
 
 | Document 04 | Implemented as |
 |---|---|
-| `POST /bookings/{id}/approval` | Not implemented. Group bookings are paid for up front like individual ones; there is no approval step. |
+| `POST /bookings/{id}/approval` | No such endpoint exists. Group bookings are paid for up front like individual ones; there is no approval step. |
 | `GET /settlement/pending`, `GET/… /settlement/transfers[/{id}]` | `GET /settlement/my-balance/`, `POST /settlement/reconcile/`, `GET /settlement/reconciliations/`, plus the Chapa transfer webhook (below). |
 
 ## Added since Document 04
@@ -61,3 +69,13 @@ Figures in every report count only checked-in (`Visited`) bookings by visit date
 ## Rate limits added in Phase 8
 
 `otp-verify` 10/15m (OTP and magic-link verification), `password-reset-confirm` 10/15m, `institution-lookup` 30/15m, in addition to the existing `login`, `otp-request`, `password-reset-request` (5/15m each) and `booking-create` (10/15m). A throttled request returns `429`.
+
+## Keeping the contract and Document 04 in step
+
+`contracts/openapi.yaml` is generated, never hand-edited. After any change to a serializer, view, or `urls.py`:
+
+1. Run `backend/scripts/export_contract.sh` (from the repo root: `docker compose exec api ./scripts/export_contract.sh`). It regenerates `contracts/openapi.yaml` from the live Django schema and validates it before writing.
+2. Commit the regenerated contract together with the code change that produced it.
+3. Regenerate the client types: `frontend/scripts/generate-types.sh` (or `npm run generate-types`) and the mobile equivalent.
+
+`docs/04-openapi-specification.yaml` is deliberately **not** regenerated and is not kept in sync; it stays as the historical hand-authored spec. This page (04a) is the written record of where the implemented API differs, so update it when a divergence is intentional rather than a drift the contract should already reflect.

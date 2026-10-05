@@ -1,4 +1,4 @@
-# Museum Ticketing & Booking Platform — Frontend
+# ZNHM Ticketing — Frontend
 
 Next.js app serving the public Visitor site (SSR) and the internal Staff
 dashboard (CSR, under `/staff/*`) as one deployable, per
@@ -79,11 +79,13 @@ src/
 │                        │                     link), Staff password login/reset, settings
 │                        ├── catalog/          Category browsing, Museum Manager category mgmt
 │                        ├── booking/          Visitor booking flow + booking detail
-│                        ├── group-bookings/   Group/school request + Museum Manager approval
+│                        ├── group-bookings/   Group/school visit request
 │                        ├── entrance/         Cashier gate check-in console
 │                        ├── refunds/          Refund request + staff oversight
 │                        ├── settlement/       Cashier-to-Finance settlement transfer flow
 │                        ├── reporting/        Dashboard + periodic reports
+│                        ├── notifications/    Notification preferences (channels + language)
+│                        ├── audit/            Platform Admin audit log (read-only)
 │                        └── admin/            Platform Admin staff account tools
 ├── components/ui/       shared presentational primitives — build these
 │                        and the design tokens below BEFORE any feature screen
@@ -127,5 +129,11 @@ scripts/
   sidebar/nav is fixed to that role (doc 06 §4.2).
 - The Visitor site and Staff dashboard are one Next.js app, split by route
   (`/staff/*`), not separate deployables (doc 03 §2.2).
-- A native mobile app (React Native) exists for the Visitor role only and
-  lives in its own separate repo — it is out of scope here (doc 03 ADR-006).
+- A native mobile app (React Native) serves all four roles and lives in
+  `mobile/` in this repo and is described in doc 09 (doc 03 ADR-006, ADR-012).
+- The digital ticket renders a real QR code whose payload is the bare booking
+  reference (doc 02 FR-QR-001, doc 06 §5.5); there is no server-side QR
+  endpoint and no placeholder image.
+- The Platform Admin audit log (`/staff/admin/audit`) and notification
+  preferences (`/settings/notifications`) screens expose FR-AUDIT-001 and
+  FR-NOTIFY-PREF-001 respectively.

@@ -1,13 +1,15 @@
-# STATUS: hand-authored starting point, superseded by ../contracts/openapi.yaml.
-# The implemented API is generated from the real views/serializers and checked
-# for drift in CI; where this file and the contract disagree, the contract wins.
-# See 04a-api-changes-since-doc-04.md for what differs (new endpoints from
-# UAT round 1, paths that were implemented under different names, conventions).
+# Historical reference only. This is the hand-authored API specification from the
+# design phase, retained so a reader can see the original intent; it is no longer
+# authoritative. The implemented API is `contracts/openapi.yaml`, generated from
+# the real views and serializers and checked for drift in CI. Where this file and
+# the contract disagree, the contract wins, and this file is not kept in sync
+# endpoint by endpoint. See 04a-api-changes-since-doc-04.md for the differences
+# that matter.
 openapi: 3.0.3
 info:
   title: Museum Ticketing & Booking Platform API
   version: 0.1.0
-  description: API contract for the museum's digital ticketing track (book, pay, check in, refund, and settle) — additive to, and never merged with, the existing manual/cash counter process.
+  description: Historical hand-authored API specification for ZNHM Ticketing (book, pay, check in, refund, and settle). Superseded by ../contracts/openapi.yaml.
 servers:
 - url: https://api.museum-tickets.et.example/api/v1
 tags:

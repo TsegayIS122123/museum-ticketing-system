@@ -1,7 +1,7 @@
 # 08 — Deployment and DevOps
 
 **Document type:** Deployment and DevOps Runbook
-**Project:** Museum Ticketing & Booking Platform
+**Project:** ZNHM Ticketing
 **Audience:** DevOps engineers, backend engineers, on-call responders, technical reviewers
 **Status:** Complete — derived from and traceable to the SRS, SDS, Database Design, and Testing and QA documents
 **Related documents:** [02 — Software Requirements Specification](02-software-requirements-specification.md) (source of the NFR-AVAIL, NFR-PERF, and NFR-RETENTION requirements this document operationalizes) · [03 — Software Design Specification](03-software-design-specification.md), [Sections 6.1–6.7](03-software-design-specification.md#6-cross-cutting-design-concerns) (background jobs, caching, storage, and observability this document deploys and monitors) and [Sections 8.1–8.3](03-software-design-specification.md#8-deployment-architecture) (the architectural input this document turns into operational configuration) · [05 — Database Design](05-database-design.md), [Section 6](05-database-design.md#6-migration-strategy) (the migration pattern this document's deploy sequence executes) · [07 — Testing and Quality Assurance](07-testing-and-quality-assurance.md), [Section 5](07-testing-and-quality-assurance.md#5-cicd-test-gate-pipeline) (the test gates this document's pipeline extends into an actual deploy)
@@ -12,7 +12,7 @@
 
 ### 1.1 Purpose
 
-This document specifies **how the Museum Ticketing & Booking Platform is built, deployed, operated, and recovered**: environment configuration, infrastructure strategy, the CI/CD pipeline's deploy stage (beyond the test gates already specified in [Document 07](07-testing-and-quality-assurance.md)), monitoring and alerting, backup and disaster recovery, scaling policy, incident response, and the hosting decision this project's design deliberately leaves open. This document introduces no new architecture — every decision here is the operational realization of the architecture already fixed in [Document 03, Sections 8.1–8.3](03-software-design-specification.md#8-deployment-architecture), per that document's own forward reference (Document 03, Section 10).
+This document specifies **how the ZNHM Ticketing is built, deployed, operated, and recovered**: environment configuration, infrastructure strategy, the CI/CD pipeline's deploy stage (beyond the test gates already specified in [Document 07](07-testing-and-quality-assurance.md)), monitoring and alerting, backup and disaster recovery, scaling policy, incident response, and the hosting decision this project's design deliberately leaves open. This document introduces no new architecture — every decision here is the operational realization of the architecture already fixed in [Document 03, Sections 8.1–8.3](03-software-design-specification.md#8-deployment-architecture), per that document's own forward reference (Document 03, Section 10).
 
 ### 1.2 Scope
 
@@ -35,7 +35,7 @@ This is the operational configuration of the container topology fixed in [Docume
 | Component | Deployment unit | Scaling | Notes |
 |---|---|---|---|
 | Nginx (reverse proxy, TLS termination) | Load balancer + Nginx container | Managed by load balancer | Terminates TLS; origin traffic to the app tier is internal-network only. |
-| Web (Next.js) | Docker container, N replicas | Horizontal, small fixed pool (2 replicas minimum for zero-downtime rolling deploys) | Stateless; serves the Visitor SSR site and the Staff CSR dashboard under the same app, split by route (Document 03 §7.1). |
+| Web (Next.js) | Docker container, N replicas | Horizontal, small fixed pool (2 replicas minimum for zero-downtime rolling deploys) | Stateless; serves the Visitor SSR site and the Staff CSR dashboard under the same web client, split by route (Document 03 §7.1). |
 | API (Django) | Docker container, N replicas | Horizontal, small fixed pool (2 replicas minimum) | Stateless (Document 03 §8.1); no session affinity required, consistent with ADR-002's stateless-JWT decision. |
 | Celery Worker | Docker container, N replicas | Horizontal, **per-queue** (Section 7.2) | Separate replica pools per queue (`notifications`, `documents`, `payments`) so a backlog in one queue cannot starve another — see [Document 03, Section 6.2](03-software-design-specification.md#62-caching-and-queue-design-redis). |
 | Celery Beat | Docker container, **exactly 1 replica** | None — fixed at 1 | Enforced by deployment configuration (not just convention), since a second replica would duplicate the daily no-show/refund checks (Document 03 §8.1, ADR-003's accepted trade-off). |
@@ -54,6 +54,17 @@ All infrastructure (load balancer, container orchestration, database/cache/stora
 One image per deployable component (`web`, `api`, `worker`; `beat` reuses the `api`/`worker` image with a different entrypoint rather than a fourth image, to minimize build surface). Images are tagged with the Git commit SHA, never `latest`, so that "the exact image tested in staging is the one deployed to production" (Document 03 §8.2) is enforceable by tag equality, not by trust.
 
 The **Mobile app** (React Native, ADR-006) is not part of this container-based deploy pipeline — it is released independently through the Apple App Store and Google Play Store review processes, which introduce a review-time lag the backend deploy cadence does not have. Because both share the same API (Document 03 §2.2), a backend release that changes request/response shape in a way an already-published mobile build depends on must be avoided or made backward-compatible until store review confirms the corresponding mobile update has rolled out — an engineering discipline this project treats as good practice, since Document 02 does not define a formal API-versioning NFR.
+
+### 2.4 Mobile release
+
+The mobile app is built and shipped through Expo services, separately from the container pipeline:
+
+- Builds are produced with **EAS Build** (`eas build`), one profile per environment, and submitted with `eas submit`.
+- iOS ships to the **App Store** and Android to the **Google Play Store**, under the bundle/package ID `et.aau.znhm.ticketing`.
+- The mobile app registers the URL scheme `znhm` for deep links.
+- The client's only build-time configuration is `EXPO_PUBLIC_API_URL` (Section 5.3); because store review lags the backend deploy cadence, a backend change that alters request/response shape must stay backward-compatible until the matching mobile update is live (Section 2.3).
+
+QR codes are rendered entirely on the client, so the backend needs no QR generation dependency; there is no server-side QR endpoint to deploy.
 
 ---
 
@@ -166,6 +177,7 @@ Alerts route to on-call per Section 8.
 | `LOG_LEVEL` | backend | Level for `apps.*` loggers (default `INFO`). |
 | `NEXT_PUBLIC_SITE_URL` | frontend | Canonical origin for the sitemap, Open Graph tags and hreflang alternates. Required in every deployed environment. |
 | `NEXT_PUBLIC_FISCAL_YEAR_START_MONTH` / `_DAY` | frontend | Seeds the "This year" preset in Manager reports. Must match the backend's `FISCAL_YEAR_START_MONTH` / `_DAY`; the report figures themselves always come from the backend. |
+| `EXPO_PUBLIC_API_URL` | mobile | Base URL of the API, **including the `/api/v1` prefix** (for example `http://192.168.1.10:8000/api/v1`). On a physical device this must be a LAN address, not `localhost`, because the device cannot reach the development machine's loopback interface. |
 
 ## 6. Backup and Disaster Recovery
 

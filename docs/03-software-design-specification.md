@@ -11,7 +11,7 @@
 
 ### 1.1 Purpose
 
-This document specifies **how** the Museum Ticketing & Booking Platform is built. Every design decision here exists to satisfy one or more requirements in [Document 02](02-software-requirements-specification.md). Where a requirement changes, this document changes with it; no new product behavior is introduced here — only the architecture and mechanisms that implement behavior already specified.
+This document specifies **how** the ZNHM Ticketing is built. Every design decision here exists to satisfy one or more requirements in [Document 02](02-software-requirements-specification.md). Where a requirement changes, this document changes with it; no new product behavior is introduced here — only the architecture and mechanisms that implement behavior already specified.
 
 ### 1.2 Scope
 
@@ -33,14 +33,14 @@ This document covers system architecture, backend module decomposition, authenti
 
 ```mermaid
 C4Context
-    title System Context — Museum Ticketing & Booking Platform
+    title System Context — ZNHM Ticketing
 
-    Person(visitor, "Visitor", "Books and pays for a ticket online, or pays cash at the counter")
+    Person(visitor, "Visitor", "Books and pays for a ticket online, then presents a ticket at the gate")
     Person(cashier, "Cashier", "Verifies headcount and category at the gate, corrects a booking's category when it doesn't match, keys each visitor's transaction into IFMIS herself, and settles her own outstanding balance via a Chapa transfer")
     Person(manager, "Museum Manager", "Controls date availability, configures ticket categories/prices, views reporting")
     Person(admin, "Platform Admin", "Provisions staff accounts")
 
-    System(platform, "Museum Ticketing & Booking Platform", "Digital booking, payment, and settlement track — additive to the existing manual/cash process")
+    System(platform, "ZNHM Ticketing", "Unified digital booking, payment, gate check-in, and settlement")
 
     System_Ext(chapa, "Chapa", "Payment aggregator: online checkout, payment confirmation, and refunds")
     System_Ext(email, "Email Provider", "Delivers booking confirmations, no-show notices, receipts")
@@ -58,21 +58,21 @@ C4Context
 
 **Note on external parties not shown above:** the **Finance Office** and **IFMIS** are real parties in this system's business process (Document 02, §1 and §2.9) but are deliberately **not system integrations**. Per FR-GOV-001, nothing in this architecture calls IFMIS or the Finance Office's systems directly. Per the IFMIS decision (Document 01/02, §2.7): the Cashier personally keys each visitor's transaction into IFMIS herself, under her own name, and hands the resulting voucher directly to the visitor — the platform's role is limited to giving her the fields to copy in (`apps.entrance`) and tracking her own outstanding balance (`apps.settlement`); it never produces a document of its own for the Finance Office. They are omitted from the diagram above for that reason — including them with a `Rel` arrow would misstate this as a technical integration.
 
-**Note on the manual/cash track:** the existing counter process (cash, paper receipt) is unaffected by this platform and has no representation here — see the system model note in Document 02.
+**One platform.** ZNHM Ticketing is the museum's single ticketing system: every sale is an online booking that moves through one lifecycle and one gate, and reaches the Finance Office through the per-cashier settlement path (Document 02 §2.7).
 
 ### 2.2 Level 2 — Container Diagram
 
 ```mermaid
 C4Container
-    title Container Diagram — Museum Ticketing & Booking Platform
+    title Container Diagram — ZNHM Ticketing
 
     Person(visitor, "Visitor")
     Person(staff, "Cashier / Museum Manager / Platform Admin")
 
-    System_Boundary(platform, "Museum Ticketing & Booking Platform") {
+    System_Boundary(platform, "ZNHM Ticketing") {
         Container(proxy, "Reverse Proxy", "Nginx", "TLS termination, routing, static assets (NFR-SEC-001)")
         Container(web, "Web Application", "Next.js (React)", "Visitor self-service site + Staff dashboard, both bilingual (EN/AM)")
-        Container(mobile, "Mobile App", "React Native", "Visitor booking, payment, and receipts on iOS/Android — same API as web")
+        Container(mobile, "Mobile App", "React Native", "Four-role client (Visitor, Cashier, Museum Manager, Platform Admin) on iOS/Android — same API as web")
         Container(api, "API Application", "Django + Django REST Framework", "Stateless REST API implementing all FR-* modules")
         Container(worker, "Background Worker", "Celery", "Notifications, receipt rendering, no-show detection, refund processing")
         Container(beat, "Scheduler", "Celery Beat", "Daily no-show detection and refund-deadline checks (FR-PAY-005)")
@@ -104,7 +104,7 @@ C4Container
     Rel(beat, cache, "Schedules periodic jobs")
 ```
 
-The **Web** application serves both the Visitor-facing site and the internal Staff dashboard (Cashier/Museum Manager/Platform Admin), split by route rather than by separate deployable apps — there is no multi-tenant or multi-organization reason to separate them (§3.3). The **Mobile** app exists only for the Visitor role (§7.1) and talks to the same API, never a separate backend.
+The **web client** serves both the Visitor-facing site and the internal Staff dashboard (Cashier/Museum Manager/Platform Admin), split by route rather than by a separate deployable — there is no multi-tenant or multi-organization reason to separate them (§3.3). The **mobile app** serves all four roles (§7.1, ADR-012) and talks to the same API, never a separate backend.
 
 ### 2.3 Level 3 — Component Diagram (API Application)
 
@@ -199,7 +199,18 @@ issued it:
 - **Access token:** 15-minute expiry, `Authorization: Bearer` header. Contains `user_id` and `token_version` only — no role claims, so a role change is re-checked against the database on every request rather than trusted from an old token.
 - **Refresh token:** 30-day expiry, rotated on every use.
 
-A token-based (rather than cookie/session-based) scheme is required here specifically because there are **three clients** consuming the same API — Web, Mobile, and the Staff dashboard — none of which can rely on a browser-managed session cookie uniformly (see ADR-002).
+**Client platform header (`X-Client-Platform`, ADR-013).** `POST /auth/login/`, `POST
+/auth/visitor/verify/confirm/`, and `POST /auth/refresh/` accept an optional `X-Client-Platform`
+request header:
+
+- Absent or `web`: the refresh token is delivered only as an HttpOnly cookie, exactly as a browser
+expects.
+- `expo`: the refresh token is additionally returned in the response body as `refresh_token`, and
+`POST /auth/refresh/` also accepts a `refresh_token` field in the request body. A React Native
+client has no cookie jar, so it stores the refresh token in `expo-secure-store` and sends it back
+on refresh itself.
+
+A token-based (rather than cookie/session-based) scheme is required here specifically because there are **four clients** consuming the same API — Web, Mobile, and the Staff dashboard (Web and Mobile) — none of which can rely on a browser-managed session cookie uniformly (see ADR-002, ADR-013).
 
 **Visitor path — passwordless (FR-ACC-001, FR-ACC-003, FR-ACC-004):** no password is ever created,
 stored, or checked for a Visitor account.
@@ -339,6 +350,8 @@ sequenceDiagram
 
 Because a QR scanner emulates keyboard input (ADR-007), this is the **same code path** whether the Cashier types the reference or scans a code — the API never needs to know which happened.
 
+On the mobile client, the Cashier can scan the ticket's QR code with the device camera instead of using keyboard-wedge hardware. This is still the same API lookup: the camera decodes the bare reference and submits it exactly as a typed entry would, so the API never needs to know which input method was used (ADR-011). The web gate console keeps its single keyboard-wedge lookup field.
+
 The check-in response also carries the payer name, amount in figures/words, and a generated purpose string the Cashier needs to key this transaction into IFMIS herself (`apps.entrance`, per FR-GOV-001 — the platform never calls IFMIS directly). Once she has the real Document No/Ref No back from IFMIS, a small follow-up call, `PATCH /bookings/{id}/ifmis-voucher`, records it on the booking (`booking.ifmis_voucher_reference`, Document 05 §3.3) — restricted to the same Cashier who checked the visitor in, and settable only once.
 
 ### 5.2 No-response notice and automatic refund (FR-PAY-005, FR-REFUND-001c)
@@ -373,8 +386,9 @@ Both checks are idempotent: a booking that is rescheduled or refunded between ru
 ### 5.3 Cashier-initiated reconciliation (FR-SETTLE)
 
 Per the IFMIS decision (Document 01/02, §2.7): this is a **per-cashier** running balance, settled
-by a real Chapa transfer, never a platform-wide batch — and the platform generates no receipt of
-its own for it. The Chapa Transfer call is made synchronously from the API tier (not enqueued to
+by a real Chapa transfer, never a platform-wide batch. On completing a reconciliation the platform
+generates a Transfer Receipt for the Cashier to carry to the Finance Office (§6.3, FR-SETTLE-004);
+this is distinct from the IFMIS voucher she keys herself. The Chapa Transfer call is made synchronously from the API tier (not enqueued to
 the Celery worker, unlike refunds — §6.1), but the transfer's own confirmation is asynchronous:
 initiating it only ever produces a `pending` row, and a later webhook call is what moves it to
 `completed` or `failed`.
@@ -432,6 +446,7 @@ platform generates, are what show Finance how many visitors she handled and how 
 | `check_pending_visit_date_passed` | Celery Beat, daily | FR-PAY-005 (step 1: notice) |
 | `check_no_response_refund` | Celery Beat, daily | FR-PAY-005 (step 2: auto-refund) |
 | `process_refund` | Visitor cancellation, shortfall refund request, no-response auto-refund | FR-REFUND-001–004 |
+| `send_push_notification` | Notification that must reach a Visitor's registered device (booking confirmed, no-show notice, refund confirmed) | FR-NOTIFY-PUSH-001, NFR-NOTIFY-001 |
 
 All jobs retry automatically on transient failure and log a structured failure event on final exhaustion. `process_refund` is additionally guarded by a DB-level "already processed" check before calling Chapa, so a retried job cannot double-refund (NFR-IDEMPOTENT-001, NFR-CONSIST-001).
 
@@ -453,7 +468,7 @@ Category and availability caches are invalidated on write (a Museum Manager pric
 |---|---|---|
 | `receipts/temporary/{booking_id}.pdf` | Temporary receipt issued at payment confirmation (FR-PAY-002) | Private; readable by the owning Visitor via a short-lived signed URL |
 
-Receipts are **rendered once and stored**, not regenerated on demand, so a receipt's content always matches exactly what was issued at the time — important since these documents may later be relied on by the Finance Office (see ADR-009). A cashier's reconciliation transfer (§5.3) deliberately has no entry here: per the IFMIS decision, the platform never generates a document for that transfer — the Cashier's own proof of the Chapa transfer, alongside the IFMIS vouchers already handed to each visitor (Document 05 §3.3), is what she carries to the Finance Office instead. S3-compatible storage is chosen specifically because it has a drop-in, self-hosted equivalent (e.g. MinIO), consistent with the still-undecided hosting target.
+Receipts are **rendered once and stored**, not regenerated on demand, so a receipt's content always matches exactly what was issued at the time — important since these documents may later be relied on by the Finance Office (see ADR-009). A cashier's reconciliation Transfer Receipt (§5.3, FR-SETTLE-004) is stored here as well, rendered once and persisted exactly like the temporary receipt. It documents the Chapa transfer for that one Cashier's reconciliation, and is distinct from the IFMIS vouchers already handed to each visitor (Document 05 §3.3), which the Cashier keys herself. S3-compatible storage is chosen specifically because it has a drop-in, self-hosted equivalent (e.g. MinIO), consistent with the still-undecided hosting target.
 
 ### 6.4 Internationalization implementation (FR-LOC-001–004)
 
@@ -497,13 +512,13 @@ Implemented as DRF throttle classes backed by Redis DB 2 (§6.2):
 
 ### 7.1 Structure
 
-Three clients, one API:
+One system, one API, two clients: a **web client** and a **mobile app**. The web client is the browser application (Next.js); the mobile app is the native client. The web client serves both the Visitor site and the Staff dashboard, and the mobile app serves all four roles.
 
 | Client | Technology | Audience | Rationale |
 |---|---|---|---|
-| Web — Visitor site | Next.js, SSR for public pages | Visitor | Public booking/date pages benefit from fast first load; no auth required to browse |
-| Web — Staff dashboard | Next.js, CSR behind auth, same app under `/staff/*` | Cashier, Museum Manager, Platform Admin | Highly interactive, no SEO need, no reason to be a separate deployable given single-venue scope (§3.3) |
-| Mobile app | React Native (iOS + Android) | Visitor | Chosen so booking, payment, and receipts are available on-device, per the product decision to support a native app alongside the web site |
+| Web client — Visitor site | Next.js, SSR for public pages | Visitor | Public booking/date pages benefit from fast first load; no auth required to browse |
+| Web client — Staff dashboard | Next.js, CSR behind auth, same web client under `/staff/*` | Cashier, Museum Manager, Platform Admin | Highly interactive, no SEO need, no reason to be a separate deployable given single-venue scope (§3.3) |
+| Mobile app | React Native (iOS + Android) | Visitor, Cashier, Museum Manager, Platform Admin | A first-class four-role client; after login the mobile app routes each account to the experience for its role (ADR-012) |
 
 ### 7.2 State management
 
@@ -584,8 +599,8 @@ A failing stage blocks progression; production deployment requires manual approv
 **Consequence:** Module boundaries are enforced by code convention (§3.1), not network boundaries.
 
 ### ADR-002: JWT over server-side sessions
-**Decision:** Stateless JWT access + rotated refresh tokens for all three clients (Web, Mobile, Staff dashboard).
-**Rationale:** A native mobile app cannot share a browser session cookie with the web app; a token-based scheme is the natural common denominator across all three clients, not just a scalability choice.
+**Decision:** Stateless JWT access + rotated refresh tokens for both clients (the web client and the mobile app).
+**Rationale:** A native mobile app cannot share a browser session cookie with the web client; a token-based scheme is the natural common denominator across both clients, not just a scalability choice.
 **Trade-off accepted:** Immediate access-token revocation isn't free with pure JWTs; mitigated by a `token_version` check per request, at the cost of one indexed comparison.
 
 ### ADR-003: Celery + Redis for asynchronous work
@@ -605,7 +620,7 @@ A failing stage blocks progression; production deployment requires manual approv
 
 ### ADR-006: React Native for the mobile app
 **Decision:** A single React Native codebase for iOS and Android, rather than two separate native codebases.
-**Rationale:** The product decision was "web + native mobile app." Given a small team already building a React-based web app, React Native lets the same engineers reuse data-fetching patterns, and where practical, shared API-client code, rather than maintaining three fully independent frontends.
+**Rationale:** The product decision was "web + native mobile app." Given a small team already building a React-based web client, React Native lets the same engineers reuse data-fetching patterns, and where practical, shared API-client code, rather than maintaining two fully independent frontends.
 **Consequence:** Any Mobile-specific platform capability (e.g., native camera APIs, if ever needed) may require a native module bridge — an accepted cost given the team-size constraint this decision is optimizing for.
 
 ### ADR-007: Keyboard-wedge QR scanning over camera-based scanning
@@ -622,13 +637,43 @@ A failing stage blocks progression; production deployment requires manual approv
 **Decision:** The temporary receipt (FR-PAY-002) is rendered to PDF and stored in object storage at the moment it's issued.
 **Rationale:** This is a financial document the Finance Office may later rely on for reconciliation. If receipt template design changes after go-live, a regenerate-on-demand approach would silently alter the content of a document that's already been physically handed over and audited elsewhere — an unacceptable inconsistency for a financial record.
 **Consequence:** A template change only affects newly issued receipts going forward; historical receipts remain exactly as issued, which is the correct behavior for an audit trail.
-**Superseded scope:** an earlier design also rendered a "Transfer Receipt" here for the (platform-wide, batched) settlement transfer described in the original FR-SETTLE-001–004 wording. That design was replaced by the per-cashier reconciliation model (ADR-010) before this document's Settlement Module (§2.3, §3.2) was implemented — no Transfer Receipt is generated for a reconciliation transfer, per that ADR.
+**Superseded scope:** an earlier design rendered a single "Transfer Receipt" here for a platform-wide, batched settlement transfer. That batch model was replaced by the per-cashier reconciliation model (ADR-010); a Transfer Receipt is still generated for each reconciliation and still persisted at issue for the same audit reason, but it documents one Cashier's transfer, not a platform-wide batch.
 
 ### ADR-010: Per-cashier reconciliation, not a platform-wide settlement batch
-**Decision:** `apps.settlement` tracks a running balance **per Cashier** (`CashierReconciliation`, scoped by `booking.checked_in_by_user_id`), settled by a real Chapa Transfer into the university's fixed bank account — never one shared, platform-wide total, and never a document the platform generates for the transfer itself.
-**Rationale:** IFMIS ties financial responsibility to a named individual, not the institution as a whole. A Cashier who checks a visitor in personally keys that one transaction into IFMIS under her own name and hands the visitor the resulting voucher — the same thing she already does for a paper ticket. The platform's job is only to (a) give her the fields to copy into IFMIS at check-in (`apps.entrance`, §5.1) and (b) track what she individually still owes, so that settling up is her own number, never mixed with another cashier's shift. A single dedicated settlement account, or multiple cashiers sharing one IFMIS login, were both considered and rejected: neither preserves the per-transaction accountability IFMIS requires (see docs/ decision summary).
-**Consequence:** There is no batch settlement endpoint, no join table between a reconciliation and the bookings it covers beyond a plain FK (`booking.reconciliation_id`, Document 05 §3.6), and no platform-generated Transfer Receipt (superseding the relevant part of ADR-009, above) — the IFMIS vouchers she has already handed each visitor (`booking.ifmis_voucher_reference`) remain the only audit trail Finance uses for that transfer.
+**Decision:** `apps.settlement` tracks a running balance **per Cashier** (`CashierReconciliation`, scoped by `booking.checked_in_by_user_id`), settled by a real Chapa Transfer into the university's fixed bank account — never one shared, platform-wide total. For each completed reconciliation the platform generates a **Transfer Receipt** for the Cashier to carry to the Finance Office (`GET …/settlement/reconciliations/{id}/transfer-receipt/download/`, Document 04a); this platform receipt is distinct from any IFMIS document, which the Cashier keys herself.
+**Rationale:** IFMIS ties financial responsibility to a named individual, not the institution as a whole. A Cashier who checks a visitor in personally keys that one transaction into IFMIS under her own name and hands the visitor the resulting voucher — the same thing she already does for a paper ticket. The platform's job is to (a) give her the fields to copy into IFMIS at check-in (`apps.entrance`, §5.1), (b) track what she individually still owes so that settling up is her own number, never mixed with another cashier's shift, and (c) produce the Transfer Receipt that documents the bank transfer of that individual balance, so Finance can reconcile the money that actually moved against the bookings it covers. A single dedicated settlement account, or multiple cashiers sharing one IFMIS login, were both considered and rejected: neither preserves the per-transaction accountability IFMIS requires (see docs/ decision summary). A platform-wide batch settlement, which would pool every Cashier's balance into one transfer, was rejected for the same reason.
+**Consequence:** There is no batch settlement endpoint and no join table between a reconciliation and the bookings it covers beyond a plain FK (`booking.reconciliation_id`, Document 05 §3.6). A per-reconciliation Transfer Receipt (FR-SETTLE-004) is generated for the Cashier to download, print, and carry to Finance; the IFMIS vouchers she has already handed each visitor (`booking.ifmis_voucher_reference`) remain her own separate record there.
 **Trade-off accepted:** A reconciliation attempt's outcome is only known once Chapa's transfer webhook confirms it (§5.3), not at the moment `POST /settlement/reconcile` returns — the Cashier sees a `pending` status first, mirroring how payment confirmation itself is webhook-driven (§4.2) rather than synchronous with checkout.
+
+### ADR-011: Camera-based QR scanning on the mobile client
+**Decision:** The Casher's mobile experience scans a ticket's QR code with the device camera. This reverses ADR-007 **for the mobile scope only**; the web gate console keeps its keyboard-wedge lookup field.
+**Rationale:** ADR-007's premise was a counter with desktop terminals only. The mobile client introduces a camera-equipped device by definition, and a roaming Cashier can scan without a dedicated scanner. The camera decodes the same bare reference, so it remains one server-side lookup path (§5.1).
+**Consequence:** Camera permission becomes a first-run concern for Cashier users (requested only on the scan screen), and the ticket QR must render at a size and contrast the camera can read reliably.
+
+### ADR-012: Four-role mobile application
+**Decision:** The native mobile app serves all four roles — `visitor`, `cashier`, `museum_manager`, `platform_admin` — not the Visitor alone. This supersedes the Visitor-only mobile scope previously stated in Document 01 §6, Document 03 §7.1, and Document 06 §5.
+**Rationale:** All four roles benefit from an on-device client, gate check-in and camera scanning are inherently mobile use cases, and one codebase already exists. Routing each account to its role's experience after login keeps the permission surface identical to the web client.
+**Consequence:** Role-based route guards are per-role (never a blanket `isStaff` check), and server-side authorization remains the sole authority; see Document 09 §3.4.
+
+### ADR-013: Mobile-specific refresh-token delivery (`X-Client-Platform`)
+**Decision:** The three auth endpoints accept an optional `X-Client-Platform` header. When it is `expo`, the refresh token is returned in the response body (and accepted in the refresh request body) rather than only as an HttpOnly cookie (§4.1).
+**Rationale:** A React Native client has no cookie jar, so the cookie-only design would sign a user out after the 15-minute access token expires. Declaring the platform header leaves the browser cookie path untouched while giving the native client a token it can store securely.
+**Consequence:** The header is contract-documented and defaults to `web`; an unknown value behaves as `web`.
+
+### ADR-014: Read-only Visitor ticket cache
+**Decision:** The mobile app may cache the Visitor's own confirmed ticket (reference, QR, visit date) for offline display. This narrowly amends NFR-AVAIL-001.
+**Rationale:** A ticket is the one artifact a Visitor may need to show without a connection. It is display-only and never an input to a decision.
+**Consequence:** The cache is scoped to `visitor`; Cashier, Museum Manager, and Platform Admin screens never read it, and the gate remains fully online-only (Document 07 `TC-NFR-AVAIL-001`).
+
+### ADR-015: Real QR code on tickets
+**Decision:** Every ticket renders a real QR code whose payload is the bare booking reference; the client renders the image, so no server-side QR endpoint exists.
+**Rationale:** The reference is already the single lookup key, and encoding it directly keeps the QR a lookup aid rather than an authenticator. Client rendering avoids an extra endpoint and an extra round trip.
+**Consequence:** The QR is scannable only while a valid booking exists; validating it still requires the server, so a screenshot of a QR cannot admit anyone.
+
+### ADR-016: Push notifications with user preferences
+**Decision:** Push is a first-class notification channel alongside email and SMS, delivered to registered devices, and gated by the user's stored notification preferences (channels and language).
+**Rationale:** Booking confirmations, no-show notices, and refund confirmations are more useful on the device the Visitor actually carries; letting the user choose channels and language keeps the platform bilingual and non-intrusive.
+**Consequence:** Device tokens are registered and deactivated through the API (`POST`/`DELETE /notifications/devices/`), preferences through `GET`/`PUT /notifications/preferences/`, and NFR-NOTIFY-001 prevents repeat sends for the same booking.
 
 ---
 

@@ -1,7 +1,7 @@
 # 06 — UI/UX Specification
 
 **Document type:** UI/UX Specification
-**Project:** Museum Ticketing & Booking Platform
+**Project:** ZNHM Ticketing
 **Audience:** Frontend and mobile engineers, product designers, QA engineers, technical reviewers
 **Status:** Complete — derived from and traceable to the SRS and SDS
 **Related documents:** [01 — Product Overview](01-product-overview.md) (vision, personas, and the core product journey this document turns into screens) · [02 — Software Requirements Specification](02-software-requirements-specification.md) (source of every `FR-*`/`NFR-*` this document exposes to a user) · [03 — Software Design Specification](03-software-design-specification.md), [Section 7](03-software-design-specification.md#7-frontend-architecture) (rendering strategy, state management, and component organization this document's screens conform to) · [04 — API Specification](04-openapi-specification.yaml) (the contract each screen's data comes from) · [05 — Database Design](05-database-design.md) (the `status` and other enumerations `StatusBadge` and form controls render)
@@ -12,7 +12,7 @@
 
 ### 1.1 Purpose
 
-This document specifies **what the user sees and does**: the screen inventory, information architecture, key flows, and design-system rules for the Museum Ticketing & Booking Platform. Every screen listed here exposes one or more `FR-*`/`NFR-*` requirements from [Document 02](02-software-requirements-specification.md), and every screen's rendering strategy and component boundaries follow the frontend architecture already fixed in [Document 03, Section 7](03-software-design-specification.md#7-frontend-architecture). This document introduces no new product behavior — only the presentation and interaction layer for behavior already specified.
+This document specifies **what the user sees and does**: the screen inventory, information architecture, key flows, and design-system rules for the ZNHM Ticketing. Every screen listed here exposes one or more `FR-*`/`NFR-*` requirements from [Document 02](02-software-requirements-specification.md), and every screen's rendering strategy and component boundaries follow the frontend architecture already fixed in [Document 03, Section 7](03-software-design-specification.md#7-frontend-architecture). This document introduces no new product behavior — only the presentation and interaction layer for behavior already specified.
 
 ### 1.2 Scope
 
@@ -32,8 +32,8 @@ Per [Document 02, Section 1](02-software-requirements-specification.md#1-roles),
 | **One error contract, one error experience** | Every form on every screen renders validation errors using the single envelope shape defined in [Document 03, Section 6.5](03-software-design-specification.md#65-error-handling-and-api-response-contract) — inline, field-adjacent, in the active interface language — so the interaction pattern is identical whether the form is Visitor verification, a group-booking request, or the Cashier's check-in field. |
 | **Bilingual by construction, not by translation layer** | Amharic and English are both first-class from the first release (FR-LOC-001–004); no screen is designed in English and "translated after." Layouts accommodate the roughly 20–30% text-length variance between the two languages (Amharic strings frequently run longer) without truncation, since both catalogs ship together (Document 03 §6.4). |
 | **No optimistic UI for money-moving or state-changing actions** | Booking creation, payment, cancellation, reschedule, check-in, refund requests, and settlement transfers all show a pending state and wait for the API's authoritative response before updating the screen — never an optimistic client-side update rolled back on failure. This is the UI-layer expression of NFR-CONSIST-001 (atomicity) and NFR-IDEMPOTENT-001 (safe retries): a Cashier should never see a settlement appear to succeed and then silently revert. |
-| **The gate console is built for the hardware that already exists** | The Cashier's check-in screen (Section 5.5) is a single reference-lookup text field that accepts both a typed code and a keyboard-wedge QR scan through the same input, because the counter has desktop terminals only — no tablets, no camera (Document 02 §F; ADR-007). Nothing in this UI assumes a camera-based scanning flow. |
-| **No offline/degraded mode** | Per NFR-AVAIL-001, museum connectivity is reliable enough that no screen needs an offline fallback at this stage; every screen assumes a live connection to the API and shows a request-level error (Section 10) rather than a cached/stale view if that connection drops. |
+| **The gate console meets the Cashier wherever she is** | The web check-in screen (Section 5.5) is a single reference-lookup text field that accepts a typed code and a keyboard-wedge QR scan through the same input (ADR-007), suited to the counter's desktop terminal. The mobile app adds a camera scan that resolves through the same server lookup (ADR-011). Both are front doors to one API path; neither is a fallback for the other. |
+| **Online by default, with one narrow exception** | Per NFR-AVAIL-001, every screen assumes a live connection to the API and shows a request-level error (Section 10) rather than a cached view. The one exception is the Visitor's own confirmed ticket, which the mobile app may render read-only offline (Document 09 §4); the gate and all staff screens never read a cache. |
 
 ---
 
@@ -123,7 +123,7 @@ obtained; once issued, the Visitor's navigation and permissions are identical to
 under any other credential scheme. Staff (`Cashier`, `Museum Manager`, `Platform Admin`) continue to
 authenticate with a password (FR-ACC-005).
 
-The Web application serves both the public Visitor site and the internal Staff dashboard, split by route (`/staff/*` for Cashier/Museum Manager/Platform Admin), per [Document 03, Section 2.2](03-software-design-specification.md#22-level-2--container-diagram) — there is no separate deployable app or subdomain for staff.
+The web client serves both the public Visitor site and the internal Staff dashboard, split by route (`/staff/*` for Cashier/Museum Manager/Platform Admin), per [Document 03, Section 2.2](03-software-design-specification.md#22-level-2--container-diagram) — there is no separate staff deployable or subdomain.
 
 ---
 
@@ -145,7 +145,7 @@ is both the first-time and the returning-Visitor entry point (FR-ACC-001, FR-ACC
 only auth screen exposed to Visitors. Staff login remains a conventional email+password screen,
 now under its own `/staff/*` route since it no longer shares a screen with Visitor verification.
 
-Mobile app mirrors Verify and Account Settings as native screens for the Visitor role only (ADR-006; Document 03 §7.1) — there is no Staff mobile experience.
+The mobile app implements Verify and Account Settings natively for all four roles, routed after login (ADR-012; Document 09). Visitor verification and Staff login are the two entry screens; the mobile app then dispatches each account to its own role's experience.
 
 ### 5.2 Catalog & Availability
 
@@ -166,7 +166,7 @@ Mobile app mirrors Verify and Account Settings as native screens for the Visitor
 | Booking detail (reference, receipt, cancel/reschedule/refund actions) | `/bookings/{id}` | CSR | Visitor | FR-BOOK-005, FR-BOOK-006, FR-BOOK-007, FR-REFUND-001b |
 | Request a group/school visit | `/group-visits/new` | CSR | Visitor (becomes group leader) | FR-BOOK-003 |
 
-Mobile app mirrors Book a visit, Booking detail, and My bookings as native screens (ADR-006) — the same API, per [Document 03, Section 2.2](03-software-design-specification.md#22-level-2--container-diagram).
+Mobile app mirrors Book a visit, Booking detail, and My bookings as native screens (ADR-006, ADR-012) — the same API, per [Document 03, Section 2.2](03-software-design-specification.md#22-level-2--container-diagram). The ticket view renders the booking's real QR code — the bare reference (FR-QR-001) — and the same `GET /bookings/{id}/` call the web booking page makes; there is no placeholder image, and a paid booking always encodes its live reference.
 
 ### 5.4 (Removed) Group Booking Approval
 
@@ -187,6 +187,12 @@ booked quantity, and an attendance-count field to submit (Section 6.4). The resu
 inline "Correct" action next to the category (FR-TICKET-006, ID-verification addendum), available
 only before check-in -- it opens a category picker in place, and the outcome (reopen-for-payment or
 automatic refund) is reported back in a toast; there is no separate screen or route for it.
+
+The web gate console and the mobile gate experience are two front doors to the same server lookup.
+On the web, the Cashier types the reference or uses a keyboard-wedge scanner (ADR-007). In the
+mobile app, the Cashier either types the reference or points the camera at the ticket's QR code
+(FR-QR-002, ADR-011). Both submit the bare reference to `GET /bookings/lookup/`, so the booking is
+resolved identically and the API never needs to know which input method was used.
 
 ### 5.6 Refunds
 
@@ -221,6 +227,22 @@ There is no dedicated Visitor "refunds" screen — a refund is always initiated 
 ### 5.10 Localization
 
 The language toggle (FR-LOC-001) is not a standalone screen; it is a persistent control in the global header (`components/ui`, Section 7), present on every screen in this inventory, on both Web and Mobile.
+
+### 5.11 Notification preferences
+
+| Screen | Route (Web) | Rendering | Role(s) | FR IDs exposed |
+|---|---|---|---|---|
+| Notification preferences (channels + language) | `/settings/notifications`; Mobile: the settings area of the signed-in role | CSR / Native | All authenticated roles | FR-NOTIFY-PREF-001, NFR-NOTIFY-001 |
+
+The screen lets a user enable or disable email, SMS, and push, and choose the language of notification copy. Web and Mobile read and write the same preferences endpoint, so a change made on one client applies on the other (Document 04a).
+
+### 5.12 Audit log
+
+| Screen | Route (Web) | Rendering | Role(s) | FR IDs exposed |
+|---|---|---|---|---|
+| Audit log (read-only, filterable) | `/staff/admin/audit`; Mobile: `(admin)/audit` | CSR / Native | Platform Admin | FR-AUDIT-001 |
+
+The audit log is read-only by construction: it offers filters (actor, action, entity, date range) and pagination, and no edit or delete affordance (FR-AUDIT-001).
 
 ---
 
@@ -293,7 +315,7 @@ flowchart TD
     B -->|"Reference not found / not presentable"| I["Manual lookup by name/payment details\n(FR-TICKET-004)"]
 ```
 
-*UI note:* because a keyboard-wedge scanner emulates keyboard input, the reference field at B never has a separate "scan" mode or camera viewfinder — a scan and a typed entry are visually and functionally identical to the Cashier, matching ADR-007 exactly. The category-correction branch (J) is only ever offered before D — once attendance is recorded the booking is no longer `Pending` (FR-TICKET-003) and the "Correct" action is hidden, not just disabled, matching how every other Pending-only action in this UI (cancel, reschedule) already behaves once a booking moves on.
+*UI note:* on the web, a keyboard-wedge scanner emulates keyboard input, so the reference field at B has no separate "scan" mode and a scan is indistinguishable from a typed entry (ADR-007). In the mobile app the same step offers a camera scan that decodes the same bare reference (ADR-011); both submit to the identical lookup and the result card at C is the same. The category-correction branch (J) is only ever offered before D — once attendance is recorded the booking is no longer `Pending` (FR-TICKET-003) and the "Correct" action is hidden, not just disabled, matching how every other Pending-only action in this UI (cancel, reschedule) already behaves once a booking moves on.
 
 ### 6.5 Cashier: settlement transfer
 
@@ -374,7 +396,8 @@ Document 02 does not enumerate dedicated accessibility (`NFR-ACC-*`) or usabilit
 | FR-ACC-002, FR-ACC-005, FR-ACC-006 | Section 5.1 (`/staff/login`, `/staff/forgot-password`, `/staff/reset-password`), Section 5.9 |
 | FR-ACC-007 | Section 5.8 (Reporting) — activity is attributable to a verified email/phone for every Visitor, one-time or repeat, since there is a single verification flow (Section 5.1) rather than a separate guest/account choice |
 | FR-CAT-001 – FR-CAT-003 | Section 5.2 |
-| FR-BOOK-001 – FR-BOOK-002 | Section 5.3, Flow 6.1 |
+| FR-BOOK-001 | Section 5.3, Flow 6.1 |
+| FR-BOOK-002 | Section 5.3, Flow 6.1 |
 | FR-BOOK-003 | Section 5.3, Flow 6.3 |
 | FR-BOOK-004 | Flow 6.1 |
 | FR-BOOK-005 – FR-BOOK-007 | Section 5.3, Flow 6.2 |
@@ -393,6 +416,10 @@ Document 02 does not enumerate dedicated accessibility (`NFR-ACC-*`) or usabilit
 | NFR-AVAIL-001 | Section 2 ("no offline/degraded mode" principle) |
 | NFR-LOCALE-001 | Section 9 |
 | NFR-RETENTION-001 | Section 5.7 (Settlement History), Section 5.6 (Refunds list) — both remain viewable, never purged from the UI |
+| FR-QR-001 – FR-QR-002 | Section 5.3, Section 5.5, Flow 6.4 (real QR on the ticket; camera scan on mobile) |
+| FR-AUDIT-001 | Section 5.12 |
+| FR-NOTIFY-PUSH-001, FR-NOTIFY-PREF-001 | Section 5.11 |
+| NFR-NOTIFY-001 | Section 5.11 |
 
 ---
 

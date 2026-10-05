@@ -1,4 +1,4 @@
-# Museum Ticketing & Booking Platform — Backend
+# ZNHM Ticketing — Backend
 
 Django + DRF modular monolith. See `../docs/` for the full spec.
 
@@ -9,11 +9,11 @@ this app's stack (`db`, `redis`, `api`, `worker`, `beat`) together
 with `frontend/`'s `web` service — run `docker compose` from the repo
 root, not from inside `backend/`.
 
-**This is a scaffold only** — every app has the standard four-layer file
-set (`models.py` → `services.py` → `serializers.py` → `views.py`) stubbed
-out with comments pointing at the requirement/design-doc sections that
-justify what goes there, but no models, endpoints, or business logic are
-implemented yet.
+Every app follows the same four-layer file set (`models.py` → `services.py`
+→ `serializers.py` → `views.py`), and the API they expose is described in
+full by `../contracts/openapi.yaml`. See the "Notable endpoints" section
+below for behavior a reader should not have to reverse-engineer from the
+contract.
 
 ## Stack
 
@@ -42,6 +42,23 @@ git commit -m "contract: describe what changed"
 ```
 
 Then, on the frontend side: `npm run generate-types` (from `frontend/`).
+
+## Notable endpoints
+
+- **Auth.** `POST /auth/login/`, `POST /auth/visitor/verify/confirm/`, and
+  `POST /auth/refresh/` accept an optional `X-Client-Platform` header. When it
+  is `expo`, the refresh token is returned in the response body (and accepted
+  in the refresh request body) for the mobile client; otherwise the refresh
+  token is delivered as an HttpOnly cookie only. See Document 03, ADR-013.
+- **Audit log.** `GET /admin/audit-log/` — read-only, filterable, paginated,
+  Platform Admin only (FR-AUDIT-001).
+- **Notification preferences.** `GET`/`PUT /notifications/preferences/` —
+  per-account channels and language (FR-NOTIFY-PREF-001).
+- **Device tokens.** `POST /notifications/devices/` and
+  `DELETE /notifications/devices/{token}/` — push registration
+  (FR-NOTIFY-PUSH-001).
+- **QR tickets.** Tickets carry a client-rendered QR whose payload is the
+  bare booking reference; there is no server-side QR endpoint (FR-QR-001).
 
 You can also browse the live, always-current schema while `api` is running:
 - Raw schema: http://localhost:8000/api/schema/
@@ -105,7 +122,7 @@ scripts/             export_contract.sh
 | `payments` | FR-PAY (Chapa integration, webhook-confirmed) | `bookings` |
 | `entrance` | FR-TICKET (gate check-in, headcount reconciliation) | `bookings` |
 | `refunds` | FR-REFUND | `payments`, `entrance` |
-| `settlement` | FR-SETTLE (Cashier → Finance batched transfer) | `entrance`, `refunds` |
+| `settlement` | FR-SETTLE (per-cashier reconciliation) | `entrance`, `refunds` |
 | `reporting` | FR-REPORT | `bookings`, `payments`, `settlement` |
 | `notifications` | Cross-cutting (SMS/email dispatch, never sent synchronously) | `core` |
 | `platform_admin` | Staff provisioning (part of FR-ACC-002, FR-CAT-002) | `accounts`, `catalog` |

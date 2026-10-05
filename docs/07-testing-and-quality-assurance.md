@@ -1,7 +1,7 @@
 # 07 — Testing and Quality Assurance
 
 **Document type:** Testing and Quality Assurance Plan
-**Project:** Museum Ticketing & Booking Platform
+**Project:** ZNHM Ticketing
 **Audience:** QA engineers, backend engineers, frontend/mobile engineers, technical reviewers
 **Status:** Complete — derived from and traceable to the SRS, SDS, Database Design, and UI/UX Specification
 **Related documents:** [02 — Software Requirements Specification](02-software-requirements-specification.md) (source of every `FR-*`/`NFR-*` this document verifies) · [03 — Software Design Specification](03-software-design-specification.md), [Section 3.1](03-software-design-specification.md#31-layering-convention) (the layering this document's unit/integration split is built on) and [Section 8.3](03-software-design-specification.md#83-cicd-pipeline) (the pipeline this document's gates extend) · [04 — API Specification](04-openapi-specification.yaml) (the contract API/contract tests verify) · [05 — Database Design](05-database-design.md) (the constraints this document's schema-level tests verify) · [06 — UI/UX Specification](06-ui-ux-specification.md) (the screens and flows this document's usability/accessibility/E2E tests exercise)
@@ -12,7 +12,7 @@
 
 ### 1.1 Purpose
 
-This document specifies **how the Museum Ticketing & Booking Platform is verified**: the testing levels applied to each architectural layer fixed in [Document 03](03-software-design-specification.md), the tooling and environments used, the exit criteria tied to the non-functional requirements in [Document 02, Section 3](02-software-requirements-specification.md#3-non-functional-requirements), the CI/CD test gate pipeline, functional test design per backend module, non-functional test methodology, the role-based authorization test strategy this single-venue system needs instead of multi-tenancy testing, defect management, pilot/UAT acceptance testing, and a full requirement-to-test traceability matrix.
+This document specifies **how the ZNHM Ticketing is verified**: the testing levels applied to each architectural layer fixed in [Document 03](03-software-design-specification.md), the tooling and environments used, the exit criteria tied to the non-functional requirements in [Document 02, Section 3](02-software-requirements-specification.md#3-non-functional-requirements), the CI/CD test gate pipeline, functional test design per backend module, non-functional test methodology, the role-based authorization test strategy this single-venue system needs instead of multi-tenancy testing, defect management, pilot/UAT acceptance testing, and a full requirement-to-test traceability matrix.
 
 ### 1.2 Scope
 
@@ -118,16 +118,19 @@ Each module's test design follows the pyramid in Section 2: unit tests cover eve
 |---|---|---|
 | **accounts** (`FR-ACC`) | `TC-ACC-001a` OTP confirmation rejected once expired or after the max incorrect-attempt count (Document 05 `phone_otp_attempts`) · `TC-ACC-001b` no `password` field is accepted or stored on any Visitor-facing endpoint · `TC-ACC-002a` Cashier/Manager accounts cannot self-register, only Platform-Admin-provisioned · `TC-ACC-003a` booking payment blocked until both email and phone are verified · `TC-ACC-004a` a Visitor's booking history returns only their own bookings, and re-verifying the same email/phone re-authenticates into the same account · `TC-ACC-005a` Staff login rejected without a correct password; Visitor credentials never satisfy `/auth/login` · `TC-ACC-006a` a Staff password-reset token is single-use and expires; `/auth/forgot-password` and `/auth/reset-password` return 404-equivalent behavior (a generic 200) for a non-staff or unknown email, never confirming account existence | Unit + API |
 | **catalog** (`FR-CAT`) | `TC-CAT-001a` seeded categories match the five current price points (Student 50 ETB, Adult/Teacher 100 ETB, Foreign Resident 300 ETB, Non-Resident 500 ETB, Exempt/Free) · `TC-CAT-002a` non-Museum-Manager category edit rejected (Visitor, Cashier, and Platform Admin all receive 403) · `TC-CAT-002b` a price change does not alter the price snapshot on an already-issued booking · `TC-CAT-003a` no discount is ever applied regardless of quantity | Unit + Integration |
-| **bookings** (`FR-BOOK`) | `TC-BOOK-001a` individual booking created for an open date · `TC-BOOK-003a` group booking goes straight to `awaiting_payment`, same as an individual booking, with no Manager approval step · `TC-BOOK-004a` booking reference generated only after payment confirmation, never before · `TC-BOOK-005a` cancel rejected once status is no longer `Pending` · `TC-BOOK-006a` cancelling a `Pending` booking enqueues a full automatic refund · `TC-BOOK-007a` a second reschedule attempt on the same booking is rejected · `TC-BOOK-008a` closing a date rejects new bookings for it but leaves existing bookings for that date untouched | Unit + Integration + E2E |
+| **bookings** (`FR-BOOK`) | `TC-BOOK-001a` individual booking created for an open date · `TC-BOOK-002a` a walk-in visitor booked by the Cashier at the counter through the same digital flow still receives a booking reference and digital ticket, identical to a self-service booking · `TC-BOOK-003a` group booking goes straight to `awaiting_payment`, same as an individual booking, with no Manager approval step · `TC-BOOK-004a` booking reference generated only after payment confirmation, never before · `TC-BOOK-005a` cancel rejected once status is no longer `Pending` · `TC-BOOK-006a` cancelling a `Pending` booking enqueues a full automatic refund · `TC-BOOK-007a` a second reschedule attempt on the same booking is rejected · `TC-BOOK-008a` closing a date rejects new bookings for it but leaves existing bookings for that date untouched | Unit + Integration + E2E |
 | **payments** (`FR-PAY`) | `TC-PAY-001a` checkout funds route to the platform's own Chapa account, never a Finance Office account · `TC-PAY-002a` a client-side checkout redirect alone does not confirm a booking; only a verified webhook does · `TC-PAY-002b` confirmation issues a temporary receipt and sets status to `Pending` · `TC-PAY-004a` a duplicate webhook for the same `tx_ref` is a no-op, not a second confirmation · `TC-PAY-005a` a `Pending` booking past its visit date with no attendance triggers the reschedule-or-refund notice exactly once · `TC-PAY-005b` no response within 7 days of the notice triggers an automatic full refund and sets status `Refunded` | Unit + Integration |
 | **entrance** (`FR-TICKET`) | `TC-TICKET-001a` gate lookup by typed reference and by keyboard-wedge-scanned QR both resolve the same booking (ADR-007) · `TC-TICKET-002a` partial attendance (e.g., 15 of 20) sets status `Visited` without auto-refunding the shortfall · `TC-TICKET-003a` a `Visited` booking can no longer be cancelled or rescheduled · `TC-TICKET-004a` manual lookup by name/payment details succeeds when the reference cannot be presented · `TC-TICKET-005a` attendance exceeding the booked quantity is rejected; excess visitors are not admitted under the original booking · `TC-TICKET-006a` (ID-verification addendum) correcting a `Pending` booking to a pricier category reopens it for payment for just the difference · `TC-TICKET-006b` correcting to a cheaper category issues an automatic refund for the difference and leaves the booking `Pending` · `TC-TICKET-006c` a category correction is rejected once the booking is no longer `Pending` | Unit + Integration |
 | **refunds** (`FR-REFUND`) | `TC-REFUND-001a` each of the three FR-REFUND-001(a)-(c) refund triggers (cancellation, shortfall request, no-response) produces exactly one refund record · `TC-REFUND-002a` refundable amount is computed from recorded attendance, never entered by hand · `TC-REFUND-003a` refunded amount is net of Chapa's transaction fee · `TC-REFUND-004a` a refund is its own traceable transaction (original charge − fee − refund) · `TC-REFUND-005a` a refund issued after its booking was already settled is deducted from the **next** settlement transfer, never retroactively altering a past one · `TC-REFUND-006a` a category-correction refund (FR-REFUND-001d) never flips the booking to `Refunded`, and never blocks a later, legitimate shortfall refund on the same booking | Unit + Integration |
-| **settlement** (`FR-SETTLE`) | `TC-SETTLE-001a` a batch transfer includes every `Visited`, not-yet-settled booking regardless of when it was checked in · `TC-SETTLE-002a` a single Cashier action nets out refunds and produces a Transfer Receipt with amount, covered bookings, and a reference number · `TC-SETTLE-003a` the Transfer Receipt renders independently of, and never merges with, the manual-track cash deposit slip · `TC-SETTLE-004a` the Transfer Receipt carries amount-in-figures, amount-in-words (both languages), purpose, date, and reference number | Unit + Integration + E2E |
+| **settlement** (`FR-SETTLE`) | `TC-SETTLE-001a` a batch transfer includes every `Visited`, not-yet-settled booking regardless of when it was checked in · `TC-SETTLE-002a` a single Cashier action nets out refunds and produces a Transfer Receipt with amount, covered bookings, and a reference number · `TC-SETTLE-003a` the settlement receipt is complete enough for the Finance Office to reconcile from, alongside the recorded IFMIS voucher references · `TC-SETTLE-004a` the Transfer Receipt carries amount-in-figures, amount-in-words (both languages), purpose, date, and reference number | Unit + Integration + E2E |
 | **reporting** (`FR-REPORT`) | `TC-REPORT-001a` dashboard revenue/status-mix figures match the underlying `booking`/`payment`/`settlement_transfer` rows · `TC-REPORT-002a` daily/weekly/monthly/yearly report granularities all return correct sums · `TC-REPORT-003a` a `Visited` booking already included in a transfer is excluded from the pending-settlement list | Unit + API |
 | **(no dedicated app — design conformance)** (`FR-GOV`) | `TC-GOV-001a` static/architecture review confirms no code path calls an IFMIS endpoint or writes to a Finance-Office-owned datastore | Design review (not automated) |
 | **Cross-cutting** (`FR-LOC`) | `TC-LOC-001a` every Visitor/Cashier-facing string renders in both Amharic and English and can be switched at any time · `TC-LOC-002a` every generated document (temporary receipt, Transfer Receipt, no-show notice) presents both languages together on one document · `TC-LOC-003a` an amount-in-words renders correctly in both languages · `TC-LOC-004a` editing a category name or notice text in one language never alters the other | E2E + Integration |
-| **notifications** (cross-cutting) | `TC-NOTIFY-001a` booking-confirmation and no-show notices are sent by both email and SMS, with email as the default/primary channel · `TC-NOTIFY-002a` an SMS gateway failure never blocks or delays the corresponding email | Integration |
+| **notifications** (cross-cutting) | `TC-NOTIFY-001a` booking-confirmation and no-show notices are sent by both email and SMS, with email as the default/primary channel · `TC-NOTIFY-002a` an SMS gateway failure never blocks or delays the corresponding email · `TC-NOTIFY-003a` (FR-NOTIFY-PUSH-001) a push is dispatched to every active `device_token` for the recipient · `TC-NOTIFY-004a` (FR-NOTIFY-PREF-001) a disabled channel is skipped · `TC-NOTIFY-004b` a preference update (`PUT /notifications/preferences/`) round-trips through `GET` unchanged · `TC-NOTIFY-005a` (NFR-NOTIFY-001) a second notification for the same booking is suppressed within the delivery window | Integration + API |
 | **platform_admin** (staff-facing part of `FR-ACC-002`) | `TC-ADMIN-001a` non-Platform-Admin receives 403 on every staff-provisioning endpoint · `TC-ADMIN-001b` deactivating a staff account does not remove that account's historical `checked_in_by_user_id`/`actor_user_id` references from past bookings or audit rows | API + Integration |
+| **auth / mobile session** (`FR-ACC`, ADR-013) | `TC-AUTH-013a` `POST /auth/login/`, `POST /auth/visitor/verify/confirm/`, and `POST /auth/refresh/` with `X-Client-Platform: expo` return a `refresh_token` in the body and do not set the refresh cookie · `TC-AUTH-013b` the same requests without the header (or with `web`) set only the HttpOnly cookie and omit `refresh_token` · `TC-AUTH-013c` `POST /auth/refresh/` accepts a body `refresh_token` when the header is `expo` | API + Integration |
+| **QR tickets** (`FR-QR`) | `TC-QR-001a` a paid booking's ticket renders a QR whose payload is exactly the bare 8-character `reference` · `TC-QR-001b` the reference matches `^[A-HJ-NP-Z2-9]{8}$` · `TC-QR-002a` the mobile camera scan resolves the same booking as a typed lookup · `TC-QR-002b` camera permission is requested only on the scan screen and a denied permission shows a clear typed-entry fallback | Unit + E2E |
+| **audit log** (`FR-AUDIT`) | `TC-AUDIT-001a` `GET /admin/audit-log/` is Platform-Admin-only (403 for every other role) · `TC-AUDIT-001b` filters (`actor`, `action`, `entityType`, `entityId`, date range) and pagination return the matching subset · `TC-AUDIT-001c` no API method can update or delete an audit entry | API + Integration |
 
 ---
 
@@ -152,7 +155,11 @@ Document 02's non-functional requirements are each a single ID (not a numbered r
 
 ### 7.3 Availability (NFR-AVAIL-001)
 
-`TC-NFR-AVAIL-001`: since Document 02 deliberately excludes an offline/degraded gate-validation mode (§4), this is verified as a design-conformance check rather than a failover drill — confirm the gate check-in screen ([Document 06, Section 5.5](06-ui-ux-specification.md#55-entrance--gate-check-in-cashier)) has no offline queue or local-cache fallback, and that a connectivity loss surfaces a clear error rather than silently accepting an unverifiable check-in.
+`TC-NFR-AVAIL-001`: the gate is the one part of the product that is always online. This is verified as a design-conformance check rather than a failover drill:
+
+- Confirm the gate check-in screen ([Document 06, Section 5.5](06-ui-ux-specification.md#55-entrance--gate-check-in-cashier)) has no offline queue or local-cache fallback, and that connectivity loss surfaces a clear error rather than silently accepting an unverifiable check-in.
+- Confirm that Cashier, Museum Manager, and Platform Admin screens never read the local ticket cache in any state.
+- Confirm the only offline read is the Visitor's own confirmed ticket ([Document 09 §4](09-mobile-app-design.md)), that it is display-only, and that it never authorizes entry.
 
 ### 7.4 Localization (NFR-LOCALE-001)
 
@@ -231,7 +238,7 @@ Every `FR-*` and `NFR-*` from [Document 02](02-software-requirements-specificati
 |---|---|---|
 | FR-ACC-001 – 007 | Unit, API | 6 |
 | FR-CAT-001 – 003 | Unit, Integration | 6 |
-| FR-BOOK-001 – 008 | Unit, Integration, E2E | 6 |
+| FR-BOOK-001 – FR-BOOK-008 | Unit, Integration, E2E | 6 |
 | FR-PAY-001 – 005 | Unit, Integration | 6 |
 | FR-TICKET-001 – 005 | Unit, Integration | 6 |
 | FR-REFUND-001 – 005 | Unit, Integration | 6 |
@@ -239,6 +246,9 @@ Every `FR-*` and `NFR-*` from [Document 02](02-software-requirements-specificati
 | FR-REPORT-001 – 003 | Unit, API | 6 |
 | FR-GOV-001 – 002 | Design review (no automated test — deliberately no integration exists) | 6 |
 | FR-LOC-001 – 004 | E2E, Integration, CI catalog-parity lint | 6, 7.4 |
+| FR-QR-001 – 002 | Unit, E2E | 6 |
+| FR-AUDIT-001 | API, Integration | 6 |
+| FR-NOTIFY-PUSH-001, FR-NOTIFY-PREF-001 | Integration, API | 6 |
 | NFR-SEC-001 | Security | 7.2 |
 | NFR-IDEMPOTENT-001 | Integration | 7.2 |
 | NFR-CONSIST-001 | Integration | 7.2 |
@@ -247,6 +257,7 @@ Every `FR-*` and `NFR-*` from [Document 02](02-software-requirements-specificati
 | NFR-PERF-001 | Performance (k6) | 7.1 |
 | NFR-AVAIL-001 | Design-conformance review | 7.3 |
 | NFR-LOCALE-001 | CI catalog-parity lint, E2E | 7.4 |
+| NFR-NOTIFY-001 | Integration | 6 |
 | NFR-RETENTION-001 | Static review + integration test | 7.5 |
 | Role-based access restrictions embedded in FR-ACC-002, FR-BOOK-003, FR-BOOK-008, FR-TICKET-001–004, FR-SETTLE-001–002, FR-REPORT-001, FR-CAT-002 | Role-boundary tests | 8 |
 

@@ -1,7 +1,7 @@
 # 02 — Software Requirements Specification
 
 **Document type:** SRS
-**Project:** Museum Ticketing & Booking Platform (working title)
+**Project:** ZNHM Ticketing — Zoological Natural History Museum, AAU CNCS, 4 Killo, Addis Ababa
 **Source material:** Stakeholder interviews — Zoological Natural History Museum site visit (cashier/front-office),
 plus follow-up interviews covering payment settlement, the Finance office's constraints, and
 policy decisions on refunds, notices, and capacity.
@@ -10,10 +10,10 @@ policy decisions on refunds, notices, and capacity.
 built — architecture, data model, specific third-party API calls, schema layout — belong in the
 Software Design Specification that follows this SRS, not here.
 
-**System model — two parallel tracks, not one merged system:** the manual/counter process (cash,
-Cashier-entered sale, government Receipt Voucher) **is not being replaced.** This project adds a
-**separate, additive digital option** (online booking + online payment). The two tracks never share
-a ledger — money from each reaches the Finance office through its own path, described in §2.7.
+**System model — one platform, one ledger.** ZNHM Ticketing is the museum's single ticketing
+system. Every sale is an online booking that moves through one lifecycle, is checked in at one
+gate, and reaches the Finance Office through the per-cashier settlement path described in §2.7.
+There is no parallel ledger to merge.
 
 **Localization is a first-class requirement, not a later phase.** Amharic and English must both be
 fully supported — in every visitor- and staff-facing feature and every document the system
@@ -25,23 +25,24 @@ produces — from the first release. See §2.10.
 
 **System actors (four only):**
 
-- **Visitor** — books and pays online, or walks in and pays cash at the counter.
-- **Cashier** — front-counter staff. Handles cash sales (manual track, unchanged), verifies
-  headcount and confirms attendance for digital bookings, and initiates settlement transfers for
-  the digital track (§2.7).
-- **Museum Manager** — approves group/school bookings submitted through non-digital channels,
-  oversees Cashiers, views reporting, controls date availability for online booking (§2.3), and
-  configures ticket categories/prices (§2.2).
-- **Platform Admin** — system-level configuration: staff accounts.
+- **Visitor** — books and pays online, then presents a reference or QR code at the gate.
+- **Cashier** — front-counter and gate staff. Verifies headcount and category against ID, confirms
+  attendance, corrects a booking's category when it does not match, and initiates her own
+  settlement transfer (§2.7).
+- **Museum Manager** — oversees Cashiers and bookings, corrects a flagged booking, views reporting,
+  controls date availability for online booking (§2.3), and configures ticket categories/prices
+  (§2.2).
+- **Platform Admin** — system-level configuration: staff accounts (FR-ACC-002) and the read-only
+  audit log (FR-AUDIT-001).
 
 **External parties (not system users):**
 
 - **Payment aggregator** — processes the Visitor's online payment into a bank account the platform
   itself owns and controls.
-- **Finance Office** (of the museum's parent public body) — receives money and physical receipts
-  from the Cashier and reconciles independently, in its own systems. Confirmed directly: they
-  cannot accept payments landing straight into their account, and reconcile from a receipt the
-  Cashier brings them in person.
+- **Finance Office** (of the museum's parent public body) — receives the settled funds and the
+  voucher trail and reconciles independently, in its own systems. Confirmed directly: they cannot
+  accept payments landing straight into their account, and reconcile from the vouchers the Cashier
+  hands over.
 - **IFMIS** — the government financial system the Finance Office uses internally for its own
   ledger and balance management. See §2.9 for the scope decision on this system's relationship to
   IFMIS.
@@ -103,12 +104,25 @@ step; the only difference is that the repeat visitor's history is already there 
   price; changes do not retroactively affect already-issued tickets.
 - **FR-CAT-003**: No category carries an automatic group discount.
 
+### 2.2.1 Booking reference format
+
+Every paid booking carries a reference of exactly 8 characters, drawn from the alphabet
+`ABCDEFGHJKLMNPQRSTUVWXYZ23456789` — the full A–Z/0–9 set minus the ambiguous characters `I`,
+`O`, `0`, and `1`. The format is validated by the regular expression `^[A-HJ-NP-Z2-9]{8}$`. The
+reference is the single value a Visitor presents at the gate and the payload encoded in the
+ticket's QR code.
+
 ### 2.3 Bookings, Reservations & Capacity
+
+The booking requirements run from FR-BOOK-001 – FR-BOOK-008, covering creation, the booking
+reference, cancellation, rescheduling, and per-date capacity control.
 
 - **FR-BOOK-001**: An individual Visitor can self-serve: pick a date, category, and quantity, and
   pay online.
-- **FR-BOOK-002**: A Visitor can also walk in unannounced and be processed entirely by the Cashier
-  at the counter with cash, exactly as today — untouched by this system.
+- **FR-BOOK-002**: A visitor who arrives at the museum without a prior booking is assisted by the
+  Cashier at the counter, who walks them through the same digital booking flow (category, quantity,
+  date, payment) using the counter terminal. The visitor still receives a booking reference and a
+  digital ticket, identical to a self-service online booking.
 - **FR-BOOK-003**: A school/group visit is booked the same way as an individual one (FR-BOOK-001) —
   same self-serve flow, same instant `awaiting_payment` outcome — with a group name/contact and a
   headcount instead of a single visitor's details. There is no separate Museum Manager approval
@@ -173,8 +187,8 @@ Every digital booking moves through a defined lifecycle:
 - **FR-TICKET-004**: If a Visitor cannot present their booking reference, the Cashier can look the
   booking up by name/payment details and confirm it manually.
 - **FR-TICKET-005**: If more visitors show up than were booked, the extra visitors are not admitted
-  under the original booking — they must book/pay separately, either online or through the existing
-  manual/cash counter, exactly as any other new visitor would.
+  under the original booking — they must book and pay separately, online, exactly as any other new
+  visitor would.
 - **FR-TICKET-006** (ID-verification addendum): A Visitor's stated category (Student,
   Foreign Resident, Exempt, etc.) is a self-declared claim at booking time, attested to rather than
   proven with an uploaded document — a teacher booking for 30 students, or a family of 5, should
@@ -183,7 +197,7 @@ Every digital booking moves through a defined lifecycle:
   presented, she corrects the category on a still-`Pending` booking. If the corrected category
   costs more, the booking is reopened for payment (§2.4's `awaiting_payment`, exactly like a fresh
   booking) for just the difference — the Visitor pays it themselves, from their own device, before
-  check-in can proceed; nothing is collected as cash by the Cashier. If the corrected category costs
+  check-in can proceed. If the corrected category costs
   less, the difference is refunded automatically (§2.6) and check-in proceeds immediately. Either
   way, the booking's `booked_quantity`/`visitor` are unchanged — only the category and its price.
 
@@ -213,23 +227,22 @@ Every digital booking moves through a defined lifecycle:
   transfer — the Finance Office must see the net figure (revenue minus refunds), never an
   overstated gross figure.
 
-### 2.7 Cashier → Finance Settlement (digital track)
+### 2.7 Cashier → Finance Settlement
 
-There is no Audit/Finance role in this system — this is a physical hand-off the Cashier performs,
-mirroring how the existing cash track already works.
+There is no Audit/Finance role in this system — this is a hand-off the Cashier performs herself,
+scoped to the bookings she personally checked in.
 
 - **FR-SETTLE-001**: Settlement transfers happen in batches, on the Cashier's own timeline — not
-  per booking or per payment. A Cashier accumulates `Visited` bookings and transfers their combined
-  value together, typically alongside the existing manual-track cash audit, rather than on a fixed
-  schedule the system enforces.
+  per booking or per payment. A Cashier accumulates the bookings she has checked in and transfers
+  their combined value together, rather than on a fixed schedule the system enforces.
 - **FR-SETTLE-002**: The Cashier initiates a batch transfer with a single action, covering all
   `Visited` bookings not yet included in a prior transfer, net of any refunds processed against
   them. On completion, the system produces a Transfer Receipt documenting the net amount, the
   bookings it covers, and a reference number.
-- **FR-SETTLE-003**: The Cashier physically carries two receipts to the Finance Office for
-  reconciliation: the Transfer Receipt from the digital track, and the existing manual-track cash
-  deposit slip. The system does not need to unify these into one record; it only needs to produce a
-  Transfer Receipt complete enough to stand next to the existing paper one.
+- **FR-SETTLE-003**: The Cashier carries her settlement transfer's receipt to the Finance Office
+  for reconciliation, alongside the per-visitor IFMIS voucher references she has recorded in the
+  platform. The system produces a Transfer Receipt complete enough for the Finance Office to
+  reconcile from.
 - **FR-SETTLE-004**: The Transfer Receipt must carry the same information the Finance Office
   already expects on a formal receipt: amount in figures and in words, purpose/description, date,
   and a reference number.
@@ -264,13 +277,12 @@ mirroring how the existing cash track already works.
 
 ### 2.9 Relationship to IFMIS
 
-- **FR-GOV-001**: This system does **not** integrate directly with IFMIS in this phase. The
-  Finance Office continues to receive and reconcile the digital track's revenue the same way it
-  already reconciles the manual track's — from a physical receipt (§2.7) — and enters it into
-  IFMIS through its own existing process.
-- **FR-GOV-002**: If a future phase confirms IFMIS offers the museum's parent institution a
-  supported way to receive transaction data directly, revisiting this decision is out of scope for
-  the current SRS and would be defined separately.
+- **FR-GOV-001**: This system does **not** integrate directly with IFMIS. The Finance Office
+  receives and reconciles the platform's revenue from the voucher trail described in §2.7, and
+  enters it into IFMIS through its own existing process.
+- **FR-GOV-002**: Direct IFMIS integration is not part of this platform. If the museum's parent
+  institution later adopts a supported way to receive transaction data directly, that would be
+  separate work with its own requirements.
 
 _Rationale (context, not a requirement): IFMIS is a closed, internal government financial system
 operated by Finance staff, not a platform documented as open to third-party revenue systems. The
@@ -291,6 +303,28 @@ this is the working assumption to build against, not a gap to close later._
   purpose, notices — must be maintainable in both languages independently, so an update to one
   language does not require guessing or auto-translating the other.
 
+### 2.11 QR codes
+
+- **FR-QR-001**: Every paid booking renders a QR code on its ticket, on both web and mobile. The
+  payload is the bare booking reference (§2.2.1); the client renders the image, so no server-side
+  QR endpoint is required.
+- **FR-QR-002**: The mobile Cashier experience scans that QR code with the device camera at the
+  gate and resolves it through the same lookup path as a typed reference (FR-TICKET-001). Camera
+  access is requested only when the Cashier opens the scanner.
+
+### 2.12 Notifications and preferences
+
+- **FR-NOTIFY-PUSH-001**: The system delivers push notifications to a Visitor's registered
+  devices, in addition to email and SMS.
+- **FR-NOTIFY-PREF-001**: A user controls their notification preferences — which channels are
+  enabled and the language of the messages — and the system honors them.
+
+### 2.13 Audit log
+
+- **FR-AUDIT-001**: Platform Admin can read the append-only audit log through a read-only API,
+  with filtering and pagination. Every money-moving and state-changing operation writes to it, and
+  nothing in the audit log is editable or deletable through the API.
+
 ## 3. Non-Functional Requirements
 
 | ID                 | Requirement                                                                                                                                                                                                                                                                                                                      |
@@ -301,20 +335,22 @@ this is the working assumption to build against, not a gap to close later._
 | NFR-AUDIT-001      | Every refund and every settlement transfer is logged with the acting Cashier, amount, affected booking(s), and timestamp.                                                                                                                                                                                                        |
 | NFR-TEST-001       | Every function that moves money or changes booking status has a defined happy-path and failure-path test case (e.g., partial attendance, already-refunded booking, duplicate payment confirmation).                                                                                                                              |
 | NFR-PERF-001       | The dashboard reflects a new sale or status change within a few seconds.                                                                                                                                                                                                                                                         |
-| NFR-AVAIL-001      | Connectivity at the museum is reliable enough that no offline/degraded mode is required at this stage.                                                                                                                                                                                                                           |
+| NFR-AVAIL-001      | The gate is always online-only: no Cashier, Museum Manager, or Platform Admin screen reads a local cache. A Visitor-only, read-only ticket cache may render the Visitor's own confirmed ticket offline (Document 09 §4); it never authorizes entry and is never consulted at the gate. The platform otherwise requires a live connection. |
 | NFR-LOCALE-001     | Amharic and English are supported as parallel, equally complete languages across every user-facing feature and generated document from the first release — not a post-launch addition.                                                                                                                                           |
 | NFR-RETENTION-001  | Booking, payment, refund, and settlement records are retained for at least one year, aligned to the organization's budget/fiscal calendar. Ethiopian federal government fiscal years conventionally run Hamle 1 to Sene 30 (≈ July 8 to July 7 Gregorian); the exact boundary dates should be confirmed with the Finance Office. |
+| NFR-NOTIFY-001     | Notifications respect the recipient's saved preferences (channel and language) and are not repeated for the same booking within a delivery window. |
 
-## 4. Explicitly out of scope for this phase
+## 4. Not part of this release
 
-- Direct technical integration with IFMIS (§2.9) — deliberately excluded, not merely undiscovered.
-- Any merging of the manual (cash) track's data into the digital track's records — they stay
-  independent per the system model note above.
-- Automated, system-calculated museum capacity limits — capacity is managed manually by the Museum
-  Manager (FR-BOOK-008).
-- Automated group-size discounts.
-- Offline/degraded-mode ticket validation at the gate.
-- Multi-venue support.
+- **IFMIS reconciliation is performed by the Cashier outside the platform.** She keys each
+  transaction into IFMIS herself and hands over the voucher; the platform records the Document
+  No / Ref No she reports back (§2.9).
+- **Capacity is controlled manually by the Museum Manager on a per-date basis** (FR-BOOK-008).
+- **Pricing is one price per category** (FR-CAT-003): every ticket in a category, individual or
+  group, is booked at that category's price.
+- **The gate validates online.** Check-in reaches the server for every booking; the only offline
+  read is the Visitor's own ticket, read-only (NFR-AVAIL-001).
+- **ZNHM Ticketing serves a single venue.**
 
 ## 5. Open Questions
 

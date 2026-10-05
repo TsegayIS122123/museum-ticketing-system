@@ -8,123 +8,153 @@
 
 ## 1. Vision
 
-The **Museum Ticketing & Booking Platform** gives visitors to the Zoological Natural History Museum (an Addis Ababa University museum, credited on the home page but not part of the brand name) a digital way to book, pay for, and receive a ticket online — bilingually, in Amharic and English — as an option that sits **alongside** the museum's existing counter process, not a replacement for it.
+**ZNHM Ticketing** is the unified digital ticketing platform of the **Zoological Natural History Museum (ZNHM)**, an Addis Ababa University museum at 4 Killo, Addis Ababa. It gives every visitor a single way to browse the museum's tickets, book a visit, pay online, receive a ticket, and be checked in at the gate — bilingually, in Amharic and English — and it gives museum staff the tools they need to run that operation end to end.
 
-The product exists on a simple premise: the museum already runs a working ticketing operation — cashiers, categories, group bookings, government-receipted reconciliation — it just has no digital path for a visitor who would rather book ahead and pay by phone than queue in person with cash. The MVP's job is to add that path cleanly, without disturbing the manual process the museum, its cashiers, and its Finance Office already depend on.
+The platform is one product, not a digital option bolted onto a paper one. A booking made on the web, in the mobile app, or by a group coordinator all live in the same system of record, move through the same lifecycle, and are validated at the same gate. The museum's ticket categories, prices, date availability, gate check-in, revenue reporting, and settlement to the Finance Office are all managed here.
+
+The product's premise is simple: a visitor should be able to decide to visit the museum, book and pay from wherever they are, and walk straight to the entrance with a ticket on their phone.
+
+- Product: **ZNHM Ticketing** (short form **ZNHM**)
+- Bundle / package ID: `et.aau.znhm.ticketing`
+- URL scheme: `znhm`
+- Brand blue: `#015484`
+- Roles: `visitor`, `cashier`, `museum_manager`, `platform_admin`
+- Languages: Amharic (`am`) and English (`en`), both first-class
 
 ## 2. The problem
 
-The current process, confirmed directly through a site visit and stakeholder interviews, works — but only through in-person, cash-based, single-channel operation:
+Visitors want to book and pay online, ahead of arrival, and skip the in-person queue. The museum's ticketing operation has not historically offered that path:
 
-- **No digital payment option.** Every ticket is paid for in cash at the counter; visitors who would prefer Telebirr, CBE Birr, or card have no way to pay that way today.
-- **No advance booking for individual visitors.** Only school/group visits can be arranged ahead of time, and only by phone call or letter — an individual visitor's only option is to show up and queue.
-- **Bottlenecks when groups arrive unscheduled or all at once.** Large student groups arriving simultaneously strain the single entrance point and the cashier's manual headcount process.
-- **No booking reference for groups.** A school group's headcount is only confirmed physically at the gate; there is no digital confirmation code that would let gate verification go faster.
-- **Cash handling is the only settlement path.** Every reconciliation step — counting cash, matching it to system sales, producing a government Receipt Voucher — depends on a person physically carrying money and paper to the Finance Office.
+- **No online purchase.** A visitor who would prefer to pay by Telebirr, CBE Birr, or card has no way to do so, and must pay in person instead.
+- **No advance booking.** Individual visitors cannot reserve a time or a date before they travel to the museum; they can only arrive and hope the day is open.
+- **Queues at the entrance.** Every visitor must pay at the counter before entering, so a busy morning or a school group arriving together congests the single entrance point.
+- **No digital confirmation.** A group coordinator has no reference code to present; headcount is confirmed physically at the gate, which slows entry for large parties.
+- **No affordable visibility.** Museum staff cannot see what has been booked, paid, or attended for a given day or period, and cannot plan around demand.
 
-None of this means the current process is broken — the Finance Office's own reconciliation method (a physical receipt, reconciled by hand) works today and is explicitly being kept, not replaced (Document 02, §2.7, §2.9). The gap is narrower and specific: there is no option for a visitor who wants to pay digitally and skip the queue.
+ZNHM Ticketing removes those limitations by putting the whole journey — discovery, booking, payment, ticket, gate check-in, and revenue reporting — online and in one place.
 
 ## 3. Product positioning
 
-The product is best understood as **an additive digital ticket counter that runs next to the real one** — not a system that replaces or absorbs the museum's existing process, and not a general-purpose ticketing SaaS for arbitrary venues.
+ZNHM Ticketing replaces the museum's ad-hoc, in-person ticketing with a single digital platform. The table below contrasts the experience before and after this product; both columns describe the digital platform's own scope, not a choice between two systems.
 
-| Dimension | Current manual process | Museum Ticketing & Booking Platform (digital track) |
+| Dimension | Before | After |
 |---|---|---|
-| Payment | Cash only, at the counter | Online payment via Chapa (Telebirr, CBE Birr, card), alongside cash — cash is untouched |
-| Booking | Individuals: walk-in only. Groups: phone/letter, days in advance | Individuals and groups can book and pay online ahead of time; walk-in remains available |
-| Language | Not specified as bilingual in current tooling | Amharic and English, fully parallel, from the first release |
-| Ticket validation at the gate | Physical receipt inspected visually | Same physical process for cash sales; digital bookings add a reference code, lookup-able by typed entry or a keyboard-wedge QR scanner — no new hardware required |
-| Settlement to Finance | Cash counted, matched, deposited, government Receipt Voucher issued | A separate, batched digital settlement transfer with its own receipt, carried to Finance alongside the existing cash deposit — never merged into one ledger |
-| Booking changes | Informal, by phone, no penalty (Q34) | Formal cancel/reschedule rules with automatic refund handling, since a digital payment can't be waved off the way an unpaid phone reservation can |
+| Discovering tickets | Prices and categories are only known at the counter | Visitor browses live categories and prices online, in Amharic or English |
+| Booking | Visitors arrive unannounced; groups are arranged informally | Individuals and groups book and pay online ahead of their visit |
+| Payment | In person only | Online via Chapa (Telebirr, CBE Birr, card), settling to an account the platform controls |
+| Ticket | No digital artifact | Every paid booking carries a reference and a temporary receipt; a real QR code is rendered on the ticket |
+| Gate check-in | Headcount is confirmed physically | Cashier looks the booking up by reference — typed or camera-scanned — and records attendance |
+| Language | Single-language tooling | Amharic and English, fully parallel, in every screen and every generated document |
+| Revenue visibility | No system of record | Manager and Admin dashboards and reports over bookings, attendance, and revenue |
+| Settlement to Finance | Manual, per cashier | A per-cashier settlement transfer with the voucher trail the Finance Office expects |
+
+The product is built for the museum and its visitors specifically; it is not a general-purpose ticketing service for arbitrary venues.
 
 ## 4. Target users
 
-The platform serves the museum's own staff and the visitors who choose to use it — there is no multi-organization audience, since this is a single-venue system.
+The platform serves the museum's own staff and the visitors who use it. It is a single-venue system with four fixed roles.
 
 | Role | Represents | Primary goal on the platform |
 |---|---|---|
 | **Visitor** | An individual, family, or school/group representative | Book a visit ahead of time, pay online, and get in without queuing to pay in person |
-| **Cashier** | Front-counter and gate staff | Verify a digital booking's headcount and category (against ID) at the gate, correct a booking's category when it doesn't match, and periodically settle collected digital revenue to the Finance Office |
-| **Museum Manager** | Museum administration | Control which dates are open for online booking, configure ticket categories and prices, and monitor bookings and revenue |
-| **Platform Admin** | Whoever operates the platform technically | Provision staff accounts |
+| **Cashier** | Front-counter and gate staff | Look up a booking at the gate, record attendance, correct a category when ID does not match, and reconcile collected revenue to the Finance Office |
+| **Museum Manager** | Museum administration | Control which dates are open for online booking, configure ticket categories and prices, correct bookings, and monitor attendance and revenue |
+| **Platform Admin** | Whoever operates the platform technically | Provision staff accounts and review the audit trail |
 
-These four roles are fixed across the SRS and SDS; no other document in this set introduces a role not listed here. The **Finance Office** and **Chapa** are important parties in how the system works, but are external parties, not platform users (Document 02, §1).
+These four roles are fixed across this document set; no other document introduces a role not listed here. The **Finance Office** and **Chapa** are important parties in how the platform works, but they are external parties, not platform users (Document 02, §1).
 
 ### Representative personas
 
-- **Hana (24), university student visiting with three friends** — wants to book and pay for four student tickets from her phone the night before, and just show a code at the gate instead of standing in the cash line.
-- **Ato Girma, school trip coordinator** — currently books a class visit by phone call days in advance and pays in cash on arrival; wants a booking reference he can show at the gate so his group of 20 doesn't get held up at the entrance, and wants a straightforward way to handle the case where only 15 students end up coming.
-- **Cashier at the gate** — already handles cash sales and headcount checks for groups; needs the digital track to add a lookup-and-confirm step at the gate and a simple way to send collected digital revenue to Finance, without changing how the cash side of her job works.
-- **Museum Manager** — currently approves school visit requests by phone or letter and has no visibility into digital bookings until this platform exists; wants a dashboard showing what's booked, what's been paid, and the ability to close a date if the museum is already at capacity that day from other channels.
+- **Hana (24), university student visiting with three friends** — books and pays for four student tickets from her phone the night before, then shows a QR code at the gate instead of standing in line.
+- **Ato Girma, school trip coordinator** — books a class visit online, gets a booking reference he can present at the gate so his group of 20 is not held up, and can handle the case where only 15 students end up coming.
+- **Cashier at the gate** — looks up a booking by its reference, confirms or corrects the category against the ID presented, records attendance, and reconciles her collected revenue to the Finance Office.
+- **Museum Manager** — opens and closes dates, manages categories and prices, corrects a flagged booking, and uses the dashboard to see what is booked, paid, and attended.
 
 ## 5. Core product journey
 
-At the center of the digital track is one lifecycle, additive to — and running in parallel with — the museum's existing walk-in process:
+One lifecycle sits at the center of the platform, and every role participates in it:
 
 ```mermaid
 flowchart LR
     A[Browse dates & categories] --> B[Book & pay online]
-    B --> C[Receive booking reference<br/>+ temporary receipt]
+    B --> C[Receive booking reference<br/>+ temporary receipt + QR ticket]
     C --> D[Arrive & check in at gate]
     D --> E{Attendance vs. booked count}
     E -->|Full/partial attendance| F[Visited]
-    E -->|No-show, no response| G[Refunded]
-    F --> H[Cashier settles revenue<br/>to Finance Office]
+    E -->|Category mismatch| G[Manager corrects; visit continues]
+    E -->|No-show, no response| H[Refunded]
+    F --> I[Cashier settles revenue<br/>to Finance Office]
 ```
 
-**Gate flow after UAT round 1.** The Cashier checks a booking in, reads the voucher, keys the IFMIS *Document No* and *Ref No*, and hands the voucher over; she does not enter or correct headcounts. A matching headcount checks straight in and counts as revenue immediately. A mismatch blocks check-in and is flagged for the Museum Manager, who alone corrects headcount and category (and any resulting payment or refund is settled) before the Cashier can complete the check-in. The museum is closed every Sunday, enforced server-side and not openable by the Manager.
+The Cashier checks a booking in, reads the voucher, keys the IFMIS *Document No* and *Ref No*, and hands the voucher over. A matching headcount checks straight in and counts as revenue immediately. A mismatch blocks check-in and is flagged for the Museum Manager, who alone corrects headcount and category (and any resulting payment or refund is settled) before the Cashier can complete the check-in. The museum is closed every Sunday, enforced server-side and not openable by the Manager.
 
 Every functional requirement in Document 02 exists to make one stage of this journey work correctly for one of the four roles above; Document 03 specifies how each stage is implemented.
 
 ## 6. MVP scope boundary
 
-The MVP is scoped to make the digital booking-and-payment path above work correctly and safely, without touching or duplicating the museum's existing manual process.
+The platform is scoped to make the booking-to-settlement journey above work correctly and safely for the four roles.
 
-### In scope for MVP
+### In scope
 
-- Online booking and payment (individual and group/school) via a payment aggregator, with the funds settling to an account the platform itself controls — never directly into the Finance Office's account.
-- A booking lifecycle (`Pending` → `Visited` / `Cancelled` / `Refunded`) covering cancellation, a one-time reschedule, gate headcount reconciliation, partial-attendance refund requests, and an automatic refund if a booking is never resolved.
-- Gate check-in that works with the museum's existing desktop hardware — by typed reference lookup or a keyboard-wedge QR scanner — with no new device requirement.
-- Manual, Museum-Manager-controlled date availability (no automated capacity calculation).
-- Batched Cashier-to-Finance settlement, producing its own Transfer Receipt, kept entirely separate from the manual cash track.
+- Online booking and payment (individual and group/school) via a payment aggregator, with funds settling to an account the platform itself controls.
+- A booking lifecycle (`awaiting_payment` → `pending` → `visited` / `cancelled` / `refunded`) covering cancellation, a one-time reschedule, gate headcount reconciliation, partial-attendance refund requests, and an automatic refund if a booking is never resolved.
+- A real QR code rendered on every ticket (web and mobile), encoding the bare booking reference, and camera-based scanning in the mobile Cashier experience.
+- Gate check-in that works both from the museum's desktop terminals (typed reference or keyboard-wedge QR scanner) and from the mobile app (camera).
+- Manual, Museum-Manager-controlled date availability.
+- Per-cashier settlement, producing the voucher trail the Finance Office expects.
 - Bilingual (Amharic/English) interface and generated documents, from the first release.
-- A responsive web app and a native mobile app for Visitors; a web dashboard for staff.
-- Reporting for Museum Manager and Platform Admin (revenue, category/group breakdowns, booking status mix), aligned to the museum's budget/fiscal calendar. Since UAT round 1 this is one date-range-driven report set -- Overview, Schools, Categories, Attendance, Revenue -- with per-school visit history, no-show and shortfall figures, CSV export and print/PDF output, all counting people who actually attended rather than only people who booked.
+- A responsive web client for visitors and staff, and a native mobile app for all four roles.
+- Reporting for Museum Manager and Platform Admin (revenue, category/group breakdowns, booking status mix), aligned to the museum's budget/fiscal calendar. One date-range-driven report set — Overview, Schools, Categories, Attendance, Revenue — with per-school visit history, no-show and shortfall figures, CSV export and print/PDF output, all counting people who actually attended rather than only people who booked.
 - A school/institution registry keyed on the 10-digit TIN, so a school is one record across all its group bookings and can be reported on over time.
+- Push notifications to registered devices, with user-controlled notification preferences (channel and language).
+- A read-only audit log for Platform Admin.
 
-### Explicitly out of scope for this phase (see Document 02, §4 for the authoritative list)
+### Not part of this release
 
-- Direct technical integration with IFMIS — the Finance Office continues to reconcile from a physical receipt, by design, not as a gap to close later.
-- Any merging of the manual (cash) track's records into the digital track's database.
-- Automated, system-calculated museum capacity limits.
-- Automated group-size discounts.
-- Offline/degraded-mode ticket validation at the gate.
-- Multi-venue support.
+- **IFMIS reconciliation stays with the Cashier.** She keys each transaction into IFMIS herself and hands over the voucher; the platform records the Document No / Ref No she reports back.
+- **Capacity is controlled manually.** The Museum Manager opens and closes each date on a per-date basis, judging that day's capacity herself.
+- **Pricing is one flat price per category.** Every ticket in a category, individual or group, is booked at that category's price.
+- **The gate validates online.** Check-in reaches the server for every booking; the only offline read is the Visitor's own ticket, shown read-only.
+- **ZNHM Ticketing serves one venue**, the Zoological Natural History Museum at 4 Killo.
 
-Every feature above the line was kept because it's required to make a Visitor's digital booking-to-settlement journey work correctly and safely. Every feature below the line was deliberately excluded because the museum's own stakeholders — Finance Office included — described a working alternative that this MVP is not meant to disturb.
+Every feature above was kept because it is required to make a visitor's booking-to-settlement journey work correctly and safely across the four roles.
 
-## 7. Product-level success criteria
+## 7. Mobile app
 
-Detailed, testable acceptance criteria live in Document 02 (per-requirement). At the product level, the specific adoption targets below are placeholders pending confirmation with the Museum Manager and Finance Office — but directionally, the MVP succeeds if:
+ZNHM Ticketing is a first-class four-role mobile client, not a visitor add-on. The native mobile app (iOS and Android, one React Native codebase) is a client of the same API as the web client and introduces no separate backend or source of truth.
 
-- A Visitor can complete the full digital journey (browse → book → pay → check in) with no staff intervention beyond the existing gate headcount step.
-- The Cashier can settle a batch of digital revenue to the Finance Office in a single action, producing a receipt Finance accepts without extra explanation.
-- No incident of a booking being double-refunded, double-settled, or lost between `Pending` and its final status occurs during the pilot period.
-- [Placeholder — confirm with stakeholders] A target share of ticket sales (e.g., "X% of individual visitors") moves to the digital track within a defined pilot window, without a corresponding drop in overall visitor satisfaction with the gate experience.
+After sign-in, the mobile app routes each account to the experience for its own role:
 
-## 8. Glossary
+| Role literal | Route group | Experience |
+|---|---|---|
+| `visitor` | `(visitor)` | Verify, browse, book, pay, ticket with QR, cancel/reschedule, refund request, profile |
+| `cashier` | `(cashier)` | Gate lookup (typed or camera-scanned), check-in, mismatch flagging, IFMIS voucher, personal reconciliation |
+| `museum_manager` | `(manager)` | Dashboard, categories, availability, booking oversight and correction, reports |
+| `platform_admin` | `(admin)` | Staff administration, audit log, reports |
+
+Session bootstrap reads the stored token, calls the API for the current account, and dispatches to the matching route group; an unknown or missing role returns the user to sign-in. Role guards are per-role, and authorization is enforced server-side on every request. Full detail lives in [Document 09 — Mobile Application Design](09-mobile-app-design.md).
+
+## 8. Product-level success criteria
+
+Detailed, testable acceptance criteria live in Document 02 (per-requirement). At the product level, the platform succeeds if:
+
+- A Visitor can complete the full journey (browse → book → pay → check in) with no staff intervention beyond the gate.
+- The Cashier can reconcile a batch of collected revenue to the Finance Office in a single action, producing the voucher trail Finance accepts without extra explanation.
+- No booking is double-refunded, double-settled, or lost between `pending` and its final status during the pilot period.
+- A defined share of ticket sales moves online within the pilot window without a drop in visitor satisfaction with the gate experience.
+
+## 9. Glossary
 
 Definitions used consistently across this document set:
 
 | Term | Meaning |
 |---|---|
 | Visitor | Anyone booking or purchasing a museum ticket, individually or as a group/school representative |
-| Digital track | The online booking and payment path this project adds |
-| Manual/cash track | The museum's existing counter process — cash, cashier-entered sale, government Receipt Voucher — left unchanged |
-| Booking | One paid, digital reservation for one visit date, covering one or more visitors under a single category |
-| Settlement | The batched transfer of collected digital revenue from the platform's own account to the Finance Office |
-| Transfer Receipt | The document the digital track produces at settlement, carried physically to the Finance Office alongside the manual track's deposit slip |
-| IFMIS | The Ministry of Finance's government financial system the Finance Office uses internally; not directly integrated with in this phase |
+| Booking | One paid reservation for one visit date, covering one or more visitor categories under a single reference |
+| Booking Item | One category line on a booking: category, quantity, attended quantity, unit price, subtotal |
+| Reference | The 8-character code generated on a paid booking and presented at the gate |
+| Settlement | The transfer of collected revenue from the platform's account to the Finance Office |
+| IFMIS | The Ministry of Finance's government financial system the Finance Office uses internally; not directly integrated with |
 | MVP | Minimum Viable Product |
 | SRS | Software Requirements Specification |
 | SDS | Software Design Specification |

@@ -1,7 +1,7 @@
 # 05 — Database Design
 
 **Document type:** Database Design Specification
-**Project:** Museum Ticketing & Booking Platform
+**Project:** ZNHM Ticketing
 **Audience:** Backend engineers, database administrators, technical reviewers
 **Status:** Complete — derived from and traceable to the SRS and SDS
 **Related documents:** [01 — Product Overview](01-product-overview.md) (vision and scope) · [02 — Software Requirements Specification](02-software-requirements-specification.md) (functional and non-functional requirement source) · [03 — Software Design Specification](03-software-design-specification.md) (module boundaries, single-tenant design, and background-job architecture this schema implements) · [04 — API Specification](04-openapi-specification.yaml) (resource shapes this schema serves) · 08 — Deployment and DevOps (backup, retention, and migration operations, once written)
@@ -12,7 +12,7 @@
 
 ### 1.1 Purpose
 
-This document specifies the **table-level schema** of the Museum Ticketing & Booking Platform's primary datastore: engine, column definitions, data types, keys, constraints, and indexes for every persisted entity. Every table exists to satisfy one or more functional or non-functional requirements defined in [Document 02](02-software-requirements-specification.md), and every design choice exists to satisfy the module boundaries and single-venue simplification defined in [Document 03, Sections 3.2–3.3](03-software-design-specification.md#32-module-to-requirement-mapping). No new product behavior is introduced here; this document is the schema-level realization of decisions already made upstream.
+This document specifies the **table-level schema** of the ZNHM Ticketing's primary datastore: engine, column definitions, data types, keys, constraints, and indexes for every persisted entity. Every table exists to satisfy one or more functional or non-functional requirements defined in [Document 02](02-software-requirements-specification.md), and every design choice exists to satisfy the module boundaries and single-venue simplification defined in [Document 03, Sections 3.2–3.3](03-software-design-specification.md#32-module-to-requirement-mapping). No new product behavior is introduced here; this document is the schema-level realization of decisions already made upstream.
 
 ### 1.2 Scope
 
@@ -45,6 +45,8 @@ erDiagram
     ACCOUNT ||--o{ DATE_AVAILABILITY : "opens/closes"
     ACCOUNT ||--o{ NOTIFICATION : receives
     ACCOUNT ||--o{ AUDIT_LOG : performs
+    ACCOUNT ||--o{ DEVICE_TOKEN : registers
+    ACCOUNT ||--|| NOTIFICATION_PREFERENCE : "has one"
 
     CATEGORY ||--o{ BOOKING : prices
 
@@ -139,18 +141,16 @@ Implements FR-BOOK-001 – FR-BOOK-008 and the lifecycle mechanics of FR-PAY-002
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | UUID | PK | |
-| `reference` | TEXT | `UNIQUE NOT NULL` | The single value looked up at the gate, whether typed or emitted by a keyboard-wedge QR scanner (FR-BOOK-004, FR-TICKET-001, ADR-007) — both paths hit the same field, so the API never needs to know which happened. |
+| `reference` | TEXT | `UNIQUE NOT NULL, CHECK (reference ~ '^[A-HJ-NP-Z2-9]{8}$')` | The single value looked up at the gate, whether typed, read from a camera scan (mobile, ADR-011), or emitted by a keyboard-wedge scanner (web, ADR-007) — all paths hit the same field. Exactly 8 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (ambiguous `I`, `O`, `0`, `1` excluded); the same value is encoded in the ticket's QR code (FR-QR-001). |
 | `visitor_id` | UUID | `NOT NULL, FK → account.id ON DELETE RESTRICT` | The Visitor or group-leader who owns the booking. |
-| `category_id` | UUID | `NOT NULL, FK → category.id ON DELETE RESTRICT` | |
-| `category_name_en` / `category_name_am` | TEXT | `NOT NULL` | Snapshot of the category's bilingual name at booking time. |
-| `unit_price_etb` | NUMERIC(12,2) | `NOT NULL` | Snapshot of the category's price at booking time — a later Museum Manager price edit (FR-CAT-002) never touches this row. |
+| `items` | reverse relation → `booking_item` | `NOT NULL` (at least one) | The category lines of this booking (Section 3.3.1). A booking can mix categories, and each line snapshots its own category name and unit price. |
 | `visit_date` | DATE | `NOT NULL` | Mutated in place on a reschedule (FR-BOOK-007); see `rescheduled_count` below. |
 | `booking_type` | TEXT | `CHECK (booking_type IN ('individual','group')) NOT NULL` | |
 | `group_name` | TEXT | `CHECK (booking_type <> 'group' OR group_name IS NOT NULL)` | DB-enforced version of FR-BOOK-003's requirement that a group booking name a school/group. |
 | `group_contact_phone` | TEXT | | |
-| `booked_quantity` | INTEGER | `NOT NULL, CHECK (booked_quantity >= 1)` | |
-| `attended_quantity` | INTEGER | `CHECK (attended_quantity IS NULL OR (attended_quantity >= 0 AND attended_quantity <= booked_quantity))` | Set once, by the Cashier, at check-in. The upper-bound half of this constraint is FR-TICKET-005 ("extra visitors are not admitted under the original booking") enforced at the database level, not just in `services.py`. |
-| `total_amount_etb` | NUMERIC(12,2) | `NOT NULL` | `booked_quantity × unit_price_etb`, computed and fixed at creation. |
+| `booked_quantity` | INTEGER | `NOT NULL, CHECK (booked_quantity >= 1)` | Derived total of the booking's item quantities, kept on the booking so list views and reports need not aggregate. |
+| `attended_quantity` | INTEGER | `CHECK (attended_quantity IS NULL OR (attended_quantity >= 0 AND attended_quantity <= booked_quantity))` | The total actually admitted, set once by the Cashier at check-in; each item also carries its own `attended_quantity`. The upper-bound half of this constraint is FR-TICKET-005 ("extra visitors are not admitted under the original booking"). |
+| `total_amount_etb` | NUMERIC(12,2) | `NOT NULL` | Sum of the item `subtotal_etb` values, computed and fixed at creation. |
 | `status` | TEXT | `CHECK (status IN ('awaiting_payment','pending','visited','cancelled','refunded')) NOT NULL DEFAULT 'awaiting_payment'` | A group booking starts `awaiting_payment` exactly like an individual one -- there is no Museum-Manager approval state; `date_availability` (FR-BOOK-008) is the only capacity control, and it applies identically to both. |
 | `rescheduled_count` | INTEGER | `NOT NULL DEFAULT 0, CHECK (rescheduled_count <= 1)` | FR-BOOK-007's "at most once" cap enforced as a database invariant, not only a service-layer check — a second reschedule attempt cannot succeed even if a bug bypasses `services.py`. |
 | `notice_sent_at` | TIMESTAMPTZ | | Set the day the visit date has passed while still `Pending` (FR-PAY-005, step 1). |
@@ -168,7 +168,25 @@ Implements FR-BOOK-001 – FR-BOOK-008 and the lifecycle mechanics of FR-PAY-002
 | `reconciliation_id` | UUID | `FK → cashier_reconciliation.id ON DELETE RESTRICT` | Set once, only when this booking's amount has been included in a *completed* per-cashier reconciliation (Section 3.6) — never at the moment a reconciliation is merely initiated. `RESTRICT` (not `SET NULL`/`CASCADE`): a reconciliation with bookings attributed to it must never be deleted out from under them. |
 | `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
 
-**Indexes:** unique on `reference`; (`visitor_id`); (`category_id`); (`status`, `visit_date`) — serves both the daily no-show sweep (`status='pending' AND visit_date < today`, Document 03 §5.2) and staff filtering (`GET /bookings?status=&visitDate=`); partial index on `checked_in_by_user_id` `WHERE status='visited' AND reconciliation_id IS NULL` — this is the query behind one Cashier's outstanding balance (FR-SETTLE, Section 3.6), scoped per-cashier rather than platform-wide since accountability in IFMIS is personal, not pooled; partial index on `notice_sent_at` `WHERE status='pending' AND notice_sent_at IS NOT NULL` for the seven-day no-response sweep.
+**Indexes:** unique on `reference`; (`visitor_id`); (`status`, `visit_date`) — serves both the daily no-show sweep (`status='pending' AND visit_date < today`, Document 03 §5.2) and staff filtering (`GET /bookings?status=&visitDate=`); partial index on `checked_in_by_user_id` `WHERE status='visited' AND reconciliation_id IS NULL` — this is the query behind one Cashier's outstanding balance (FR-SETTLE, Section 3.6), scoped per-cashier rather than platform-wide since accountability in IFMIS is personal, not pooled; partial index on `notice_sent_at` `WHERE status='pending' AND notice_sent_at IS NOT NULL` for the seven-day no-response sweep.
+
+#### `booking_item`
+
+Implements the category-line detail of FR-BOOK-001/003 and FR-TICKET-002/006. One row per category on a booking, so a single checkout can mix categories (for example one Adult plus two Student tickets).
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `booking_id` | UUID | `NOT NULL, FK → booking.id ON DELETE CASCADE` | |
+| `category_id` | UUID | `NOT NULL, FK → category.id ON DELETE RESTRICT` | |
+| `category_name_en` / `category_name_am` | TEXT | `NOT NULL` | Snapshot of the category's bilingual name at booking time (FR-LOC-004). |
+| `quantity` | INTEGER | `NOT NULL, CHECK (quantity >= 1)` | Tickets bought on this line. |
+| `attended_quantity` | INTEGER | `CHECK (attended_quantity IS NULL OR (attended_quantity >= 0 AND attended_quantity <= quantity))` | People who actually attended this line, recorded at check-in. |
+| `unit_price_etb` | NUMERIC(12,2) | `NOT NULL` | Snapshot of the category's price at booking time; a later price edit (FR-CAT-002) never touches it. |
+| `subtotal_etb` | NUMERIC(12,2) | `NOT NULL` | `quantity × unit_price_etb`. |
+| `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
+
+**Indexes:** (`booking_id`); (`category_id`).
 
 ### 3.4 `payments` app
 
@@ -287,13 +305,45 @@ Cross-cutting; backs every module that issues an email or SMS (Document 03 §6.1
 |---|---|---|---|
 | `id` | UUID | PK | |
 | `notification_id` | UUID | `NOT NULL, FK → notification.id` | |
-| `channel` | TEXT | `CHECK (channel IN ('email','sms')) NOT NULL` | FR-PAY-005 sends both for a no-show notice, so one `notification` fans out to two `notification_delivery` rows. |
+| `channel` | TEXT | `CHECK (channel IN ('email','sms','push')) NOT NULL` | FR-PAY-005 sends email and SMS for a no-show notice, so one `notification` can fan out to several `notification_delivery` rows. `push` reaches a registered `device_token`, subject to the recipient's `notification_preference`. |
 | `status` | TEXT | `CHECK (status IN ('queued','sent','failed')) NOT NULL DEFAULT 'queued'` | |
 | `sent_at` | TIMESTAMPTZ | | |
 | `error_message` | TEXT | | Populated on final job exhaustion (Document 03 §6.1). |
 | `created_at` | TIMESTAMPTZ | `NOT NULL` | |
 
 **Indexes:** (`account_id`) and (`booking_id`) on `notification`; (`notification_id`) on `notification_delivery`.
+
+#### `device_token`
+
+Backs push delivery (FR-NOTIFY-PUSH-001). One row per device an account has registered.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `account_id` | UUID | `NOT NULL, FK → account.id ON DELETE CASCADE` | |
+| `token` | TEXT | `UNIQUE NOT NULL` | The platform push token. Unique so re-registering the same device updates in place. |
+| `platform` | TEXT | `CHECK (platform IN ('ios','android')) NOT NULL` | |
+| `active` | BOOLEAN | `NOT NULL DEFAULT true` | Set false on `DELETE /notifications/devices/{token}/`. |
+| `last_seen_at` | TIMESTAMPTZ | `NULLABLE` | Refreshed each time the device re-registers. |
+| `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
+
+**Indexes:** unique on `token`; partial index on `account_id` `WHERE active`.
+
+#### `notification_preference`
+
+Backs FR-NOTIFY-PREF-001 and NFR-NOTIFY-001. Exactly one row per account.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `account_id` | UUID | `UNIQUE NOT NULL, FK → account.id ON DELETE CASCADE` | One preference row per account. |
+| `email_enabled` | BOOLEAN | `NOT NULL DEFAULT true` | |
+| `sms_enabled` | BOOLEAN | `NOT NULL DEFAULT true` | |
+| `push_enabled` | BOOLEAN | `NOT NULL DEFAULT false` | |
+| `language` | TEXT | `CHECK (language IN ('en','am')) NOT NULL DEFAULT 'en'` | Language of notification copy (FR-LOC-001). |
+| `created_at` / `updated_at` | TIMESTAMPTZ | `NOT NULL` | |
+
+**Indexes:** unique on `account_id`.
 
 #### `audit_log`
 
