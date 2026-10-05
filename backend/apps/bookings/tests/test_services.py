@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+from django.conf import settings
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
@@ -58,6 +59,26 @@ def _next_non_sunday(start):
 
 
 TOMORROW = _next_non_sunday(date.today() + timedelta(days=1))
+
+
+def _next_open_date(after):
+    """Return the next date after ``after`` that is guaranteed open for booking.
+
+    Skips Sundays (the museum is closed every Sunday per
+    ``settings.RECURRING_CLOSED_WEEKDAYS``) and any date with an explicit
+    ``DateAvailability`` row marked closed. Dates without a row are
+    implicitly open, matching the production model.
+    """
+    candidate = after + timedelta(days=1)
+    for _ in range(60):
+        if candidate.weekday() not in settings.RECURRING_CLOSED_WEEKDAYS:
+            closed = DateAvailability.objects.filter(
+                visit_date=candidate, is_open_for_booking=False
+            ).exists()
+            if not closed:
+                return candidate
+        candidate += timedelta(days=1)
+    raise AssertionError("No open date found within 60 days")
 
 # A guaranteed Sunday in the near future, for the weekly-closure tests
 # below -- deliberately not derived from TOMORROW, which is defined to
@@ -1014,7 +1035,9 @@ def test_cancel_awaiting_payment_booking_rejected_for_a_different_visitor():
 
 def test_reschedule_pending_booking_succeeds():
     booking, visitor = _make_pending_booking()
-    new_date = TOMORROW + timedelta(days=5)
+    # Pick a target date that is guaranteed open: not a Sunday, not a
+    # date with an explicit DateAvailability closure row.
+    new_date = _next_open_date(after=TOMORROW)
 
     booking = services.reschedule_booking(booking=booking, visitor=visitor, new_visit_date=new_date)
 
@@ -1025,13 +1048,16 @@ def test_reschedule_pending_booking_succeeds():
 
 def test_reschedule_rejected_after_first_reschedule():
     booking, visitor = _make_pending_booking()
+    first_new_date = _next_open_date(after=TOMORROW)
     services.reschedule_booking(
-        booking=booking, visitor=visitor, new_visit_date=TOMORROW + timedelta(days=5)
+        booking=booking, visitor=visitor, new_visit_date=first_new_date
     )
 
+    # Any second target date works -- the cap is what we are testing, not the
+    # date itself, so we can reuse an open date.
     with pytest.raises(Conflict):
         services.reschedule_booking(
-            booking=booking, visitor=visitor, new_visit_date=TOMORROW + timedelta(days=6)
+            booking=booking, visitor=visitor, new_visit_date=_next_open_date(after=first_new_date)
         )
 
 
