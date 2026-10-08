@@ -236,7 +236,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Bilingual (EN/AM) online booking, payment, and gate "
                     "check-in for the Zoological Natural History Museum's "
                     "digital ticketing track.",
-    "VERSION": "1.0.0",
+    "VERSION": "0.2.0",
     "SERVE_INCLUDE_SCHEMA": False,
     # apps.platform_admin.serializers.StaffCreateSerializer/StaffUpdateSerializer
     # both have a `role` field restricted to {cashier, museum_manager} --
@@ -261,6 +261,12 @@ SPECTACULAR_SETTINGS = {
         "BookingStatusEnum": "apps.bookings.models.Booking.Status",
         "NotificationDeliveryStatusEnum": "apps.notifications.models.NotificationDelivery.Status",
         "RefundStatusEnum": "apps.refunds.models.Refund.Status",
+        # `Account.Language` is exposed on more than one serializer under a
+        # different field name (`language_preference` on UserProfile,
+        # `language` on NotificationPreference). Pinned so both resolve to
+        # the same component instead of drifting into two enums with
+        # identical values.
+        "LanguagePreferenceEnum": "apps.accounts.models.Account.Language",
     },
 }
 

@@ -1,10 +1,11 @@
-from rest_framework.routers import DefaultRouter
+from django.urls import path
+
+from . import views
 
 app_name = "notifications"
-router = DefaultRouter()
-# No entries: `notifications` has no HTTP endpoints per `contracts/openapi.yaml`
-# -- see views.py's docstring. Kept as an (empty) router so `config/urls.py`'s
-# `include("apps.notifications.urls")` continues to work unchanged if that
-# ever changes.
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("preferences/", views.NotificationPreferenceView.as_view(), name="preferences"),
+    path("devices/", views.DeviceTokenRegisterView.as_view(), name="device-register"),
+    path("devices/<str:token>/", views.DeviceTokenUnregisterView.as_view(), name="device-unregister"),
+]

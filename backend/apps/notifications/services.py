@@ -35,7 +35,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
 
-from .models import Notification, NotificationDelivery
+from .models import DeviceToken, Notification, NotificationDelivery, NotificationPreference
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +332,17 @@ def _send_sms(*, to_phone, body):
         raise _ChannelSendError(f"SMS send failed: {exc}") from exc
 
 
+def _send_push(*, account, body):
+    """FR-NOTIFY-PUSH-001 / ADR-016. No Expo/APNs/FCM provider is wired up
+    yet -- like `_send_sms`'s no-gateway path, this logs instead of
+    sending or failing, so enabling push later is a change here plus an
+    entry in `NOTIFICATION_CHANNELS`, not a new plumbing exercise."""
+    if not account.device_tokens.filter(active=True).exists():
+        raise _ChannelSendError("Account has no active device tokens.")
+    for token in account.device_tokens.filter(active=True).values_list("token", flat=True):
+        logger.info("Push (no provider configured) to %s: %s", token, body)
+
+
 def _send_one(*, account, delivery, content):
     if delivery.channel == NotificationDelivery.Channel.EMAIL:
         _send_email(
@@ -341,6 +352,8 @@ def _send_one(*, account, delivery, content):
         )
     elif delivery.channel == NotificationDelivery.Channel.SMS:
         _send_sms(to_phone=account.phone, body=_bilingual_text(content["body"]))
+    elif delivery.channel == NotificationDelivery.Channel.PUSH:
+        _send_push(account=account, body=_bilingual_text(content["body"]))
     else:  # pragma: no cover -- guarded by the model's own choices constraint
         raise _ChannelSendError(f"Unknown channel: {delivery.channel}")
 
@@ -384,3 +397,58 @@ def mark_stalled_deliveries_failed(*, notification, error_message):
         notification.notification_type,
         error_message,
     )
+
+
+# --------------------------------------------------------------------------
+# Push device registry (FR-NOTIFY-PUSH-001)
+# --------------------------------------------------------------------------
+
+
+def register_device(*, account, token, platform):
+    """Implements `POST /notifications/devices` -- registers (or refreshes)
+    a push destination. `update_or_create` on the unique `token` so a
+    device re-registering (new session, app update, or a different account
+    signing in on the same install) refreshes ownership/timestamp in place
+    rather than accumulating duplicate rows."""
+    device, _ = DeviceToken.objects.update_or_create(
+        token=token,
+        defaults={
+            "account": account,
+            "platform": platform,
+            "active": True,
+            "last_seen_at": timezone.now(),
+        },
+    )
+    return device
+
+
+def unregister_device(*, account, token):
+    """Implements `DELETE /notifications/devices/{token}` -- deactivates a
+    device rather than deleting it (see `DeviceToken`'s own docstring).
+    Scoped to `account` so one account can never deactivate another's
+    device; an unknown/deactivated token is a no-op (the endpoint is
+    idempotent and returns 204 either way)."""
+    DeviceToken.objects.filter(account=account, token=token).update(active=False)
+
+
+# --------------------------------------------------------------------------
+# Notification preferences (FR-NOTIFY-PREF-001)
+# --------------------------------------------------------------------------
+
+
+def get_notification_preference(*, account):
+    """Implements `GET /notifications/preferences`. Lazily creates the row
+    with all channels on, so an account that never touches settings keeps
+    today's default behaviour (all notifications delivered)."""
+    preference, _ = NotificationPreference.objects.get_or_create(account=account)
+    return preference
+
+
+def update_notification_preference(*, account, **fields):
+    """Implements `PUT /notifications/preferences` -- a full replace of the
+    four stored fields (the serializer supplies all of them)."""
+    preference = get_notification_preference(account=account)
+    for field, value in fields.items():
+        setattr(preference, field, value)
+    preference.save()
+    return preference

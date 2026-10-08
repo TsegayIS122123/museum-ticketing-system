@@ -3,7 +3,8 @@ HTTP concerns only: routing to a service call, permission checks, and
 response status codes. No business logic here (Design Spec Sec 3.1).
 """
 
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.response import Response
 
@@ -13,7 +14,11 @@ from apps.core.pagination import EnvelopeLimitOffsetPagination
 from apps.core.permissions import IsPlatformAdmin
 
 from . import services
-from .serializers import StaffCreateSerializer, StaffUpdateSerializer
+from .serializers import (
+    AuditLogEntrySerializer,
+    StaffCreateSerializer,
+    StaffUpdateSerializer,
+)
 
 
 # NOTE on the `post=` schema override below: `ListCreateAPIView` (see
@@ -85,3 +90,74 @@ class StaffDetailView(generics.GenericAPIView):
         account = self.get_object()
         services.deactivate_staff_account(actor=request.user, account=account)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AuditLogListView(generics.ListAPIView):
+    """`GET /admin/audit-log` -- Platform Admin only, read-only
+    (FR-AUDIT-001). The append-only trail every module writes through
+    `core.services.write_audit_log`, filterable and paginated."""
+
+    permission_classes = [IsPlatformAdmin]
+    pagination_class = EnvelopeLimitOffsetPagination
+    serializer_class = AuditLogEntrySerializer
+
+    def get_queryset(self):
+        params = self.request.query_params
+        return services.list_audit_log(
+            actor=params.get("actor"),
+            action=params.get("action"),
+            entity_type=params.get("entityType"),
+            entity_id=params.get("entityId"),
+            date_from=params.get("from"),
+            date_to=params.get("to"),
+        )
+
+    @extend_schema(
+        operation_id="listAuditLog",
+        parameters=[
+            OpenApiParameter(
+                name="actor",
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by acting account UUID.",
+            ),
+            OpenApiParameter(
+                name="action",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by action, e.g. `booking.cancelled`.",
+            ),
+            OpenApiParameter(
+                name="entityType",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by the audited entity's type, e.g. `account`.",
+            ),
+            OpenApiParameter(
+                name="entityId",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by the audited entity's id.",
+            ),
+            OpenApiParameter(
+                name="from",
+                type=OpenApiTypes.DATETIME,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Only entries created at/after this ISO-8601 instant.",
+            ),
+            OpenApiParameter(
+                name="to",
+                type=OpenApiTypes.DATETIME,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Only entries created at/before this ISO-8601 instant.",
+            ),
+        ],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)

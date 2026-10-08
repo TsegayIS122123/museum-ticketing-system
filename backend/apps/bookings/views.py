@@ -7,7 +7,8 @@ from datetime import date as _date
 
 from django.core.files.storage import default_storage
 from django.http import FileResponse, Http404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import get_object_or_404
@@ -52,7 +53,25 @@ class AvailabilityListView(APIView):
 
     permission_classes = [permissions.AllowAny]
 
-    @extend_schema(responses=DateAvailabilitySerializer(many=True))
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="from",
+                type=OpenApiTypes.DATE,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="First date of the requested range (inclusive), ISO-8601 `YYYY-MM-DD`.",
+            ),
+            OpenApiParameter(
+                name="to",
+                type=OpenApiTypes.DATE,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="Last date of the requested range (inclusive), ISO-8601 `YYYY-MM-DD`.",
+            ),
+        ],
+        responses=DateAvailabilitySerializer(many=True),
+    )
     def get(self, request):
         date_from = _parse_required_date(request, "from")
         date_to = _parse_required_date(request, "to")
@@ -110,7 +129,43 @@ class BookingListCreateView(generics.GenericAPIView):
             flagged=params.get("flagged") == "true",
         )
 
-    @extend_schema(operation_id="listBookings", responses=BookingSerializer)
+    @extend_schema(
+        operation_id="listBookings",
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                enum=[value for value, _ in Booking.Status.choices],
+                description="Only return bookings in this lifecycle status.",
+            ),
+            OpenApiParameter(
+                name="visitDate",
+                type=OpenApiTypes.DATE,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Only return bookings for this visit date, ISO-8601 `YYYY-MM-DD`.",
+            ),
+            OpenApiParameter(
+                name="bookingType",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                enum=[value for value, _ in Booking.BookingType.choices],
+                description="Only return individual or group bookings.",
+            ),
+            OpenApiParameter(
+                name="flagged",
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="When `true`, only return bookings flagged for a "
+                "Museum Manager's mismatch review.",
+            ),
+        ],
+        responses=BookingSerializer,
+    )
     def get(self, request):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)

@@ -4,6 +4,27 @@
  */
 
 export interface paths {
+    "/api/v1/admin/audit-log/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description `GET /admin/audit-log` -- Platform Admin only, read-only
+         *     (FR-AUDIT-001). The append-only trail every module writes through
+         *     `core.services.write_audit_log`, filterable and paginated.
+         */
+        get: operations["listAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/staff/": {
         parameters: {
             query?: never;
@@ -761,6 +782,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/devices/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /notifications/devices -- register a push destination
+         *     (FR-NOTIFY-PUSH-001).
+         */
+        post: operations["v1_notifications_devices_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/devices/{token}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * @description DELETE /notifications/devices/{token} -- deactivate a push
+         *     destination (FR-NOTIFY-PUSH-001). Idempotent: returns 204 whether or
+         *     not the token was on file, and one account can never deactivate
+         *     another's device (`services.unregister_device` scopes by owner).
+         */
+        delete: operations["v1_notifications_devices_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/preferences/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET/PUT /notifications/preferences -- the caller's own channels and
+         *     language (FR-NOTIFY-PREF-001). `get_object` lazily creates the row so
+         *     a first-time visitor gets the all-on defaults without an explicit
+         *     setup call.
+         */
+        get: operations["v1_notifications_preferences_retrieve"];
+        /**
+         * @description GET/PUT /notifications/preferences -- the caller's own channels and
+         *     language (FR-NOTIFY-PREF-001). `get_object` lazily creates the row so
+         *     a first-time visitor gets the all-on defaults without an explicit
+         *     setup call.
+         */
+        put: operations["v1_notifications_preferences_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description GET/PUT /notifications/preferences -- the caller's own channels and
+         *     language (FR-NOTIFY-PREF-001). `get_object` lazily creates the row so
+         *     a first-time visitor gets the all-on defaults without an explicit
+         *     setup call.
+         */
+        patch: operations["v1_notifications_preferences_partial_update"];
+        trace?: never;
+    };
     "/api/v1/payments/webhooks/chapa/": {
         parameters: {
             query?: never;
@@ -1254,8 +1351,27 @@ export interface components {
             /** Format: date */
             from: string;
         };
+        /**
+         * @description `AuditLogEntry` (Document 04) -- one append-only row of the platform
+         *     audit trail (FR-AUDIT-001). Read-only: entries are written by
+         *     `core.services.write_audit_log` throughout the codebase, never through
+         *     the API.
+         */
+        AuditLogEntry: {
+            readonly id: number;
+            /** Format: uuid */
+            readonly actorUserId: string | null;
+            readonly action: string;
+            readonly entityType: string;
+            readonly entityId: string;
+            readonly metadata: unknown;
+            /** Format: date-time */
+            readonly createdAt: string;
+        };
         AuthResponse: {
             access_token: string;
+            /** @description Only present when the request carries `X-Client-Platform: expo`. Native clients store it themselves; web clients receive it as an httpOnly cookie instead. */
+            refresh_token?: string;
             user: components["schemas"]["Account"];
         };
         /**
@@ -1266,6 +1382,10 @@ export interface components {
         Booking: {
             /** Format: uuid */
             readonly id: string;
+            /**
+             * @description The 8-character booking reference, drawn from the alphabet `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (ambiguous `0/O/1/I` excluded). The Visitor presents it at the gate, typed or scanned.
+             * @example K7M2QP4A
+             */
             readonly reference: string;
             /** Format: uuid */
             readonly visitorId: string;
@@ -1626,6 +1746,10 @@ export interface components {
         CheckInResponse: {
             /** Format: uuid */
             readonly id: string;
+            /**
+             * @description The 8-character booking reference, drawn from the alphabet `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (ambiguous `0/O/1/I` excluded). The Visitor presents it at the gate, typed or scanned.
+             * @example K7M2QP4A
+             */
             readonly reference: string;
             /** Format: uuid */
             readonly visitorId: string;
@@ -1724,6 +1848,20 @@ export interface components {
         };
         DetailResponse: {
             detail: string;
+        };
+        /**
+         * @description `DeviceToken` (Document 04) -- FR-NOTIFY-PUSH-001. `active` and
+         *     `lastSeenAt` are server-managed (see
+         *     `services.register_device`/`unregister_device`); a client only ever
+         *     supplies `token` and `platform`.
+         */
+        DeviceToken: {
+            /** @description Expo push token for this install. */
+            token: string;
+            platform: components["schemas"]["PlatformEnum"];
+            readonly active: boolean;
+            /** Format: date-time */
+            readonly lastSeenAt: string | null;
         };
         /**
          * @description `FlagMismatchRequest` -- Cashier only (UAT round 1). Optional
@@ -1835,6 +1973,17 @@ export interface components {
          */
         LanguagePreferenceEnum: "en" | "am";
         /**
+         * @description `NotificationPreference` (Document 04) -- FR-NOTIFY-PREF-001. All
+         *     four fields are always present in a response and all four are required
+         *     on the replacing `PUT` (a full replace, not a partial update).
+         */
+        NotificationPreference: {
+            emailEnabled: boolean;
+            smsEnabled: boolean;
+            pushEnabled: boolean;
+            language?: components["schemas"]["LanguagePreferenceEnum"];
+        };
+        /**
          * @description `GET /settlement/my-balance/` response shape. Wraps a plain
          *     Decimal (the return value of `services.get_outstanding_balance`) --
          *     there is no model behind this endpoint, it's a computed figure, so a
@@ -1853,6 +2002,14 @@ export interface components {
         };
         PaginatedAccountList: {
             data: components["schemas"]["Account"][];
+            meta: {
+                limit: number;
+                offset: number;
+                total: number;
+            };
+        };
+        PaginatedAuditLogEntryList: {
+            data: components["schemas"]["AuditLogEntry"][];
             meta: {
                 limit: number;
                 offset: number;
@@ -1957,6 +2114,17 @@ export interface components {
             refNo?: string;
         };
         /**
+         * @description `NotificationPreference` (Document 04) -- FR-NOTIFY-PREF-001. All
+         *     four fields are always present in a response and all four are required
+         *     on the replacing `PUT` (a full replace, not a partial update).
+         */
+        PatchedNotificationPreference: {
+            emailEnabled?: boolean;
+            smsEnabled?: boolean;
+            pushEnabled?: boolean;
+            language?: components["schemas"]["LanguagePreferenceEnum"];
+        };
+        /**
          * @description `GET /reports/comparison` response shape (Phase 7b) -- powers the
          *     Overview tab's "+12% vs previous period" KPI deltas. See
          *     `services.get_period_comparison`'s own docstring for why this is
@@ -1975,6 +2143,12 @@ export interface components {
          * @enum {string}
          */
         PeriodEnum: "daily" | "weekly" | "monthly" | "yearly";
+        /**
+         * @description * `ios` - iOS
+         *     * `android` - Android
+         * @enum {string}
+         */
+        PlatformEnum: "ios" | "android";
         /**
          * @description * `cancellation` - Cancellation
          *     * `partial_shortfall` - Partial shortfall
@@ -2117,8 +2291,14 @@ export interface components {
             cancelled: number;
             refunded: number;
         };
+        TokenRefreshRequest: {
+            /** @description Required only when `X-Client-Platform: expo`; web clients omit it and rely on the httpOnly refresh cookie. */
+            refresh_token?: string;
+        };
         TokenRefreshResponse: {
             access: string;
+            /** @description Only present when the request carries `X-Client-Platform: expo`. */
+            refresh_token?: string;
         };
         /** @description `VisitorVerifyConfirmRequest`. */
         VisitorVerifyConfirm: {
@@ -2181,6 +2361,42 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAuditLog: {
+        parameters: {
+            query?: {
+                /** @description Filter by action, e.g. `booking.cancelled`. */
+                action?: string;
+                /** @description Filter by acting account UUID. */
+                actor?: string;
+                /** @description Filter by the audited entity's id. */
+                entityId?: string;
+                /** @description Filter by the audited entity's type, e.g. `account`. */
+                entityType?: string;
+                /** @description Only entries created at/after this ISO-8601 instant. */
+                from?: string;
+                /** @description Number of results to return per page. */
+                limit?: number;
+                /** @description The initial index from which to return the results. */
+                offset?: number;
+                /** @description Only entries created at/before this ISO-8601 instant. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAuditLogEntryList"];
+                };
+            };
+        };
+    };
     v1_admin_staff_list: {
         parameters: {
             query?: {
@@ -2305,7 +2521,10 @@ export interface operations {
     v1_auth_login_create: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Caller platform. `expo` returns the refresh token in the response body (auth responses) and accepts it in the request body (refresh); `web` (default) uses the httpOnly refresh cookie. */
+                "X-Client-Platform"?: "expo" | "web";
+            };
             path?: never;
             cookie?: never;
         };
@@ -2349,11 +2568,20 @@ export interface operations {
     v1_auth_refresh_create: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Caller platform. `expo` returns the refresh token in the response body (auth responses) and accepts it in the request body (refresh); `web` (default) uses the httpOnly refresh cookie. */
+                "X-Client-Platform"?: "expo" | "web";
+            };
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TokenRefreshRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["TokenRefreshRequest"];
+                "multipart/form-data": components["schemas"]["TokenRefreshRequest"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -2401,7 +2629,10 @@ export interface operations {
     v1_auth_visitor_verify_confirm_create: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Caller platform. `expo` returns the refresh token in the response body (auth responses) and accepts it in the request body (refresh); `web` (default) uses the httpOnly refresh cookie. */
+                "X-Client-Platform"?: "expo" | "web";
+            };
             path?: never;
             cookie?: never;
         };
@@ -2471,7 +2702,12 @@ export interface operations {
     };
     v1_availability_list: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description First date of the requested range (inclusive), ISO-8601 `YYYY-MM-DD`. */
+                from: string;
+                /** @description Last date of the requested range (inclusive), ISO-8601 `YYYY-MM-DD`. */
+                to: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2517,7 +2753,16 @@ export interface operations {
     };
     listBookings: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only return individual or group bookings. */
+                bookingType?: "group" | "individual";
+                /** @description When `true`, only return bookings flagged for a Museum Manager's mismatch review. */
+                flagged?: boolean;
+                /** @description Only return bookings in this lifecycle status. */
+                status?: "awaiting_payment" | "cancelled" | "pending" | "refunded" | "visited";
+                /** @description Only return bookings for this visit date, ISO-8601 `YYYY-MM-DD`. */
+                visitDate?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3013,6 +3258,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Institution"];
+                };
+            };
+        };
+    };
+    v1_notifications_devices_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceToken"];
+                "application/x-www-form-urlencoded": components["schemas"]["DeviceToken"];
+                "multipart/form-data": components["schemas"]["DeviceToken"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceToken"];
+                };
+            };
+        };
+    };
+    v1_notifications_devices_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    v1_notifications_preferences_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreference"];
+                };
+            };
+        };
+    };
+    v1_notifications_preferences_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationPreference"];
+                "application/x-www-form-urlencoded": components["schemas"]["NotificationPreference"];
+                "multipart/form-data": components["schemas"]["NotificationPreference"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreference"];
+                };
+            };
+        };
+    };
+    v1_notifications_preferences_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedNotificationPreference"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedNotificationPreference"];
+                "multipart/form-data": components["schemas"]["PatchedNotificationPreference"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreference"];
                 };
             };
         };

@@ -3,7 +3,12 @@ HTTP concerns only: routing to a service call, permission checks, and
 response status codes. No business logic here (Design Spec Sec 3.1).
 """
 
-from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializer
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    extend_schema,
+    inline_serializer,
+)
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,16 +30,25 @@ from .serializers import (
 
 # `AuthResponse` (Document 04) -- the access token + profile shape shared
 # by every flow that ends in a session (Visitor OTP confirm, Staff
-# login). The refresh token is NOT part of this response body -- it's set
-# as an httpOnly cookie instead (see cookies.py) so it survives a full
-# page navigation (e.g. leaving for Chapa's hosted checkout and coming
-# back) without ever being readable by frontend JS.
+# login). The refresh token is NOT part of this response body for web
+# clients -- it's set as an httpOnly cookie instead (see cookies.py) so it
+# survives a full page navigation (e.g. leaving for Chapa's hosted
+# checkout and coming back) without ever being readable by frontend JS.
+# Native clients (Expo) cannot rely on cookie persistence, so they opt
+# into receiving the refresh token in the body via the X-Client-Platform
+# request header (see `_client_wants_refresh_in_body`).
 # Declared here rather than in serializers.py since it's never used to
 # parse a request, only to document `_auth_response`'s output below.
 AuthResponseSerializer = inline_serializer(
     name="AuthResponse",
     fields={
         "access_token": serializers.CharField(),
+        "refresh_token": serializers.CharField(
+            required=False,
+            help_text="Only present when the request carries "
+            "`X-Client-Platform: expo`. Native clients store it themselves; "
+            "web clients receive it as an httpOnly cookie instead.",
+        ),
         "user": AccountSerializer(),
     },
 )
@@ -44,19 +58,59 @@ DetailResponseSerializer = inline_serializer(
     fields={"detail": serializers.CharField()},
 )
 
+# Shared across every endpoint that can issue or rotate a session token
+# (Staff login, Visitor OTP confirm, token refresh). A native client sends
+# `X-Client-Platform: expo` to receive the refresh token in the JSON body
+# instead of (or in addition to) the httpOnly cookie it cannot durably
+# keep. Absent / any other value means "web" and preserves the existing
+# cookie-only contract.
+X_CLIENT_PLATFORM_PARAM = OpenApiParameter(
+    name="X-Client-Platform",
+    location=OpenApiParameter.HEADER,
+    required=False,
+    type=str,
+    enum=["web", "expo"],
+    default="web",
+    description="Caller platform. `expo` returns the refresh token in the "
+    "response body (auth responses) and accepts it in the request body "
+    "(refresh); `web` (default) uses the httpOnly refresh cookie.",
+)
 
-def _auth_response(account, refresh):
+TokenRefreshRequestSerializer = inline_serializer(
+    name="TokenRefreshRequest",
+    fields={
+        "refresh_token": serializers.CharField(
+            required=False,
+            help_text="Required only when `X-Client-Platform: expo`; web "
+            "clients omit it and rely on the httpOnly refresh cookie.",
+        )
+    },
+)
+
+
+def _client_wants_refresh_in_body(request):
+    """True when the caller is a native client that cannot persist the
+    httpOnly refresh cookie and therefore expects the refresh token in the
+    JSON body (`X-Client-Platform: expo`)."""
+    return request.headers.get("X-Client-Platform", "").lower() == "expo"
+
+
+def _auth_response(account, refresh, request):
     """`AuthResponse` (Document 04) -- shared by every flow that ends in a
     session, Visitor OTP confirm and Staff login alike (Sec 4.1). Mints
-    the response body (access token + profile) and, as a side effect,
+    the response body (access token + profile) and, for web callers,
     attaches the refresh token to the response as an httpOnly cookie
-    rather than handing it to the frontend directly."""
-    response = Response(
-        {
-            "access_token": str(refresh.access_token),
-            "user": AccountSerializer(account).data,
-        }
-    )
+    rather than handing it to the frontend directly. Native callers
+    (`X-Client-Platform: expo`) get it in the body instead."""
+    payload = {
+        "access_token": str(refresh.access_token),
+        "user": AccountSerializer(account).data,
+    }
+    if _client_wants_refresh_in_body(request):
+        payload["refresh_token"] = str(refresh)
+        return Response(payload)
+
+    response = Response(payload)
     set_refresh_cookie(response, str(refresh))
     return response
 
@@ -100,12 +154,16 @@ class VerifyOTPView(APIView):
     permission_classes = [permissions.AllowAny]
     throttle_scope = "otp-verify"
 
-    @extend_schema(request=VisitorVerifyConfirmSerializer, responses=AuthResponseSerializer)
+    @extend_schema(
+        request=VisitorVerifyConfirmSerializer,
+        responses=AuthResponseSerializer,
+        parameters=[X_CLIENT_PLATFORM_PARAM],
+    )
     def post(self, request):
         serializer = VisitorVerifyConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         account, refresh = services.confirm_visitor_verification(**serializer.validated_data)
-        return _auth_response(account, refresh)
+        return _auth_response(account, refresh, request)
 
 
 class VerifyMagicLinkView(APIView):
@@ -132,6 +190,7 @@ class StaffLoginView(APIView):
     @extend_schema(
         request=StaffLoginSerializer,
         responses=AuthResponseSerializer,
+        parameters=[X_CLIENT_PLATFORM_PARAM],
         examples=[
             OpenApiExample(
                 "Staff login (mock)",
@@ -156,7 +215,7 @@ class StaffLoginView(APIView):
         serializer = StaffLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         account, refresh = services.staff_login(**serializer.validated_data)
-        return _auth_response(account, refresh)
+        return _auth_response(account, refresh, request)
 
 
 class RequestPasswordResetView(APIView):
@@ -221,27 +280,44 @@ class CookieTokenRefreshView(TokenRefreshView):
     authentication_classes = []
 
     @extend_schema(
-        request=None,
+        request=TokenRefreshRequestSerializer,
+        parameters=[X_CLIENT_PLATFORM_PARAM],
         responses={
             200: inline_serializer(
-                name="TokenRefreshResponse", fields={"access": serializers.CharField()}
+                name="TokenRefreshResponse",
+                fields={
+                    "access": serializers.CharField(),
+                    "refresh_token": serializers.CharField(
+                        required=False,
+                        help_text="Only present when the request carries "
+                        "`X-Client-Platform: expo`.",
+                    ),
+                },
             ),
             401: DetailResponseSerializer,
         },
     )
     def post(self, request, *args, **kwargs):
-        raw_refresh = request.COOKIES.get(REFRESH_COOKIE_NAME)
+        wants_body = _client_wants_refresh_in_body(request)
+        if wants_body:
+            raw_refresh = request.data.get("refresh_token")
+        else:
+            raw_refresh = request.COOKIES.get(REFRESH_COOKIE_NAME)
+
         if not raw_refresh:
-            return Response(
-                {"detail": "No refresh token cookie."}, status=status.HTTP_401_UNAUTHORIZED
+            detail = (
+                "No refresh token provided."
+                if wants_body
+                else "No refresh token cookie."
             )
+            return Response({"detail": detail}, status=status.HTTP_401_UNAUTHORIZED)
 
         serializer = TokenRefreshSerializer(data={"refresh": raw_refresh})
         try:
             serializer.is_valid(raise_exception=True)
         except TokenError:
-            # Expired/invalid/already-rotated cookie -- clear it so the
-            # browser stops presenting a dead token on every subsequent
+            # Expired/invalid/already-rotated token -- clear the cookie so
+            # the browser stops presenting a dead token on every subsequent
             # page load, and let the frontend fall back to a normal login.
             #
             # NOTE: this must be `return response`, not `raise InvalidToken`.
@@ -256,9 +332,13 @@ class CookieTokenRefreshView(TokenRefreshView):
             clear_refresh_cookie(response)
             return response
 
-        response = Response({"access": serializer.validated_data["access"]})
+        payload = {"access": serializer.validated_data["access"]}
         rotated_refresh = serializer.validated_data.get("refresh")
-        if rotated_refresh:
+        if wants_body and rotated_refresh:
+            payload["refresh_token"] = rotated_refresh
+
+        response = Response(payload)
+        if rotated_refresh and not wants_body:
             set_refresh_cookie(response, rotated_refresh)
         return response
 

@@ -24,10 +24,14 @@ and Museum Manager* accounts, never another Platform Admin account, so
 that path stays `manage.py createsuperuser`-only (accounts/models.py).
 """
 
+from uuid import UUID
+
+from django.utils.dateparse import parse_datetime
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import Account
 from apps.core.exceptions import Conflict
+from apps.core.models import AuditLogEntry
 from apps.core.services import write_audit_log
 
 # Document 04's StaffCreateRequest/StaffUpdateRequest `role` enum -- a
@@ -195,3 +199,51 @@ def deactivate_staff_account(*, actor, account):
         )
 
     return account
+
+
+def list_audit_log(
+    *,
+    actor=None,
+    action=None,
+    entity_type=None,
+    entity_id=None,
+    date_from=None,
+    date_to=None,
+):
+    """Implements `GET /admin/audit-log` -- FR-AUDIT-001, Platform Admin
+    only. Read-only, append-only: this is a straight query over
+    `core.AuditLogEntry`, the same rows every module writes via
+    `core.services.write_audit_log`; nothing here ever creates or edits an
+    entry. Most-recent first, since the trail is only ever scanned from
+    the top for a recent incident.
+
+    `entity_type`/`entity_id` map onto `AuditLogEntry.target_type`/
+    `target_id` (Document 05's audit table predates the "entity"
+    vocabulary used in the API's query params -- same columns, different
+    label). Bad `actor`/date values are treated as an empty match rather
+    than a 500: the querysets simply ignore unparseable input so a
+    mistyped filter degrades to "no results", not a crash.
+    """
+    queryset = AuditLogEntry.objects.all().order_by("-created_at")
+
+    if actor:
+        try:
+            actor_id = UUID(str(actor))
+        except ValueError:
+            return queryset.none()
+        queryset = queryset.filter(actor_id=actor_id)
+    if action:
+        queryset = queryset.filter(action=action)
+    if entity_type:
+        queryset = queryset.filter(target_type=entity_type)
+    if entity_id:
+        queryset = queryset.filter(target_id=entity_id)
+
+    parsed_from = parse_datetime(date_from) if date_from else None
+    if parsed_from is not None:
+        queryset = queryset.filter(created_at__gte=parsed_from)
+    parsed_to = parse_datetime(date_to) if date_to else None
+    if parsed_to is not None:
+        queryset = queryset.filter(created_at__lte=parsed_to)
+
+    return queryset

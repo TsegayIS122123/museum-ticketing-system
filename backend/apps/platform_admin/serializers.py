@@ -12,6 +12,7 @@ imports that directly rather than this module defining a parallel
 from rest_framework import serializers
 
 from apps.accounts.models import Account
+from apps.core.models import AuditLogEntry
 
 from .services import PROVISIONABLE_ROLES
 
@@ -46,3 +47,28 @@ class StaffUpdateSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=255, required=False)
     role = serializers.ChoiceField(choices=STAFF_ROLE_CHOICES, required=False)
     active = serializers.BooleanField(required=False)
+
+
+class AuditLogEntrySerializer(serializers.ModelSerializer):
+    """`AuditLogEntry` (Document 04) -- one append-only row of the platform
+    audit trail (FR-AUDIT-001). Read-only: entries are written by
+    `core.services.write_audit_log` throughout the codebase, never through
+    the API."""
+
+    actorUserId = serializers.UUIDField(source="actor_id", read_only=True, allow_null=True)
+    entityType = serializers.CharField(source="target_type", read_only=True)
+    entityId = serializers.CharField(source="target_id", read_only=True)
+    createdAt = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = AuditLogEntry
+        fields = [
+            "id",
+            "actorUserId",
+            "action",
+            "entityType",
+            "entityId",
+            "metadata",
+            "createdAt",
+        ]
+        read_only_fields = fields
