@@ -765,5 +765,19 @@
   "tabDashboard": "Dashboard",
   "tabCategories": "Categories",
   "tabAvailability": "Dates",
-  "tabReports": "Reports"
+  "tabReports": "Reports",
+  "staffAccounts": "Staff accounts",
+  "addStaff": "New staff account",
+  "editStaff": "Edit staff account",
+  "fullName": "Full name",
+  "deactivateStaffTitle": "Deactivate this staff account?",
+  "deactivateStaffBody": "The staff member will no longer be able to log in.",
+  "deactivateFailed": "Deactivate failed",
+  "validationEmailPassword": "Enter a valid email and a password of at least 6 characters.",
+  "auditLog": "Audit log",
+  "auditLogSubtitle": "Append-only trail of platform actions.",
+  "actor": "Actor",
+  "systemActor": "System",
+  "tabStaff": "Staff",
+  "tabAudit": "Audit"
 }

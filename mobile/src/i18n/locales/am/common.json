@@ -765,5 +765,19 @@
   "tabDashboard": "ዳሽቦርድ",
   "tabCategories": "ምድቦች",
   "tabAvailability": "ቀኖች",
-  "tabReports": "ሪፖርቶች"
+  "tabReports": "ሪፖርቶች",
+  "staffAccounts": "የሰራተኛ መዝገቦች",
+  "addStaff": "አዲስ የሰራተኛ መዝገብ",
+  "editStaff": "የሰራተኛ መዝገብ አስተካክል",
+  "fullName": "ሙሉ ስም",
+  "deactivateStaffTitle": "ይህን የሰራተኛ መዝገብ ያቦዝኑ?",
+  "deactivateStaffBody": "ሰራተኛው ከእንግዲህ መግባት አይችልም።",
+  "deactivateFailed": "ማቦዘን አልተሳካም",
+  "validationEmailPassword": "ትክክለኛ ኢሜይል እና ቢያንስ ባለ 6 ፊደል የይለፍ ቃል ያስገቡ።",
+  "auditLog": "የኦዲት መዝገብ",
+  "auditLogSubtitle": "የመድረክ እርምጃዎች መዝገብ።",
+  "actor": "ተግባሪ",
+  "systemActor": "ስርዓት",
+  "tabStaff": "ሰራተኞች",
+  "tabAudit": "ኦዲት"
 }
