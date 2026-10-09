@@ -286,6 +286,7 @@ SIMPLE_JWT = {
 # --------------------------------------------------------------------------
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"])
+CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=False)
 
 # Required for the refresh-token cookie (apps.accounts.cookies) to make it
 # across the web (:3000) <-> api (:8000) origin boundary: without this,
@@ -294,6 +295,20 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localho
 # above already limits *which* origin that applies to (never combined with
 # a "*" origin -- browsers reject credentialed requests against a wildcard).
 CORS_ALLOW_CREDENTIALS = True
+
+# Mobile (ADR-013) sends X-Client-Platform: expo so the backend returns the
+# refresh token in the body instead of a cookie. Browsers block any custom
+# request header not listed here, so this must include x-client-platform or
+# every mobile request fails CORS preflight.
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-client-platform",
+]
 
 # --------------------------------------------------------------------------
 # Redis -- three logical DB indices, Design Spec Sec 6.2. Kept as separate
