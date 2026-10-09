@@ -1,10 +1,8 @@
-import axios, { AxiosError, AxiosInstance } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { API_BASE_URL } from '@/constants/config';
+import { ApiError, normalizeError } from './errors';
+import { getAccessToken, refreshAccessToken } from '@/auth/session';
 
-/**
- * Base axios instance. Phase 2 adds auth interceptors (Bearer token,
- * refresh-on-401). Phase 1 has no tokens yet.
- */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 20_000,
@@ -14,33 +12,38 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
-export interface ApiErrorPayload {
-  errors?: Record<string, string[]>;
-  message?: string;
-}
-
-export class ApiError extends Error {
-  code: string;
-  fieldErrors: Record<string, string[]>;
-
-  constructor(payload: ApiErrorPayload, fallback = 'Request failed') {
-    super(payload.message ?? fallback);
-    this.code = 'API_ERROR';
-    this.fieldErrors = payload.errors ?? {};
+// Attach the access token to every request
+apiClient.interceptors.request.use(async (config) => {
+  const token = await getAccessToken();
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
   }
-}
+  return config;
+});
 
-export function isApiError(error: unknown): error is ApiError {
-  return error instanceof ApiError;
-}
+// On 401, try a single silent refresh, retry the original request once
+let inFlightRefresh: Promise<string | null> | null = null;
+apiClient.interceptors.response.use(
+  (r) => r,
+  async (error) => {
+    const original = error.config;
+    if (
+      error.response?.status === 401 &&
+      !original._retried &&
+      !original.url?.includes('/auth/refresh/')
+    ) {
+      original._retried = true;
+      inFlightRefresh = inFlightRefresh ?? refreshAccessToken();
+      const newToken = await inFlightRefresh;
+      inFlightRefresh = null;
+      if (newToken) {
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient(original);
+      }
+    }
+    return Promise.reject(normalizeError(error));
+  }
+);
 
-export function normalizeError(error: unknown): ApiError {
-  if (error instanceof ApiError) return error;
-  if (error instanceof AxiosError) {
-    return new ApiError(error.response?.data ?? {}, error.message);
-  }
-  if (error instanceof Error) {
-    return new ApiError({ message: error.message });
-  }
-  return new ApiError({});
-}
+export { ApiError, isApiError } from './errors';
