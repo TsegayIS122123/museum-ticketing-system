@@ -1,17 +1,23 @@
 import { ReactNode } from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
-import { colors, spacing } from '@/theme';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { colors, radius, spacing } from '@/theme';
 
-export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+interface CardProps {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  padding?: boolean;
+}
+
+export function Card({ children, style, padding = true }: CardProps) {
+  return <View style={[styles.card, padding && styles.padded, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  padded: { padding: spacing.lg },
 });
