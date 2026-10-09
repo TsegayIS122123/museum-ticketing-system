@@ -683,5 +683,18 @@
   "paymentMissingUrlBody": "የክፍያ አድራሻ አልተሰጠም። እባክዎ ቦኪንጉን እንደገና ይጀምሩ።",
   "paymentMissingContext": "የክፍያ መረጃ ጠፍቷል። እባክዎ እንደገና ይጀምሩ።",
   "retryCheck": "እንደገና ያረጋግጡ",
-  "reopenCheckout": "ክፍያ እንደገና ይክፈቱ"
+  "reopenCheckout": "ክፍያ እንደገና ይክፈቱ",
+  "noBookingsTitle": "እስካሁን ቦኪንግ የለም",
+  "noBookingsBody": "የመጀመሪያ ጉብኝትዎን ይያዙ።",
+  "bookNow": "አሁን ያዝዙ",
+  "cancelBookingTitle": "ይህን ቦኪንግ ይሰርዙ?",
+  "cancelBookingBody": "ሙሉ ተመላሽ በራስ-ሰር ይሰጣል። ተግባሩን መመለስ አይችሉም።",
+  "cancelConfirm": "ቦኪንግ ሰርዝ",
+  "cancelFailed": "ስረዛ አልተሳካም",
+  "rescheduleTitle": "ቦኪንግ እንደገና ያስይዙ",
+  "rescheduleBody": "አንድ ጊዜ ብቻ ማስያዝ ይችላሉ።",
+  "rescheduleFailed": "ማስያዝ አልተሳካም",
+  "rescheduleBooking": "እንደገና ያስይዙ",
+  "cancelBooking": "ቦኪንግ ሰርዝ",
+  "tabTicketsTitle": "የእኔ ቲኬቶች"
 }

@@ -683,5 +683,18 @@
   "paymentMissingUrlBody": "No checkout URL was provided. Please start the booking again.",
   "paymentMissingContext": "Payment information missing. Please start over.",
   "retryCheck": "Retry check",
-  "reopenCheckout": "Reopen checkout"
+  "reopenCheckout": "Reopen checkout",
+  "noBookingsTitle": "No bookings yet",
+  "noBookingsBody": "Book your first visit to the museum.",
+  "bookNow": "Book now",
+  "cancelBookingTitle": "Cancel this booking?",
+  "cancelBookingBody": "A full refund will be issued automatically. You cannot undo this.",
+  "cancelConfirm": "Cancel booking",
+  "cancelFailed": "Cancellation failed",
+  "rescheduleTitle": "Reschedule booking",
+  "rescheduleBody": "You can reschedule a booking only once.",
+  "rescheduleFailed": "Reschedule failed",
+  "rescheduleBooking": "Reschedule",
+  "cancelBooking": "Cancel booking",
+  "tabTicketsTitle": "My Tickets"
 }

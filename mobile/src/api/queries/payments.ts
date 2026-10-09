@@ -2,13 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiClient } from '@/api/client';
 
-const bookingItemSchema = z.object({
-  id: z.string().optional(),
-  category_id: z.string().optional(),
-  quantity: z.number().optional(),
-  unit_price_etb: z.string().optional(),
-  subtotal_etb: z.string().optional(),
-});
+const bookingItemSchema = z
+  .object({
+    id: z.string().optional(),
+    categoryId: z.string().optional(),
+    categoryNameEn: z.string().optional(),
+    categoryNameAm: z.string().optional(),
+    quantity: z.number().optional(),
+    unitPriceEtb: z.string().optional(),
+    subtotalEtb: z.string().optional(),
+  })
+  .passthrough(); // tolerate additional fields without failing
 
 const bookingSchema = z.object({
   id: z.string().uuid(),
