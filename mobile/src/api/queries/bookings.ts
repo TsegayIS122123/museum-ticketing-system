@@ -120,7 +120,12 @@ export async function fetchMyBookings(): Promise<MyBooking[]> {
 export function useMyBookings() {
   return useQuery({
     queryKey: ['my-bookings'],
-    queryFn: fetchMyBookings,
+    queryFn: async () => {
+      const bookings = await fetchMyBookings();
+      // Best-effort cache; never block the UI
+      mirrorMyBookingsToCache(bookings).catch(() => {});
+      return bookings;
+    },
     staleTime: 30_000,
   });
 }
@@ -164,5 +169,53 @@ export function useRescheduleBooking() {
       qc.invalidateQueries({ queryKey: ['my-bookings'] });
       qc.invalidateQueries({ queryKey: ['booking', id] });
     },
+  });
+}
+
+// ---------- offline cache mirroring ----------
+
+/**
+ * Called after every successful read of the visitor's own bookings.
+ * Only `pending` bookings are cached (see database/tickets.ts).
+ */
+export async function mirrorMyBookingsToCache(bookings: MyBooking[]): Promise<void> {
+  const { cacheTicket, purgeExpiredTickets } = await import('@/database/tickets');
+  await purgeExpiredTickets();
+  for (const b of bookings) {
+    const firstItem = b.items?.[0];
+    await cacheTicket({
+      reference: b.reference,
+      bookingId: b.id,
+      status: b.status,
+      visitDate: b.visit_date,
+      categoryNameEn: b.category_name_en ?? firstItem?.categoryNameEn ?? null,
+      categoryNameAm: b.category_name_am ?? firstItem?.categoryNameAm ?? null,
+      quantity: b.booked_quantity ?? firstItem?.quantity ?? null,
+      totalEtb: b.total_amount_etb,
+      payload: b,
+    });
+  }
+}
+
+export async function mirrorSingleBookingToCache(booking: {
+  id: string;
+  reference: string;
+  status: string;
+  visit_date: string;
+  total_amount_etb: string;
+  items?: Array<{ categoryNameEn?: string; categoryNameAm?: string; quantity?: number }>;
+}): Promise<void> {
+  const { cacheTicket } = await import('@/database/tickets');
+  const firstItem = booking.items?.[0];
+  await cacheTicket({
+    reference: booking.reference,
+    bookingId: booking.id,
+    status: booking.status,
+    visitDate: booking.visit_date,
+    categoryNameEn: firstItem?.categoryNameEn ?? null,
+    categoryNameAm: firstItem?.categoryNameAm ?? null,
+    quantity: firstItem?.quantity ?? null,
+    totalEtb: booking.total_amount_etb,
+    payload: booking,
   });
 }

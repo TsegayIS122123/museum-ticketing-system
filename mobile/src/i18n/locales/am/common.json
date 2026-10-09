@@ -696,5 +696,8 @@
   "rescheduleFailed": "ማስያዝ አልተሳካም",
   "rescheduleBooking": "እንደገና ያስይዙ",
   "cancelBooking": "ቦኪንግ ሰርዝ",
-  "tabTicketsTitle": "የእኔ ቲኬቶች"
+  "tabTicketsTitle": "የእኔ ቲኬቶች",
+  "offlineBanner": "ከመስመር ውጭ ነዎት — የተቀመጡ ቲኬቶች ብቻ ይታያሉ።",
+  "offlineTicketNote": "የተቀመጠ ቲኬት — ለማስተካከል ወደ መስመር ይመለሱ።",
+  "bookingNotFoundOffline": "ይህ ቲኬት ከመስመር ውጭ አይገኝም።"
 }

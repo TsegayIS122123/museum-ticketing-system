@@ -696,5 +696,8 @@
   "rescheduleFailed": "Reschedule failed",
   "rescheduleBooking": "Reschedule",
   "cancelBooking": "Cancel booking",
-  "tabTicketsTitle": "My Tickets"
+  "tabTicketsTitle": "My Tickets",
+  "offlineBanner": "You are offline — showing cached tickets only.",
+  "offlineTicketNote": "Showing cached ticket — connect to make changes.",
+  "bookingNotFoundOffline": "This ticket is not available offline."
 }
