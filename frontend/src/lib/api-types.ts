@@ -2782,7 +2782,10 @@ export interface operations {
     createBooking: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Caller platform. `expo` returns the refresh token in the response body (auth responses) and accepts it in the request body (refresh); `web` (default) uses the httpOnly refresh cookie. */
+                "X-Client-Platform"?: "expo" | "web";
+            };
             path?: never;
             cookie?: never;
         };
@@ -2828,7 +2831,10 @@ export interface operations {
     updateBooking: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Caller platform. `expo` returns the refresh token in the response body (auth responses) and accepts it in the request body (refresh); `web` (default) uses the httpOnly refresh cookie. */
+                "X-Client-Platform"?: "expo" | "web";
+            };
             path: {
                 id: string;
             };

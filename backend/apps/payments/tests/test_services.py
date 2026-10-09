@@ -132,7 +132,7 @@ def test_create_checkout_session_charges_explicit_amount_not_the_booking_total(m
 
     assert payment.amount_etb == Decimal("30.00")
     mock_init.assert_called_once_with(
-        tx_ref=mock.ANY, booking=booking, amount=Decimal("30.00")
+        tx_ref=mock.ANY, booking=booking, amount=Decimal("30.00"), client_platform="web"
     )
 
 
@@ -144,7 +144,7 @@ def test_create_checkout_session_defaults_amount_to_booking_total(mock_init):
 
     assert payment.amount_etb == booking.total_amount_etb
     mock_init.assert_called_once_with(
-        tx_ref=mock.ANY, booking=booking, amount=booking.total_amount_etb
+        tx_ref=mock.ANY, booking=booking, amount=booking.total_amount_etb, client_platform="web"
     )
 
 
