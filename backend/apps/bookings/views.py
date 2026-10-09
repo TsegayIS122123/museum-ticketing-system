@@ -15,6 +15,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.views import X_CLIENT_PLATFORM_PARAM
 from apps.core.pagination import EnvelopeLimitOffsetPagination
 from apps.core.permissions import (
     IsMuseumManager,
@@ -46,6 +47,16 @@ def _parse_required_date(request, param):
         return _date.fromisoformat(raw)
     except ValueError:
         raise ValidationError({param: "Must be an ISO-8601 date (YYYY-MM-DD)."})
+
+
+def _client_platform(request):
+    """Native clients advertise themselves with `X-Client-Platform: expo`
+    (ADR-013) so server-side behaviour matches the calling platform --
+    e.g. the Chapa `return_url` becomes a deep link back into the app
+    instead of a web page (see `apps.payments.services
+    .create_checkout_session`). Defaults to `web` for anything that omits
+    the header."""
+    return request.headers.get("X-Client-Platform", "web")
 
 
 class AvailabilityListView(APIView):
@@ -172,7 +183,10 @@ class BookingListCreateView(generics.GenericAPIView):
         return self.get_paginated_response(BookingSerializer(page, many=True).data)
 
     @extend_schema(
-        operation_id="createBooking", request=BookingCreateSerializer, responses=BookingSerializer
+        operation_id="createBooking",
+        request=BookingCreateSerializer,
+        responses=BookingSerializer,
+        parameters=[X_CLIENT_PLATFORM_PARAM],
     )
     def post(self, request):
         serializer = BookingCreateSerializer(data=request.data)
@@ -188,7 +202,7 @@ class BookingListCreateView(generics.GenericAPIView):
         # itself.
         from apps.payments.services import create_checkout_session
 
-        create_checkout_session(booking=booking)
+        create_checkout_session(booking=booking, client_platform=_client_platform(request))
         return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 
@@ -232,7 +246,10 @@ class BookingDetailView(generics.RetrieveAPIView):
         return booking
 
     @extend_schema(
-        operation_id="updateBooking", request=BookingUpdateSerializer, responses=BookingSerializer
+        operation_id="updateBooking",
+        request=BookingUpdateSerializer,
+        responses=BookingSerializer,
+        parameters=[X_CLIENT_PLATFORM_PARAM],
     )
     def patch(self, request, *args, **kwargs):
         # Fetched directly, not via self.get_object() -- that method's
@@ -263,7 +280,7 @@ class BookingDetailView(generics.RetrieveAPIView):
         from apps.payments.services import create_checkout_session, invalidate_open_checkout_sessions
 
         invalidate_open_checkout_sessions(booking=booking)
-        create_checkout_session(booking=booking)
+        create_checkout_session(booking=booking, client_platform=_client_platform(request))
 
         return Response(BookingSerializer(booking).data)
 
@@ -413,7 +430,9 @@ class BookingCategoryCorrectionView(APIView):
         if delta > 0:
             from apps.payments.services import create_checkout_session
 
-            create_checkout_session(booking=booking, amount=delta)
+            create_checkout_session(
+                booking=booking, amount=delta, client_platform=_client_platform(request)
+            )
         elif delta < 0:
             from apps.refunds.services import trigger_category_correction_refund
 
@@ -461,7 +480,9 @@ class BookingCategoryCorrectionBatchView(APIView):
         if delta > 0:
             from apps.payments.services import create_checkout_session
 
-            create_checkout_session(booking=booking, amount=delta)
+            create_checkout_session(
+                booking=booking, amount=delta, client_platform=_client_platform(request)
+            )
         elif delta < 0:
             from apps.refunds.services import trigger_category_correction_refund
 
@@ -502,7 +523,9 @@ class BookingItemAddView(APIView):
         # only ever imported here, at the view layer.
         from apps.payments.services import create_checkout_session
 
-        create_checkout_session(booking=booking, amount=new_item.subtotal_etb)
+        create_checkout_session(
+            booking=booking, amount=new_item.subtotal_etb, client_platform=_client_platform(request)
+        )
 
         return Response(BookingSerializer(booking).data)
 

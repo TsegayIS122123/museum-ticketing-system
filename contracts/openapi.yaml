@@ -593,6 +593,18 @@ paths:
       description: |-
         GET /bookings (Staff only) and POST /bookings (Visitor only,
         FR-BOOK-001/FR-BOOK-003).
+      parameters:
+      - in: header
+        name: X-Client-Platform
+        schema:
+          type: string
+          enum:
+          - expo
+          - web
+          default: web
+        description: Caller platform. `expo` returns the refresh token in the response
+          body (auth responses) and accepts it in the request body (refresh); `web`
+          (default) uses the httpOnly refresh cookie.
       tags:
       - v1
       requestBody:
@@ -658,6 +670,17 @@ paths:
         the GET above rather than a separate endpoint, since it's the same
         `Booking` -- just a different HTTP method and a narrower audience.
       parameters:
+      - in: header
+        name: X-Client-Platform
+        schema:
+          type: string
+          enum:
+          - expo
+          - web
+          default: web
+        description: Caller platform. `expo` returns the refresh token in the response
+          body (auth responses) and accepts it in the request body (refresh); `web`
+          (default) uses the httpOnly refresh cookie.
       - in: path
         name: id
         schema:

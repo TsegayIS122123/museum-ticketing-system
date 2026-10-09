@@ -146,7 +146,7 @@ def _build_chapa_description(booking):
     return truncated.strip()
 
 
-def _initialize_chapa_checkout(*, tx_ref, booking, amount):
+def _initialize_chapa_checkout(*, tx_ref, booking, amount, client_platform="web"):
     """The one function that actually talks to Chapa -- isolated so
     services-level tests can monkeypatch this instead of the network
     (mirrors how `apps.notifications.tasks.send_notification` is mocked
@@ -162,6 +162,19 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
     that instead would double-bill the portion the visitor already
     paid."""
     first_name, last_name = _split_name(booking.visitor.full_name)
+
+    # Where Chapa sends the visitor's browser back after payment. A native
+    # client can't be a web URL -- there is no browser page to land on --
+    # so an `X-Client-Platform: expo` caller opts into a deep link back
+    # into the app (ADR-013). Everything else (web, and any client that
+    # omits the header) keeps the existing web redirect. Confirmation is
+    # webhook-driven either way (FR-PAY-002); this URL only resumes the
+    # call flow, nothing is trusted from it.
+    if client_platform == "expo":
+        return_url = f"{settings.PUBLIC_APP_SCHEME}://bookings/{booking.id}"
+    else:
+        return_url = f"{settings.PUBLIC_WEB_BASE_URL.rstrip('/')}/bookings/{booking.id}"
+
     payload = {
         "amount": str(amount),
         "currency": "ETB",
@@ -173,7 +186,7 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
         "callback_url": (
             f"{settings.PUBLIC_API_BASE_URL.rstrip('/')}/api/v1/payments/webhooks/chapa/"
         ),
-        "return_url": f"{settings.PUBLIC_WEB_BASE_URL.rstrip('/')}/bookings/{booking.id}",
+        "return_url": return_url,
         "customization": {
             "title": "Museum Ticket",
             "description": _build_chapa_description(booking),
@@ -216,7 +229,7 @@ def _initialize_chapa_checkout(*, tx_ref, booking, amount):
 
 
 @transaction.atomic
-def create_checkout_session(*, booking, amount=None):
+def create_checkout_session(*, booking, amount=None, client_platform="web"):
     """Implements FR-PAY-001 and Document 04's "response includes a
     checkout URL" on `POST /bookings` (individual or group alike).
 
@@ -260,7 +273,9 @@ def create_checkout_session(*, booking, amount=None):
         return existing
 
     tx_ref = _generate_tx_ref(booking)
-    checkout_url = _initialize_chapa_checkout(tx_ref=tx_ref, booking=booking, amount=amount)
+    checkout_url = _initialize_chapa_checkout(
+        tx_ref=tx_ref, booking=booking, amount=amount, client_platform=client_platform
+    )
 
     payment = Payment.objects.create(
         booking=booking,

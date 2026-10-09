@@ -412,6 +412,12 @@ FINANCE_BANK_CODE = env("FINANCE_BANK_CODE")
 # overrides both with its actual public hostnames.
 PUBLIC_API_BASE_URL = env("PUBLIC_API_BASE_URL", default="http://localhost:8000")
 PUBLIC_WEB_BASE_URL = env("PUBLIC_WEB_BASE_URL", default="http://localhost:3000")
+# Mobile deep link -- the Expo app registers `znhm` as its scheme
+# (mobile/app.json) and resumes on `znhm://bookings/{id}` after Chapa's
+# hosted checkout. Web clients never use this; see
+# apps.payments.services.create_checkout_session's `client_platform`
+# handling (ADR-013 / X-Client-Platform).
+PUBLIC_APP_SCHEME = env("PUBLIC_APP_SCHEME", default="znhm")
 
 # --------------------------------------------------------------------------
 # SMS / Email gateways -- SMS is primary for Visitor OTP (FR-ACC-001) and
