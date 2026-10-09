@@ -15,19 +15,25 @@ interface BookingResultProps {
   booking: GateBooking;
   onDone: (attended: number) => void;
   onBack: () => void;
+  onRecordVoucher: () => void; // ← add this
 }
 
-export function BookingResult({ booking, onDone, onBack }: BookingResultProps) {
+export function BookingResult({
+  booking,
+  onDone,
+  onBack,
+  onRecordVoucher,
+}: BookingResultProps) {
   const { t, i18n } = useTranslation();
-  const isAm = i18n.language === 'am';
+  const isAm = i18n.language === "am";
 
   const alreadyCheckedIn =
-    booking.status === 'visited' || booking.checked_in_at != null;
+    booking.status === "visited" || booking.checked_in_at != null;
 
   const notCheckable =
-    booking.status === 'awaiting_payment' ||
-    booking.status === 'cancelled' ||
-    booking.status === 'refunded';
+    booking.status === "awaiting_payment" ||
+    booking.status === "cancelled" ||
+    booking.status === "refunded";
 
   return (
     <Screen>
@@ -38,15 +44,20 @@ export function BookingResult({ booking, onDone, onBack }: BookingResultProps) {
         </View>
 
         <Card>
-          <Row label={t('visitDate', 'Visit date')} value={formatDateOnly(booking.visit_date, 'EEEE, d MMM yyyy')} />
+          <Row
+            label={t("visitDate", "Visit date")}
+            value={formatDateOnly(booking.visit_date, "EEEE, d MMM yyyy")}
+          />
           {booking.group_name ? (
-            <Row label={t('groupName', 'Group')} value={booking.group_name} />
+            <Row label={t("groupName", "Group")} value={booking.group_name} />
           ) : null}
           {booking.items?.length
             ? booking.items.map((it, i) => (
                 <Row
                   key={i}
-                  label={isAm ? it.categoryNameAm ?? '' : it.categoryNameEn ?? ''}
+                  label={
+                    isAm ? (it.categoryNameAm ?? "") : (it.categoryNameEn ?? "")
+                  }
                   value={String(it.quantity ?? 1)}
                 />
               ))
@@ -56,24 +67,32 @@ export function BookingResult({ booking, onDone, onBack }: BookingResultProps) {
         {alreadyCheckedIn ? (
           <Card style={styles.okCard}>
             <Text style={styles.okText}>
-              {t('alreadyCheckedIn', 'This booking is already checked in.')}
+              {t("alreadyCheckedIn", "This booking is already checked in.")}
             </Text>
+            <Button
+              label={t("recordIfmisVoucher", "Record IFMIS voucher")}
+              onPress={() => onRecordVoucher()}
+            />
           </Card>
         ) : notCheckable ? (
           <Card style={styles.warnCard}>
             <Text style={styles.warnText}>
-              {booking.status === 'awaiting_payment'
-                ? t('notPaid', 'This booking has not been paid for.')
-                : booking.status === 'cancelled'
-                ? t('cancelledRefused', 'This booking has been cancelled.')
-                : t('refundedRefused', 'This booking has been refunded.')}
+              {booking.status === "awaiting_payment"
+                ? t("notPaid", "This booking has not been paid for.")
+                : booking.status === "cancelled"
+                  ? t("cancelledRefused", "This booking has been cancelled.")
+                  : t("refundedRefused", "This booking has been refunded.")}
             </Text>
           </Card>
         ) : (
           <CheckInForm booking={booking} onSuccess={onDone} />
         )}
 
-        <Button label={t('back', 'Back')} variant="secondary" onPress={onBack} />
+        <Button
+          label={t("back", "Back")}
+          variant="secondary"
+          onPress={onBack}
+        />
       </ScrollView>
     </Screen>
   );

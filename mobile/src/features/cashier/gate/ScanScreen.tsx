@@ -78,15 +78,18 @@ const handleDone = async (attended?: number) => {
     router.back();
   };
 
-if (state.kind === 'found') {
-  return (
-    <BookingResult
-      booking={state.booking}
-      onDone={(attended) => handleDone(attended)}
-      onBack={handleBack}
-    />
-  );
-}
+  if (state.kind === "found") {
+    return (
+      <BookingResult
+        booking={state.booking}
+        onDone={(attended) => handleDone(attended)}
+        onBack={handleBack}
+        onRecordVoucher={() =>
+          router.push(`/(cashier)/vouchers/${state.booking.id}` as any)
+        }
+      />
+    );
+  }
 
   return (
     <Screen>
