@@ -18,34 +18,45 @@ export function CashierHome() {
     <Screen>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Card>
-          <Text style={styles.title}>{t('cashierHomeTitle', 'Cashier console')}</Text>
+          <Text style={styles.title}>
+            {t("cashierHomeTitle", "Cashier console")}
+          </Text>
           <Text style={styles.subtitle}>
-            {t('cashierWelcome', 'Welcome')}, {user?.full_name ?? user?.email}
+            {t("cashierWelcome", "Welcome")}, {user?.full_name ?? user?.email}
           </Text>
         </Card>
 
         <View style={styles.actions}>
           <Button
-            label={t('openGateScanner', 'Open gate scanner')}
-            onPress={() => router.push('/(cashier)/scan' as any)}
+            label={t("openGateScanner", "Open gate scanner")}
+            onPress={() => router.push("/(cashier)/scan" as any)}
           />
           <Button
-            label={t('manualLookup', 'Enter reference manually')}
+            label={t("manualLookup", "Enter reference manually")}
             variant="secondary"
-            onPress={() => router.push('/(cashier)/scan?mode=manual' as any)}
+            onPress={() => router.push("/(cashier)/scan?mode=manual" as any)}
+          />
+          <Button
+            label={t("openSettlement", "Settlement")}
+            variant="secondary"
+            onPress={() => router.push("/(cashier)/settlement" as any)}
           />
         </View>
 
         <Card>
           <Text style={styles.hint}>
             {t(
-              'cashierHint',
-              'Scan a visitor QR code or type an 8-character reference to record attendance.'
+              "cashierHint",
+              "Scan a visitor QR code or type an 8-character reference to record attendance.",
             )}
           </Text>
         </Card>
 
-        <Button label={t('signOut', 'Sign out')} variant="secondary" onPress={signOut} />
+        <Button
+          label={t("signOut", "Sign out")}
+          variant="secondary"
+          onPress={signOut}
+        />
       </ScrollView>
     </Screen>
   );
