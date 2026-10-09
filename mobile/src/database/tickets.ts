@@ -124,7 +124,7 @@ export async function listCachedTickets(): Promise<CachedTicket[]> {
   const rows = await db.getAllAsync<any>(
     `SELECT * FROM ${CACHE_TABLE} ORDER BY visit_date ASC`
   );
-  return rows.map((row) => ({
+  return rows.map((row: any) => ({
     reference: row.reference,
     bookingId: row.booking_id,
     status: row.status,

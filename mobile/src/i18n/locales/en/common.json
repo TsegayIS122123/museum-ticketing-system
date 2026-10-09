@@ -725,5 +725,11 @@
   "cancelledRefused": "This booking has been cancelled.",
   "refundedRefused": "This booking has been refunded.",
   "overAttended": "Too many attendees",
-  "overAttendedBody": "Extra visitors must book separately."
+  "overAttendedBody": "Extra visitors must book separately.",
+  "syncing": "Syncing {{n}} offline check-ins…",
+  "pendingSync": "{{n}} check-in(s) waiting to sync",
+  "syncNow": "Sync now",
+  "offlineCheckInQueued": "Check-in queued (offline).",
+  "offlineCheckInNote": "You are offline — this check-in will be queued and synced when you reconnect.",
+  "queueCheckIn": "Queue check-in"
 }

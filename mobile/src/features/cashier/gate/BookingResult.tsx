@@ -13,7 +13,7 @@ import type { GateBooking } from '@/api/queries/gate';
 
 interface BookingResultProps {
   booking: GateBooking;
-  onDone: () => void;
+  onDone: (attended: number) => void;
   onBack: () => void;
 }
 

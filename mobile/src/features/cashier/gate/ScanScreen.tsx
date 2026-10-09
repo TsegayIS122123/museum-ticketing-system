@@ -12,6 +12,9 @@ import { LookupField } from './LookupField';
 import { BookingResult } from './BookingResult';
 import { useGateLookup } from './useGateLookup';
 import { BOOKING_REFERENCE_REGEX } from '@/constants/config';
+import { findByReference } from '@/database/offline-bookings';
+import { useEnqueueCheckIn, useProcessSyncQueue } from '@/features/cashier/offline/useOfflineSync';
+import { useOffline } from '@/features/shared/useOffline';
 
 type Mode = 'camera' | 'manual';
 
@@ -51,20 +54,39 @@ export function ScanScreen() {
     [scanLock, lookup]
   );
 
-  const handleDone = () => {
-    reset();
-    // After successful check-in, return to home
-    router.replace('/(cashier)' as any);
-  };
+const enqueueCheckIn = useEnqueueCheckIn();
+const { process: processQueue } = useProcessSyncQueue();
+const offline = useOffline();
+
+const handleDone = async (attended?: number) => {
+  reset();
+  if (offline && state.kind === "found" && attended !== undefined) {
+    await enqueueCheckIn({
+      bookingId: state.booking.id,
+      reference: state.booking.reference,
+      attendedQuantity: attended,
+    });
+  } else {
+    // Trigger a background sync attempt
+    processQueue().catch(() => {});
+  }
+  router.replace("/(cashier)" as any);
+};
 
   const handleBack = () => {
     reset();
     router.back();
   };
 
-  if (state.kind === 'found') {
-    return <BookingResult booking={state.booking} onDone={handleDone} onBack={handleBack} />;
-  }
+if (state.kind === 'found') {
+  return (
+    <BookingResult
+      booking={state.booking}
+      onDone={(attended) => handleDone(attended)}
+      onBack={handleBack}
+    />
+  );
+}
 
   return (
     <Screen>

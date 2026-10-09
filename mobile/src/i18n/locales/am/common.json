@@ -725,5 +725,11 @@
   "cancelledRefused": "ይህ ቦኪንግ ተሰርዟል።",
   "refundedRefused": "ይህ ቦኪንግ ተመልሷል።",
   "overAttended": "በጣም ብዙ ተገኝተዋል",
-  "overAttendedBody": "ተጨማሪ ጎብኚዎች ለየብቻ መያዝ አለባቸው።"
+  "overAttendedBody": "ተጨማሪ ጎብኚዎች ለየብቻ መያዝ አለባቸው።",
+  "syncing": "{{n}} ከመስመር ውጭ የተመዘገቡ በማመሳሰል ላይ…",
+  "pendingSync": "{{n}} ለማመሳሰል በመጠባበቅ ላይ",
+  "syncNow": "አሁን አመሳስል",
+  "offlineCheckInQueued": "ከመስመር ውጭ ተመዝግቧል።",
+  "offlineCheckInNote": "ከመስመር ውጭ ነዎት — ይህ መመዝገብ በሚቀጥለው ግንኙነት ይመሳሰላል።",
+  "queueCheckIn": "ወረፋ መመዝገብ"
 }

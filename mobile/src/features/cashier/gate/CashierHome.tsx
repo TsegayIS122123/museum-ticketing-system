@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { colors, spacing, typography } from '@/theme';
 import { useAuth } from '@/auth/useAuth';
+import { SyncBanner } from "@/features/cashier/offline/SyncBanner";
 
 export function CashierHome() {
   const { t } = useTranslation();
