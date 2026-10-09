@@ -1,0 +1,16 @@
+export const colors = {
+  brandPrimary: '#015484',
+  brandPrimaryDark: '#014268',
+  brandPrimaryLight: '#DFEFF8',
+  background: '#F7F5F0',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F1EFEA',
+  text: '#1C1917',
+  textMuted: '#6B7280',
+  textInverse: '#FFFFFF',
+  border: '#E8E4DE',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#DC2626',
+  focus: '#015484',
+} as const;
