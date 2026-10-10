@@ -37,17 +37,17 @@ export function ManagerDashboard() {
     );
   }
 
-  const revenue = typeof data.revenue_total_etb === 'string'
-    ? parseFloat(data.revenue_total_etb)
-    : data.revenue_total_etb;
+  const revenue = typeof data.revenueTotalEtb === 'string'
+    ? parseFloat(data.revenueTotalEtb)
+    : data.revenueTotalEtb;
 
-  const totalVisitors = Object.values(data.visitor_counts_by_category ?? {}).reduce(
+  const totalVisitors = Object.values(data.visitorCountsByCategory ?? {}).reduce(
     (a, b) => a + b,
     0
   );
-  const groupCount = data.group_vs_individual_split?.group ?? 0;
-  const individualCount = data.group_vs_individual_split?.individual ?? 0;
-  const pending = data.status_mix?.pending ?? 0;
+  const groupCount = data.groupVsIndividualSplit?.group ?? 0;
+  const individualCount = data.groupVsIndividualSplit?.individual ?? 0;
+  const pending = data.statusMix?.pending ?? 0;
 
   return (
     <Screen>

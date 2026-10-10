@@ -33,20 +33,20 @@ export function BookingWizard() {
   const handleConfirm = async () => {
     try {
       const booking = await create.mutateAsync({
-        visit_date: visitDate,
-        booking_type: bookingType,
-        group_name: bookingType === 'group' ? groupName : undefined,
-        group_tin: bookingType === 'group' ? groupTin : undefined,
+        visitDate,
+        bookingType,
+        groupName: bookingType === 'group' ? groupName : undefined,
+        groupTin: bookingType === 'group' ? groupTin : undefined,
         items: lines.map((l) => ({
-          category_id: l.categoryId,
+          categoryId: l.categoryId,
           quantity: l.quantity,
         })),
       });
 
-      if (booking.checkout_url) {
+      if (booking.checkoutUrl) {
         router.replace({
           pathname: '/(visitor)/book/payment',
-          params: { bookingId: booking.id, checkoutUrl: booking.checkout_url },
+          params: { bookingId: booking.id, checkoutUrl: booking.checkoutUrl },
         });
       } else {
         router.replace(`/(visitor)/bookings/${booking.id}` as any);

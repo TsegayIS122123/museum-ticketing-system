@@ -23,14 +23,14 @@ export function VoucherForm({ bookingId, voucher, onSuccess }: VoucherFormProps)
   const { t } = useTranslation();
   const update = useUpdateVoucher();
 
-  const [documentNo, setDocumentNo] = useState(voucher.document_no ?? '');
-  const [refNo, setRefNo] = useState(voucher.ref_no ?? '');
+  const [documentNo, setDocumentNo] = useState(voucher.documentNo ?? '');
+  const [refNo, setRefNo] = useState(voucher.refNo ?? '');
 
-  const alreadyRecorded = !!voucher.document_no && !!voucher.ref_no;
+  const alreadyRecorded = voucher.voucherRecorded;
 
   useEffect(() => {
-    setDocumentNo(voucher.document_no ?? '');
-    setRefNo(voucher.ref_no ?? '');
+    setDocumentNo(voucher.documentNo ?? '');
+    setRefNo(voucher.refNo ?? '');
   }, [voucher]);
 
   const handleSubmit = async () => {
@@ -43,8 +43,8 @@ export function VoucherForm({ bookingId, voucher, onSuccess }: VoucherFormProps)
     }
     try {
       const input: VoucherUpdateInput = {
-        document_no: documentNo.trim(),
-        ref_no: refNo.trim(),
+        documentNo: documentNo.trim(),
+        refNo: refNo.trim(),
       };
       await update.mutateAsync({ bookingId, input });
       onSuccess?.();
@@ -72,24 +72,28 @@ export function VoucherForm({ bookingId, voucher, onSuccess }: VoucherFormProps)
       {/* The fields she copies into IFMIS */}
       <View style={styles.copyBlock}>
         <CopyRow
+          label={t('publicBody', 'Paying public body')}
+          value={voucher.nameOfPublicBody}
+        />
+        <CopyRow
           label={t('payer', 'Payer')}
-          value={voucher.payer_name ?? '—'}
+          value={voucher.receivedFrom ?? '—'}
+        />
+        <CopyRow
+          label={t('voucherDate', 'Date')}
+          value={voucher.date ?? '—'}
+        />
+        <CopyRow
+          label={t('amountFig', 'Amount')}
+          value={voucher.amountFigures ?? '—'}
+        />
+        <CopyRow
+          label={t('amountWords', 'Amount in words')}
+          value={voucher.amountWords ?? '—'}
         />
         <CopyRow
           label={t('purpose', 'Purpose')}
           value={voucher.purpose ?? '—'}
-        />
-        <CopyRow
-          label={t('amountFig', 'Amount')}
-          value={voucher.amount_figures ?? '—'}
-        />
-        <CopyRow
-          label={t('amountWordsEn', 'In words (EN)')}
-          value={voucher.amount_words_en ?? '—'}
-        />
-        <CopyRow
-          label={t('amountWordsAm', 'In words (AM)')}
-          value={voucher.amount_words_am ?? '—'}
         />
       </View>
 

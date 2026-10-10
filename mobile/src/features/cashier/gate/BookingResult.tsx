@@ -27,8 +27,9 @@ export function BookingResult({
   const { t, i18n } = useTranslation();
   const isAm = i18n.language === "am";
 
-  const alreadyCheckedIn =
-    booking.status === "visited" || booking.checked_in_at != null;
+  // The contract's `Booking` has no check-in timestamp -- `check_in_booking`
+  // flips the status to `visited`, so that is the only signal available.
+  const alreadyCheckedIn = booking.status === "visited";
 
   const notCheckable =
     booking.status === "awaiting_payment" ||
@@ -46,10 +47,10 @@ export function BookingResult({
         <Card>
           <Row
             label={t("visitDate", "Visit date")}
-            value={formatDateOnly(booking.visit_date, "EEEE, d MMM yyyy")}
+            value={formatDateOnly(booking.visitDate, "EEEE, d MMM yyyy")}
           />
-          {booking.group_name ? (
-            <Row label={t("groupName", "Group")} value={booking.group_name} />
+          {booking.groupName ? (
+            <Row label={t("groupName", "Group")} value={booking.groupName} />
           ) : null}
           {booking.items?.length
             ? booking.items.map((it, i) => (

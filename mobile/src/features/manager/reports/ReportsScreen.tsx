@@ -41,9 +41,9 @@ export function ReportsScreen() {
   }
 
   const revenue =
-    typeof dash.revenue_total_etb === 'string'
-      ? parseFloat(dash.revenue_total_etb)
-      : dash.revenue_total_etb;
+    typeof dash.revenueTotalEtb === 'string'
+      ? parseFloat(dash.revenueTotalEtb)
+      : dash.revenueTotalEtb;
 
   const periods: { value: Period; label: string }[] = [
     { value: 'daily', label: t('daily', 'Daily') },
@@ -75,9 +75,9 @@ export function ReportsScreen() {
           <RevenueCard
             total={revenue}
             byCategory={
-              summary?.revenue_by_category ??
+              summary?.revenueByCategory ??
               Object.fromEntries(
-                Object.entries(dash.visitor_counts_by_category ?? {}).map(([k, v]) => [
+                Object.entries(dash.visitorCountsByCategory ?? {}).map(([k, v]) => [
                   k,
                   (v ?? 0) * 100,
                 ])
@@ -86,15 +86,15 @@ export function ReportsScreen() {
           />
         </Card>
 
-        {dash.status_mix ? (
+        {dash.statusMix ? (
           <Card>
-            <StatusMixCard mix={dash.status_mix} />
+            <StatusMixCard mix={dash.statusMix} />
           </Card>
         ) : null}
 
-        {dash.visitor_counts_by_category ? (
+        {dash.visitorCountsByCategory ? (
           <Card>
-            <CategoryBreakdownCard counts={dash.visitor_counts_by_category} />
+            <CategoryBreakdownCard counts={dash.visitorCountsByCategory} />
           </Card>
         ) : null}
       </ScrollView>

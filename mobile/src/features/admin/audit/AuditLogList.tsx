@@ -52,7 +52,7 @@ export function AuditLogList() {
 
       <FlatList
         data={data}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl
@@ -66,17 +66,17 @@ export function AuditLogList() {
           <Card style={styles.card}>
             <View style={styles.rowTop}>
               <Text style={styles.action}>{item.action}</Text>
-              <Text style={styles.time}>{formatDateTime(item.created_at)}</Text>
+              <Text style={styles.time}>{formatDateTime(item.createdAt)}</Text>
             </View>
-            {item.entity_type ? (
+            {item.entityType ? (
               <Text style={styles.entity}>
-                {item.entity_type}
-                {item.entity_id ? ` · ${item.entity_id.slice(0, 8)}` : ''}
+                {item.entityType}
+                {item.entityId ? ` · ${item.entityId.slice(0, 8)}` : ''}
               </Text>
             ) : null}
-            {item.actor_user_id ? (
+            {item.actorUserId ? (
               <Text style={styles.actor}>
-                {t('actor', 'Actor')}: {item.actor_user_id.slice(0, 8)}…
+                {t('actor', 'Actor')}: {item.actorUserId.slice(0, 8)}…
               </Text>
             ) : (
               <Text style={styles.actor}>{t('systemActor', 'System')}</Text>

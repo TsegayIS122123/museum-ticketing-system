@@ -16,10 +16,12 @@ export function BalanceCard({ balance }: BalanceCardProps) {
   return (
     <Card style={styles.card}>
       <Text style={styles.label}>{t('outstandingBalance', 'Outstanding balance')}</Text>
-      <Text style={styles.amount}>{formatEtb(balance.outstanding_etb)}</Text>
-      {balance.booking_count !== undefined ? (
+      <Text style={styles.amount}>{formatEtb(balance.balanceEtb)}</Text>
+      {balance.pendingVoucherCount ? (
         <Text style={styles.sub}>
-          {t('balanceBookings', 'Across {{n}} booking(s)', { n: balance.booking_count })}
+          {t('pendingVouchers', '{{n}} voucher(s) still pending', {
+            n: balance.pendingVoucherCount,
+          })}
         </Text>
       ) : null}
     </Card>

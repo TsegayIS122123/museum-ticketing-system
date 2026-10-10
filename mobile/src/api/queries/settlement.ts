@@ -3,10 +3,12 @@ import { z } from 'zod';
 import { apiClient } from '@/api/client';
 
 // ---------- balance ----------
+// `GET /settlement/my-balance/` returns the contract's `OutstandingBalance`
+// (camelCase), not a snake_case `outstanding_etb`/`booking_count` pair.
 
 const balanceSchema = z.object({
-  outstanding_etb: z.string(),
-  booking_count: z.number().optional(),
+  balanceEtb: z.string(),
+  pendingVoucherCount: z.number().optional(),
 });
 
 export type OutstandingBalance = z.infer<typeof balanceSchema>;
@@ -28,14 +30,15 @@ export function useBalance() {
 
 const reconcileSchema = z.object({
   id: z.string().uuid(),
-  amount_etb: z.string(),
+  cashierId: z.string().uuid().optional(),
+  amountEtb: z.string(),
   status: z.enum(['pending', 'completed', 'failed']),
-  chapa_transfer_reference: z.string().nullable().optional(),
-  initiated_at: z.string().nullable().optional(),
-  completed_at: z.string().nullable().optional(),
-  failure_reason: z.string().nullable().optional(),
-  transfer_receipt_url: z.string().nullable().optional(),
-  created_at: z.string().optional(),
+  chapaTransferReference: z.string().nullable().optional(),
+  initiatedAt: z.string().nullable().optional(),
+  completedAt: z.string().nullable().optional(),
+  failureReason: z.string().nullable().optional(),
+  transferReceiptUrl: z.string().nullable().optional(),
+  createdAt: z.string().optional(),
 });
 
 export type Reconciliation = z.infer<typeof reconcileSchema>;

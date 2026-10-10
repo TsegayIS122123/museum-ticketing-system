@@ -2,14 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiClient } from '@/api/client';
 
+// `GET /admin/audit-log/` returns `AuditLogEntry` (contract, camelCase). `id`
+// is an integer row id, not a UUID.
+
 const auditEntrySchema = z.object({
-  id: z.string().uuid(),
-  actor_user_id: z.string().uuid().nullable().optional(),
+  id: z.number(),
+  actorUserId: z.string().uuid().nullable().optional(),
   action: z.string(),
-  entity_type: z.string().optional(),
-  entity_id: z.string().optional(),
+  entityType: z.string().optional(),
+  entityId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
-  created_at: z.string(),
+  createdAt: z.string(),
 });
 
 export type AuditEntry = z.infer<typeof auditEntrySchema>;

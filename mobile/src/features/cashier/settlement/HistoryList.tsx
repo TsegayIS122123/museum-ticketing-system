@@ -72,19 +72,19 @@ function HistoryRow({ r }: { r: Reconciliation }) {
   return (
     <Card style={styles.card}>
       <View style={styles.row}>
-        <Text style={styles.amount}>{formatEtb(r.amount_etb)}</Text>
+        <Text style={styles.amount}>{formatEtb(r.amountEtb)}</Text>
         <View style={[styles.badge, badge.bg]}>
           <Text style={[styles.badgeText, badge.fg]}>{badge.label}</Text>
         </View>
       </View>
-      <Text style={styles.date}>{formatDateTime(r.created_at ?? r.initiated_at ?? '')}</Text>
-      {r.chapa_transfer_reference ? (
+      <Text style={styles.date}>{formatDateTime(r.createdAt ?? r.initiatedAt ?? '')}</Text>
+      {r.chapaTransferReference ? (
         <Text style={styles.ref}>
-          {t('transferRef', 'Ref')}: {r.chapa_transfer_reference}
+          {t('transferRef', 'Ref')}: {r.chapaTransferReference}
         </Text>
       ) : null}
-      {r.failure_reason ? (
-        <Text style={styles.failure}>{r.failure_reason}</Text>
+      {r.failureReason ? (
+        <Text style={styles.failure}>{r.failureReason}</Text>
       ) : null}
     </Card>
   );

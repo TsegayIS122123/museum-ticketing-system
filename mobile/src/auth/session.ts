@@ -74,12 +74,15 @@ export async function refreshAccessToken(): Promise<string | null> {
       await clearTokens();
       return null;
     }
+    // `POST /auth/refresh/` returns `access` (+ `refresh_token` for expo
+    // clients), unlike the login/OTP bodies which use `access_token` -- see
+    // CookieTokenRefreshView in backend/apps/accounts/views.py.
     const data = await res.json();
     await setTokens({
-      accessToken: data.access_token,
+      accessToken: data.access,
       refreshToken: data.refresh_token ?? refresh,
     });
-    return data.access_token;
+    return data.access;
   } catch {
     await clearTokens();
     return null;

@@ -14,16 +14,17 @@ const bookingItemSchema = z
   })
   .passthrough(); // tolerate additional fields without failing
 
+// `GET /bookings/{id}/` returns the contract's `Booking` schema -- camelCase.
 const bookingSchema = z.object({
   id: z.string().uuid(),
   reference: z.string(),
   status: z.enum(['awaiting_payment', 'pending', 'visited', 'cancelled', 'refunded']),
-  visit_date: z.string(),
-  total_amount_etb: z.string(),
-  checkout_url: z.string().nullable().optional(),
-  receipt_url: z.string().nullable().optional(),
+  visitDate: z.string(),
+  totalAmountEtb: z.string(),
+  checkoutUrl: z.string().nullable().optional(),
+  receiptUrl: z.string().nullable().optional(),
   items: z.array(bookingItemSchema).optional(),
-  created_at: z.string().optional(),
+  createdAt: z.string().optional(),
 });
 
 export type BookingStatus = z.infer<typeof bookingSchema>['status'];

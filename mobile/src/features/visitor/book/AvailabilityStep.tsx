@@ -36,7 +36,7 @@ export function AvailabilityStep({
   const closed = useMemo(() => {
     const set = new Set<string>();
     (rows ?? []).forEach((r) => {
-      if (!r.is_open_for_booking) set.add(r.date);
+      if (!r.isOpenForBooking) set.add(r.date);
     });
     return set;
   }, [rows]);

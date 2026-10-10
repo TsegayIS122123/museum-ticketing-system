@@ -2,13 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiClient } from '@/api/client';
 
+/**
+ * `GET /reports/dashboard` (FR-REPORT-001). Field names match
+ * `DashboardSerializer` in backend/apps/reporting/serializers.py, which
+ * emits camelCase keys over a snake_case service dict (`source=` mapping).
+ */
 const dashboardSchema = z.object({
-  revenue_total_etb: z.number().or(z.string()),
-  visitor_counts_by_category: z.record(z.string(), z.number()).optional(),
-  group_vs_individual_split: z
+  revenueTotalEtb: z.number().or(z.string()),
+  visitorCountsByCategory: z.record(z.string(), z.number()).optional(),
+  groupVsIndividualSplit: z
     .object({ group: z.number(), individual: z.number() })
     .optional(),
-  status_mix: z
+  statusMix: z
     .object({
       pending: z.number(),
       visited: z.number(),
@@ -39,8 +44,9 @@ const summarySchema = z.object({
   period: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
   from: z.string(),
   to: z.string(),
-  revenue_by_category: z.record(z.string(), z.number()).optional(),
-  visitor_counts_by_group: z.record(z.string(), z.number()).optional(),
+  bookingCount: z.number().optional(),
+  revenueByCategory: z.record(z.string(), z.number()).optional(),
+  visitorCountsByGroup: z.record(z.string(), z.number()).optional(),
 });
 
 export type ReportSummary = z.infer<typeof summarySchema>;

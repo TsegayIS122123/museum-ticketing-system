@@ -113,8 +113,8 @@ export function PaymentScreen() {
     return (
       <Card>
         <Row label={t('reference', 'Reference')} value={booking.reference} mono />
-        <Row label={t('visitDate', 'Visit date')} value={formatDateOnly(booking.visit_date, 'EEEE, d MMM yyyy')} />
-        <Row label={t('total', 'Total')} value={formatEtb(booking.total_amount_etb)} bold />
+        <Row label={t('visitDate', 'Visit date')} value={formatDateOnly(booking.visitDate, 'EEEE, d MMM yyyy')} />
+        <Row label={t('total', 'Total')} value={formatEtb(booking.totalAmountEtb)} bold />
       </Card>
     );
   }, [booking, t]);

@@ -18,9 +18,11 @@ export function BookingCard({ booking }: BookingCardProps) {
   const router = useRouter();
   const isAm = i18n.language === 'am';
 
+  const firstItem = booking.items?.[0];
+
   const categoryName = isAm
-    ? booking.category_name_am ?? booking.items?.[0]?.categoryNameAm ?? ''
-    : booking.category_name_en ?? booking.items?.[0]?.categoryNameEn ?? '';
+    ? firstItem?.categoryNameAm ?? ''
+    : firstItem?.categoryNameEn ?? '';
 
   return (
     <Pressable onPress={() => router.push(`/(visitor)/bookings/${booking.id}` as any)}>
@@ -29,14 +31,14 @@ export function BookingCard({ booking }: BookingCardProps) {
           <Text style={styles.ref}>{booking.reference}</Text>
           <StatusBadge status={booking.status} />
         </View>
-        <Text style={styles.date}>{formatDateOnly(booking.visit_date, 'EEE, d MMM yyyy')}</Text>
+        <Text style={styles.date}>{formatDateOnly(booking.visitDate, 'EEE, d MMM yyyy')}</Text>
         {categoryName ? (
           <Text style={styles.category}>
             {categoryName}
-            {booking.booked_quantity ? ` × ${booking.booked_quantity}` : ''}
+            {booking.bookedQuantity ? ` × ${booking.bookedQuantity}` : ''}
           </Text>
         ) : null}
-        <Text style={styles.total}>{formatEtb(booking.total_amount_etb)}</Text>
+        <Text style={styles.total}>{formatEtb(booking.totalAmountEtb)}</Text>
       </Card>
     </Pressable>
   );

@@ -54,7 +54,7 @@ export function RescheduleModal({
   const closed = useMemo(() => {
     const s = new Set<string>();
     (rows ?? []).forEach((r) => {
-      if (!r.is_open_for_booking) s.add(r.date);
+      if (!r.isOpenForBooking) s.add(r.date);
     });
     return s;
   }, [rows]);

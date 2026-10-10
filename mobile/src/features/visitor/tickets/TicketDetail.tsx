@@ -28,8 +28,8 @@ interface ViewModel {
   id: string;
   reference: string;
   status: string;
-  visit_date: string;
-  total_amount_etb: string;
+  visitDate: string;
+  totalAmountEtb: string;
   items?: Array<{ categoryNameEn?: string; categoryNameAm?: string; quantity?: number }>;
   fromCache: boolean;
 }
@@ -80,8 +80,8 @@ export function TicketDetail() {
         id: liveBooking.id,
         reference: liveBooking.reference,
         status: liveBooking.status,
-        visit_date: liveBooking.visit_date,
-        total_amount_etb: liveBooking.total_amount_etb,
+        visitDate: liveBooking.visitDate,
+        totalAmountEtb: liveBooking.totalAmountEtb,
         items: liveBooking.items,
         fromCache: false,
       }
@@ -90,8 +90,8 @@ export function TicketDetail() {
         id: cached.bookingId,
         reference: cached.reference,
         status: cached.status,
-        visit_date: cached.visitDate,
-        total_amount_etb: cached.totalEtb ?? '0.00',
+        visitDate: cached.visitDate,
+        totalAmountEtb: cached.totalEtb ?? '0.00',
         items: cached.categoryNameEn || cached.categoryNameAm
           ? [{
               categoryNameEn: cached.categoryNameEn ?? undefined,
@@ -158,9 +158,9 @@ export function TicketDetail() {
         <Card>
           <Row
             label={t('visitDate', 'Visit date')}
-            value={formatDateOnly(vm.visit_date, 'EEEE, d MMMM yyyy')}
+            value={formatDateOnly(vm.visitDate, 'EEEE, d MMMM yyyy')}
           />
-          <Row label={t('total', 'Total')} value={formatEtb(vm.total_amount_etb)} bold />
+          <Row label={t('total', 'Total')} value={formatEtb(vm.totalAmountEtb)} bold />
           {vm.items?.length
             ? vm.items.map((it, i) => (
                 <Row
@@ -205,7 +205,7 @@ export function TicketDetail() {
       <RescheduleModal
         visible={rescheduleOpen}
         bookingId={vm.id}
-        currentVisitDate={vm.visit_date}
+        currentVisitDate={vm.visitDate}
         onClose={() => setRescheduleOpen(false)}
         onSuccess={() => refetch()}
       />

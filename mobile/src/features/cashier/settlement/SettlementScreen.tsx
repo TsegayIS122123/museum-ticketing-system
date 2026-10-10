@@ -36,7 +36,7 @@ export function SettlementScreen() {
     );
   }
 
-  const outstanding = parseFloat(balance.outstanding_etb);
+  const outstanding = parseFloat(balance.balanceEtb);
   const canReconcile = outstanding > 0;
 
   return (

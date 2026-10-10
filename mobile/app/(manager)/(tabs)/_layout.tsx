@@ -26,6 +26,10 @@ export default function ManagerTabsLayout() {
         title: t('tabAvailability', 'Dates'),
         tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
       }} />
+      <Tabs.Screen name="bookings" options={{
+        title: t('tabBookings', 'Bookings'),
+        tabBarIcon: ({ color, size }) => <Ionicons name="list-outline" color={color} size={size} />,
+      }} />
       <Tabs.Screen name="reports" options={{
         title: t('tabReports', 'Reports'),
         tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart-outline" color={color} size={size} />,

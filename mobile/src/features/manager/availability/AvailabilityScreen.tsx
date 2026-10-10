@@ -29,7 +29,7 @@ export function AvailabilityScreen() {
   const closedSet = useMemo(() => {
     const s = new Set<string>();
     (data ?? []).forEach((r) => {
-      if (!r.is_open_for_booking) s.add(r.date);
+      if (!r.isOpenForBooking) s.add(r.date);
     });
     return s;
   }, [data]);

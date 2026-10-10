@@ -21,7 +21,7 @@ export function CheckInForm({ booking, onSuccess }: CheckInFormProps) {
 
   const bookedTotal = useMemo(
     () =>
-      booking.booked_quantity ??
+      booking.bookedQuantity ??
       booking.items?.reduce((sum, it) => sum + (it.quantity ?? 0), 0) ??
       1,
     [booking]
@@ -60,7 +60,7 @@ export function CheckInForm({ booking, onSuccess }: CheckInFormProps) {
     }
 
     try {
-      await checkIn.mutateAsync({ bookingId: booking.id, attendedQuantity: attended });
+      await checkIn.mutateAsync({ bookingId: booking.id });
       onSuccess(attended);
     } catch (err) {
       const msg = isApiError(err) ? err.message : t('commonErrorGeneric', 'Something went wrong');

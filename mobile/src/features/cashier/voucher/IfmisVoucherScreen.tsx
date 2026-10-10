@@ -56,9 +56,6 @@ export function IfmisVoucherScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <Text style={styles.title}>{t('ifmisVoucherTitle', 'IFMIS voucher')}</Text>
-          <Text style={styles.subtitle}>
-            {t('voucherRefLine', 'Booking')} {voucher.reference}
-          </Text>
         </View>
 
         <VoucherForm
@@ -82,6 +79,5 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   header: { marginBottom: spacing.sm },
   title: { fontSize: typography.sizes.xl, fontWeight: '700', color: colors.text },
-  subtitle: { fontSize: typography.sizes.sm, color: colors.textMuted, marginTop: spacing.xs, fontFamily: typography.fontFamily.latin },
   error: { color: colors.danger },
 });

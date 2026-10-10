@@ -9,26 +9,22 @@ import { apiClient } from '@/api/client';
  *
  * The platform never calls IFMIS (FR-GOV-001). It only prepares the fields
  * and later records the two identifiers the Cashier reports back.
+ *
+ * Shape matches `Voucher` in the OpenAPI contract (flat, camelCase).
+ * `documentNo`/`refNo` are null until `record_ifmis_voucher` sets them;
+ * `voucherRecorded` is true only once *both* are set — drive the
+ * "voucher pending" badge off it, never off either field individually.
  */
 const voucherSchema = z.object({
-  booking_id: z.string().uuid(),
-  reference: z.string(),
-
-  // Fields the Cashier copies into IFMIS:
-  payer_name: z.string().nullable().optional(),
-  purpose: z.string().nullable().optional(),
-  amount_figures: z.string().nullable().optional(),
-  amount_words_en: z.string().nullable().optional(),
-  amount_words_am: z.string().nullable().optional(),
-  visit_date: z.string().nullable().optional(),
-
-  // The two identifiers returned by IFMIS:
-  document_no: z.string().nullable().optional(),
-  ref_no: z.string().nullable().optional(),
-
-  // Metadata about when the voucher was recorded
-  recorded_at: z.string().nullable().optional(),
-  recorded_by_user_id: z.string().uuid().nullable().optional(),
+  documentNo: z.string().nullable(),
+  date: z.string().nullable(),
+  refNo: z.string().nullable(),
+  nameOfPublicBody: z.string(),
+  receivedFrom: z.string(),
+  amountFigures: z.string(),
+  amountWords: z.string(),
+  purpose: z.string(),
+  voucherRecorded: z.boolean(),
 });
 
 export type IfmisVoucher = z.infer<typeof voucherSchema>;
@@ -48,19 +44,28 @@ export function useVoucher(bookingId: string | null) {
 }
 
 const voucherUpdateSchema = z.object({
-  document_no: z.string().min(1),
-  ref_no: z.string().min(1),
+  documentNo: z.string().min(1),
+  refNo: z.string().min(1),
 });
 
 export type VoucherUpdateInput = z.infer<typeof voucherUpdateSchema>;
 
+// PATCH returns the full `Booking` (contract), not the voucher.
+const patchedBookingSchema = z.object({
+  id: z.string().uuid(),
+  reference: z.string(),
+  status: z.string(),
+});
+
+export type RecordedVoucherBooking = z.infer<typeof patchedBookingSchema>;
+
 export async function updateVoucher(
   bookingId: string,
   input: VoucherUpdateInput
-): Promise<IfmisVoucher> {
+): Promise<RecordedVoucherBooking> {
   const body = voucherUpdateSchema.parse(input);
   const res = await apiClient.patch(`/bookings/${bookingId}/ifmis-voucher/`, body);
-  return voucherSchema.parse(res.data);
+  return patchedBookingSchema.parse(res.data);
 }
 
 export function useUpdateVoucher() {
@@ -75,6 +80,7 @@ export function useUpdateVoucher() {
     }) => updateVoucher(bookingId, input),
     onSuccess: (_data, { bookingId }) => {
       qc.invalidateQueries({ queryKey: ['ifmis-voucher', bookingId] });
+      qc.invalidateQueries({ queryKey: ['booking', bookingId] });
     },
   });
 }

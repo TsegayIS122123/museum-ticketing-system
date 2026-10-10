@@ -2,11 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiClient } from '@/api/client';
 
+// `GET /availability/` returns `DateAvailability` (contract, camelCase); the
+// PUT body is `DateAvailabilityUpdate` (`isOpenForBooking`).
+
 const dateSchema = z.object({
   date: z.string(),
-  is_open_for_booking: z.boolean(),
-  closed_by_user_id: z.string().uuid().nullable().optional(),
-  closed_at: z.string().nullable().optional(),
+  isOpenForBooking: z.boolean(),
+  closedByUserId: z.string().uuid().nullable().optional(),
+  closedAt: z.string().nullable().optional(),
+  closedReason: z.string().nullable().optional(),
 });
 
 export type DateAvailability = z.infer<typeof dateSchema>;
@@ -26,7 +30,7 @@ export function useAvailabilityRange(from: string, to: string) {
 
 export async function setDateOpen(date: string, open: boolean) {
   const res = await apiClient.put(`/availability/${date}/`, {
-    is_open_for_booking: open,
+    isOpenForBooking: open,
   });
   return dateSchema.parse(res.data);
 }
