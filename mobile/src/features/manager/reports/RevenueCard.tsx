@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { colors, spacing, typography } from '@/theme';
 import { formatEtb, toNumber } from '@/utils/money';
@@ -13,9 +13,11 @@ import { formatEtb, toNumber } from '@/utils/money';
 export function RevenueCard({
   total,
   byCategory,
+  loading = false,
 }: {
   total: string | number;
   byCategory: Record<string, string | number>;
+  loading?: boolean;
 }) {
   const { t } = useTranslation();
   const entries = Object.entries(byCategory).map(
@@ -28,6 +30,9 @@ export function RevenueCard({
       <Text style={styles.total}>{formatEtb(total)}</Text>
       <Text style={styles.label}>{t('totalRevenue', 'Total revenue')}</Text>
       <View style={styles.bars}>
+        {loading && entries.length === 0 ? (
+          <ActivityIndicator color={colors.brandPrimary} style={styles.barsSpinner} />
+        ) : null}
         {entries.map(([name, v]) => (
           <View key={name} style={styles.row}>
             <Text style={styles.name} numberOfLines={1}>
@@ -51,6 +56,7 @@ const styles = StyleSheet.create({
   total: { fontSize: typography.sizes.xxl, fontWeight: '700', color: colors.brandPrimary },
   label: { fontSize: typography.sizes.xs, color: colors.textMuted, textTransform: 'uppercase' },
   bars: { gap: spacing.sm, marginTop: spacing.md },
+  barsSpinner: { alignSelf: 'flex-start' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   name: { width: 90, fontSize: typography.sizes.xs, color: colors.text },
   barTrack: { flex: 1, height: 8, backgroundColor: colors.surfaceAlt, borderRadius: 4 },

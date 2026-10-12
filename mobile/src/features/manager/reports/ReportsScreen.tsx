@@ -77,9 +77,13 @@ export function ReportsScreen() {
               `/reports/dashboard`'s unscoped all-time figure -- the same
               "live snapshot vs. scoped period" split the web dashboard
               labels "(All Time)". While the summary is in flight the bars
-              are empty rather than filled with a count-times-100 stand-in,
-              which showed invented ETB figures. */}
-          <RevenueCard total={revenue} byCategory={summary?.revenueByCategory ?? {}} />
+              show a spinner rather than a count-times-100 stand-in, which
+              used to fill them with invented ETB figures. */}
+          <RevenueCard
+            total={revenue}
+            byCategory={summary?.revenueByCategory ?? {}}
+            loading={loadingSummary}
+          />
         </Card>
 
         {dash.statusMix ? (
