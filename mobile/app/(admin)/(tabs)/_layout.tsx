@@ -22,6 +22,13 @@ export default function AdminTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="reports"
+        options={{
+          title: t('admin_tab_reports', 'Reports'),
+          tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="audit"
         options={{
           title: t('tabAudit', 'Audit'),

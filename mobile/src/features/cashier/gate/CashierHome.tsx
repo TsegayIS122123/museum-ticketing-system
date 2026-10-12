@@ -16,6 +16,13 @@ export function CashierHome() {
 
   return (
     <Screen>
+      {/* The offline queue's only surface. It renders nothing when the queue
+          is empty and no sync is running, so this is a no-op on a normal
+          day at the gate -- but without it a queued check-in, a 409
+          conflict against another cashier, or a failed sync was invisible:
+          the count, the "Syncing…" state and the manual "Sync now" retry
+          all live in this banner. */}
+      <SyncBanner />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Card>
           <Text style={styles.title}>
