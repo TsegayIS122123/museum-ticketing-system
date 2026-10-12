@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -28,10 +28,16 @@ export function VoucherForm({ bookingId, voucher, onSuccess }: VoucherFormProps)
 
   const alreadyRecorded = voucher.voucherRecorded;
 
-  useEffect(() => {
+  // A refetch replaces the whole `voucher` object; re-seed the two inputs
+  // from it during render (React's "adjust state when a prop changes"
+  // pattern) instead of in an effect -- the effect would paint one frame
+  // of stale input, and `react-hooks/set-state-in-effect` flags it.
+  const [seededVoucher, setSeededVoucher] = useState(voucher);
+  if (seededVoucher !== voucher) {
+    setSeededVoucher(voucher);
     setDocumentNo(voucher.documentNo ?? '');
     setRefNo(voucher.refNo ?? '');
-  }, [voucher]);
+  }
 
   const handleSubmit = async () => {
     if (!documentNo.trim() || !refNo.trim()) {

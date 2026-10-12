@@ -40,10 +40,10 @@ export function ReportsScreen() {
     );
   }
 
-  const revenue =
-    typeof dash.revenueTotalEtb === 'string'
-      ? parseFloat(dash.revenueTotalEtb)
-      : dash.revenueTotalEtb;
+  // `revenueTotalEtb` is a decimal string (see the schema comment in
+  // `api/queries/manager-dashboard.ts`); passed through as-is so
+  // `RevenueCard` owns the one place money is turned into a display number.
+  const revenue = dash.revenueTotalEtb;
 
   const periods: { value: Period; label: string }[] = [
     { value: 'daily', label: t('daily', 'Daily') },
@@ -72,18 +72,14 @@ export function ReportsScreen() {
         </View>
 
         <Card>
-          <RevenueCard
-            total={revenue}
-            byCategory={
-              summary?.revenueByCategory ??
-              Object.fromEntries(
-                Object.entries(dash.visitorCountsByCategory ?? {}).map(([k, v]) => [
-                  k,
-                  (v ?? 0) * 100,
-                ])
-              )
-            }
-          />
+          {/* The bars are the selected period's revenue
+              (`/reports/summary`), the total above them is
+              `/reports/dashboard`'s unscoped all-time figure -- the same
+              "live snapshot vs. scoped period" split the web dashboard
+              labels "(All Time)". While the summary is in flight the bars
+              are empty rather than filled with a count-times-100 stand-in,
+              which showed invented ETB figures. */}
+          <RevenueCard total={revenue} byCategory={summary?.revenueByCategory ?? {}} />
         </Card>
 
         {dash.statusMix ? (

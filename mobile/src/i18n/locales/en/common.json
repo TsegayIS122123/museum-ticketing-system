@@ -838,5 +838,10 @@
   "managerBookingsLoadError": "Could not load bookings",
   "managerBookingsEmptyFlagged": "Nothing flagged right now.",
   "managerBookingsEmptyAll": "No bookings match this filter.",
-  "pendingVouchers": "{{n}} voucher(s) still pending"
+  "pendingVouchers": "{{n}} voucher(s) still pending",
+  "tabRefunds": "Refunds",
+  "managerRefundsCount": "{{n}} refund(s)",
+  "managerRefundsLoadError": "Could not load refunds",
+  "managerRefundsEmpty": "No refunds yet.",
+  "managerRefundsChapaRef": "Chapa refund ref"
 }

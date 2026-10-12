@@ -30,6 +30,17 @@ export function multiplyMoney(amount: string | number, quantity: number): string
   return fromMinorUnits(toMinorUnits(amount) * BigInt(quantity));
 }
 
+/**
+ * Display-only numeric view of a decimal string -- bar widths, chart
+ * scaling, sorting. Never use it for arithmetic on money: `addMoney` /
+ * `subtractMoney` / `multiplyMoney` below are the exact-decimal path.
+ */
+export function toNumber(value: string | number | null | undefined): number {
+  if (value === null || value === undefined || value === '') return 0;
+  const n = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 export function formatEtb(amount: string | number): string {
   const [whole, frac = '00'] = String(amount).split('.');
   const padded = (frac + '00').slice(0, 2);

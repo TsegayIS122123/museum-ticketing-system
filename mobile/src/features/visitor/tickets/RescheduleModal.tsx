@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -47,9 +47,16 @@ export function RescheduleModal({
   const { data: rows, isLoading } = useAvailability(fromIso, toIso, visible);
   const reschedule = useRescheduleBooking();
 
-  useEffect(() => {
-    if (!visible) setNewDate('');
-  }, [visible]);
+  // Clearing the picked date when the modal closes is a prop-driven reset,
+  // done during render (React's "adjust state when a prop changes"
+  // pattern) rather than in an effect: an effect commits one frame with a
+  // stale date still selected, and `react-hooks/set-state-in-effect`
+  // flags the cascading render it causes.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
+    if (!visible && newDate) setNewDate('');
+  }
 
   const closed = useMemo(() => {
     const s = new Set<string>();

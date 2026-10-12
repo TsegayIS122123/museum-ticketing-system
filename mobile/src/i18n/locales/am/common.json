@@ -838,5 +838,10 @@
   "managerBookingsLoadError": "ቦታ ማስያዣዎችን መጫን አልተቻለም",
   "managerBookingsEmptyFlagged": "አሁን ምንም የተፈተሸ የለም።",
   "managerBookingsEmptyAll": "ከዚህ ማጣሪያ ጋር የሚዛመድ ቦታ ማስያዣ የለም።",
-  "pendingVouchers": "{{n}} ደረሰኝ(ዎች) አልተመዘገቡም"
+  "pendingVouchers": "{{n}} ደረሰኝ(ዎች) አልተመዘገቡም",
+  "tabRefunds": "ተመላሽ ክፍያዎች",
+  "managerRefundsCount": "{{n}} ተመላሽ ክፍያ(ዎች)",
+  "managerRefundsLoadError": "ተመላሽ ክፍያዎችን መጫን አልተቻለም",
+  "managerRefundsEmpty": "እስካሁን ተመላሽ ክፍያ የለም።",
+  "managerRefundsChapaRef": "የቻፓ ተመላሽ ማጣቀሻ"
 }

@@ -25,39 +25,43 @@ const POLL_TIMEOUT_MS = 60_000;
 type Phase = 'ready-to-pay' | 'opening-browser' | 'confirming' | 'success' | 'timeout';
 
 export function PaymentScreen() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ bookingId?: string; checkoutUrl?: string }>();
 
   const bookingId = typeof params.bookingId === 'string' ? params.bookingId : null;
   const checkoutUrl = typeof params.checkoutUrl === 'string' ? params.checkoutUrl : null;
 
-  const [phase, setPhase] = useState<Phase>('ready-to-pay');
+  // Everything the user drives (open checkout, retry, timeout) is local
+  // state; the one transition the *server* drives -- the booking becoming
+  // `pending` -- is derived from the polled booking below instead of being
+  // pushed into state from an effect. Same behaviour, minus the extra
+  // render `react-hooks/set-state-in-effect` warns about (and the frame
+  // where the poll had already succeeded but the screen still said
+  // "confirming").
+  const [localPhase, setLocalPhase] = useState<Phase>('ready-to-pay');
   const [elapsed, setElapsed] = useState(0);
 
-  const pollingEnabled = phase === 'confirming';
+  const pollingEnabled = localPhase === 'confirming';
   const { data: booking, refetch, isFetching } = useBookingPolling(bookingId, {
     enabled: pollingEnabled,
     intervalMs: POLL_INTERVAL_MS,
     timeoutMs: POLL_TIMEOUT_MS,
   });
 
-  // Watch for status change → success
+  // The server's answer wins over whatever the local phase says: a booking
+  // that came back `pending` is paid for, no matter which screen we were on.
+  const phase: Phase = booking?.status === 'pending' ? 'success' : localPhase;
+
+  // Watch for a booking that can no longer be paid for. No state is set
+  // here -- the alert and the redirect *are* the effect's job.
   useEffect(() => {
-    if (!booking) return;
-    if (booking.status === 'pending') {
-      setPhase('success');
-    } else if (
-      booking.status === 'cancelled' ||
-      booking.status === 'refunded'
-    ) {
-      // Server says the booking is no longer payable; surface it as a failure.
-      Alert.alert(
-        t('paymentNotCompleted', 'Payment not completed'),
-        t('paymentNotCompletedBody', 'The booking was cancelled or refunded before payment was confirmed.')
-      );
-      router.replace('/(visitor)/(tabs)/book' as any);
-    }
+    if (booking?.status !== 'cancelled' && booking?.status !== 'refunded') return;
+    Alert.alert(
+      t('paymentNotCompleted', 'Payment not completed'),
+      t('paymentNotCompletedBody', 'The booking was cancelled or refunded before payment was confirmed.')
+    );
+    router.replace('/(visitor)/(tabs)/book' as any);
   }, [booking, router, t]);
 
   // Enforce the 60s timeout locally
@@ -69,7 +73,7 @@ export function PaymentScreen() {
       setElapsed(s);
       if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
         clearInterval(id);
-        setPhase('timeout');
+        setLocalPhase('timeout');
       }
     }, 1000);
     return () => clearInterval(id);
@@ -83,17 +87,17 @@ export function PaymentScreen() {
       );
       return;
     }
-    setPhase('opening-browser');
+    setLocalPhase('opening-browser');
     try {
       await openChapaCheckout(checkoutUrl);
-    } catch (err) {
+    } catch {
       // Non-fatal — still try polling.
     }
-    setPhase('confirming');
+    setLocalPhase('confirming');
   }, [checkoutUrl, t]);
 
   const handleRetry = useCallback(async () => {
-    setPhase('confirming');
+    setLocalPhase('confirming');
     setElapsed(0);
     await refetch();
   }, [refetch]);
@@ -106,7 +110,6 @@ export function PaymentScreen() {
     router.replace('/(visitor)/(tabs)/tickets' as any);
   }, [router]);
 
-  const isAm = i18n.language === 'am';
 
   const summary = useMemo(() => {
     if (!booking) return null;

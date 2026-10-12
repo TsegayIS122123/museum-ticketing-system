@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -27,7 +27,15 @@ export function CategoryForm({ visible, editing, onClose, onSaved }: CategoryFor
   const [nameAm, setNameAm] = useState('');
   const [price, setPrice] = useState('0');
 
-  useEffect(() => {
+  // Seed the fields from the category being edited (or a blank form for a
+  // new one) whenever the form is opened or retargeted -- during render,
+  // React's "adjust state when a prop changes" pattern, rather than in an
+  // effect that would first paint the previous category's values (and that
+  // `react-hooks/set-state-in-effect` flags).
+  const seed = `${editing?.id ?? 'new'}|${visible}`;
+  const [seededFrom, setSeededFrom] = useState(seed);
+  if (seededFrom !== seed) {
+    setSeededFrom(seed);
     if (editing) {
       setNameEn(editing.name_en);
       setNameAm(editing.name_am);
@@ -37,8 +45,7 @@ export function CategoryForm({ visible, editing, onClose, onSaved }: CategoryFor
       setNameAm('');
       setPrice('0');
     }
-  }, [editing, visible]);
-
+  }
   const handleSubmit = async () => {
     if (!nameEn.trim() || !nameAm.trim()) {
       Alert.alert(t('commonErrorGeneric', 'Something went wrong'), t('nameRequired', 'Both names required'));

@@ -12,7 +12,6 @@ import { LookupField } from './LookupField';
 import { BookingResult } from './BookingResult';
 import { useGateLookup } from './useGateLookup';
 import { BOOKING_REFERENCE_REGEX } from '@/constants/config';
-import { findByReference } from '@/database/offline-bookings';
 import { useEnqueueCheckIn, useProcessSyncQueue } from '@/features/cashier/offline/useOfflineSync';
 import { useOffline } from '@/features/shared/useOffline';
 

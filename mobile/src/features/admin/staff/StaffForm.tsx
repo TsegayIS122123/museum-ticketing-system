@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -32,14 +32,20 @@ export function StaffForm({ visible, editing, onClose, onSaved }: StaffFormProps
   const [role, setRole] = useState<Role>('cashier');
   const [active, setActive] = useState(true);
 
-  useEffect(() => {
+  // Seed the fields from the record being edited (or a blank form for a
+  // new one) whenever the form is opened or retargeted -- during render,
+  // React's "adjust state when a prop changes" pattern, rather than in an
+  // effect that would first paint the previous record's values (and that
+  // `react-hooks/set-state-in-effect` flags).
+  const seed = `${editing?.id ?? 'new'}|${visible}`;
+  const [seededFrom, setSeededFrom] = useState(seed);
+  if (seededFrom !== seed) {
+    setSeededFrom(seed);
     if (editing) {
       setFullName(editing.full_name);
       setEmail(editing.email);
       setPhone(editing.phone ?? '');
-      setRole(
-        editing.role === 'platform_admin' ? 'cashier' : (editing.role as Role)
-      );
+      setRole(editing.role === 'platform_admin' ? 'cashier' : (editing.role as Role));
       setActive(editing.active);
       setPassword('');
     } else {
@@ -50,8 +56,7 @@ export function StaffForm({ visible, editing, onClose, onSaved }: StaffFormProps
       setActive(true);
       setPassword('');
     }
-  }, [editing, visible]);
-
+  }
   const handleSubmit = async () => {
     try {
       if (editing) {
