@@ -573,7 +573,9 @@ The QR encodes the bare 8-character `reference`. It is rendered on a white backg
 
 ### 9.2 Design tokens
 
-Brand blue **`#015484`**. Token module: `src/theme/colors.ts` (`znhmBlue`, surface, text, success, warning, danger), `spacing.ts` (4-point scale), `typography.ts` (system sans stack; no serif display face is used). Component names follow Document 06 §7 (`Button`, `Card`, `Input`, `Badge`, `EmptyState`, `ErrorState`, `Skeleton`, `Sheet`, `Toast`).
+Brand blue **`#015484`**, exported as `colors.brandPrimary` (it is also `primary600` on the 50–900 scale the web app uses). Token module: `src/theme/colors.ts` (brand scale, surfaces, text, border, feedback, and the web's accent set), `spacing.ts` (4-point scale), `typography.ts` (system sans stack; no serif display face is used).
+
+Components actually shipped in `src/components/ui/`: `Button`, `Card`, `TextField`, `Screen`, `Divider`, `SectionTitle`, `StatCard`, `StatusBadge`, `LanguageToggle` -- plus `features/shared/OfflineBanner.tsx`. There is deliberately no `Input`/`Badge`/`EmptyState`/`ErrorState`/`Skeleton`/`Sheet`/`Toast` primitive in the mobile app: screens draw their own empty and error branches from the tokens, and `StatusBadge` covers badge-shaped labels. (Those names are Document 06 §7's *web* set -- `frontend/src/components/ui/` -- which an earlier revision of this section listed as if it were the mobile one.)
 
 ### 9.3 Asset pipeline
 
@@ -600,7 +602,7 @@ Brand blue **`#015484`**. Token module: `src/theme/colors.ts` (`znhmBlue`, surfa
 
 1. All four roles authenticate, route, and complete their workflows against the live API.
 2. No screen exists for a capability the backend does not support; unsupported surfaces render an explicit "not yet available" state, never a mock.
-3. `npx tsc --noEmit` and `npx expo lint` are clean, and unit tests cover `money.ts`, `reference.ts`, `dates.ts`, and the auth refresh interceptor.
+3. `npx tsc --noEmit` and `npx expo lint` are clean, and unit tests cover `utils/money.ts`, the `BOOKING_REFERENCE_REGEX` check in `constants/config.ts`, `utils/dates.ts`, and the auth refresh interceptor.
 4. `en`/`am` parity holds at 100 % for every mobile-reachable key.
 5. No token, `.env` value, or personal data appears in the release bundle.
 6. The app builds for iOS and Android under bundle/package `et.aau.znhm.ticketing`, with `znhm://` deep links resolving on a cold start.
