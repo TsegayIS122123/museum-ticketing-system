@@ -1,4 +1,5 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -7,8 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { SectionTitle } from '@/components/ui/SectionTitle';
 import { colors, radius, spacing, typography } from '@/theme';
 import { BRAND } from '@/constants/brand';
-
-const HERO_IMAGE = 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1200&h=900&fit=crop&auto=format';
+import { ASSETS } from '@/constants/assets';
 
 export function HomeScreen() {
   const { t } = useTranslation();
@@ -19,9 +19,21 @@ export function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={styles.hero}>
-          <Image source={{ uri: HERO_IMAGE }} style={styles.heroImage} />
+          <Image
+            source={ASSETS.images.heroWaliaIbex}
+            style={styles.heroImage}
+            accessibilityLabel={t('heroImageAlt', 'Walia Ibex at ZNHM')}
+          />
           <View style={styles.heroOverlay} />
           <View style={styles.heroContent}>
+            <View style={styles.logoRow}>
+              <Image
+                source={ASSETS.brand.aauLogo}
+                style={styles.logo}
+                accessibilityLabel={t('aau_logo_alt', 'Addis Ababa University')}
+              />
+              <Text style={styles.logoText}>{t('museumName', BRAND.museumName)}</Text>
+            </View>
             <Text style={styles.eyebrow}>{t('heroEyebrow', BRAND.tagline)}</Text>
             <Text style={styles.title}>{t('heroTitle', BRAND.museumName)}</Text>
             <Text style={styles.subtitle}>
@@ -72,10 +84,10 @@ export function HomeScreen() {
             style={styles.exhibitCard}
             onPress={() => router.push('/(visitor)/book' as any)}
           >
-            <Image source={{ uri: HERO_IMAGE }} style={styles.exhibitImage} />
+            <Image source={ASSETS.images.heroWaliaIbex} style={styles.exhibitImage} accessibilityLabel={t('heroImageAlt', 'Walia Ibex at ZNHM')} />
             <View style={styles.exhibitInfo}>
-              <Text style={styles.exhibitName}>Walia Ibex</Text>
-              <Text style={styles.exhibitTag}>Mammal · Endemic to Ethiopia</Text>
+              <Text style={styles.exhibitName}>{t('galleryWaliaIbexName', 'Walia Ibex')}</Text>
+              <Text style={styles.exhibitTag}>{t('galleryWaliaIbexTag', 'Mammal · Endemic to Ethiopia')}</Text>
             </View>
           </Pressable>
         </View>
@@ -104,6 +116,13 @@ const styles = StyleSheet.create({
   heroImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
   heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,20,40,0.55)' },
   heroContent: { padding: spacing.xl },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  logo: { width: 42, height: 42, borderRadius: radius.pill, backgroundColor: colors.surface },
+  logoText: {
+    color: colors.textInverse,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+  },
   eyebrow: {
     color: colors.primary300,
     fontSize: typography.sizes.xs,

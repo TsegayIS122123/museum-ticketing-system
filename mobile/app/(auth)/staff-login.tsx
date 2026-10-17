@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +12,7 @@ import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { staffLogin, useAuthActions } from '@/api/queries/auth';
 import { isApiError } from '@/api/errors';
 import { homeForRole } from '@/auth/guards';
+import { ASSETS } from '@/constants/assets';
 import { colors, spacing } from '@/theme';
 
 export default function StaffLoginScreen() {
@@ -44,6 +46,11 @@ export default function StaffLoginScreen() {
   return (
     <Screen>
       <View style={styles.header}>
+        <Image
+          source={ASSETS.brand.aauLogo}
+          style={styles.logo}
+          accessibilityLabel={t('aau_logo_alt', 'Addis Ababa University')}
+        />
         <Text style={styles.title}>{t('staffLogin', 'Staff login')}</Text>
         <LanguageToggle />
       </View>
@@ -86,5 +93,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: { fontSize: 22, fontWeight: '700', color: colors.brandPrimary },
+  logo: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface },
   error: { color: colors.danger, marginVertical: spacing.sm },
 });

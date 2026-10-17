@@ -7,7 +7,7 @@ const latinStack = Platform.select({
 });
 
 const ethiopicStack = Platform.select({
-  ios: 'System',
+  ios: 'Noto Sans Ethiopic',
   android: 'NotoSansEthiopic',
   default: 'System',
 });
@@ -39,10 +39,3 @@ export const typography = {
     ethiopic: ethiopicStack,
   },
 } as const;
-
-/** Utility: return the right font family for the active locale. */
-export function fontForLocale(locale: 'en' | 'am'): string {
-  return locale === 'am'
-    ? typography.fontFamily.ethiopic
-    : typography.fontFamily.latin;
-}

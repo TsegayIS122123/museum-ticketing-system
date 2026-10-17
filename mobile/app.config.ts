@@ -4,37 +4,74 @@ const config: ExpoConfig = {
   name: 'ZNHM Ticketing',
   slug: 'znhm-ticketing',
   scheme: 'znhm',
-  version: '1.0.0',
+  version: '0.1.0',
+
   orientation: 'portrait',
   userInterfaceStyle: 'light',
-  icon: './assets/icon.png',
-  splash: {
-    image: './assets/splash.png',
-    resizeMode: 'contain',
-    backgroundColor: '#015484',
-  },
+
+  icon: './assets/app/icon.png',
+
   ios: {
     bundleIdentifier: 'et.aau.znhm.ticketing',
     supportsTablet: true,
     infoPlist: {
       NSCameraUsageDescription:
         'ZNHM Ticketing uses the camera to scan a ticket QR code at the entrance gate.',
-      NSPhotoLibraryUsageDescription:
-        'ZNHM Ticketing may save your ticket receipt to Photos when you choose to download it.',
     },
   },
   android: {
     package: 'et.aau.znhm.ticketing',
     adaptiveIcon: {
-      foregroundImage: './assets/adaptive-icon.png',
+      foregroundImage: './assets/app/android-icon-foreground.png',
+      backgroundImage: './assets/app/android-icon-background.png',
+      monochromeImage: './assets/app/android-icon-monochrome.png',
       backgroundColor: '#015484',
     },
     permissions: ['CAMERA'],
   },
   web: {
     bundler: 'metro',
+    output: 'single',
   },
-  plugins: ['expo-router', 'expo-secure-store', 'expo-camera', 'expo-sqlite'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    'expo-localization',
+    [
+      'expo-font',
+      {
+        ios: {
+          fonts: [
+            './assets/fonts/NotoSansEthiopic-Regular.ttf',
+            './assets/fonts/NotoSansEthiopic-Bold.ttf',
+          ],
+        },
+        android: {
+          fonts: [
+            {
+              fontFamily: 'NotoSansEthiopic',
+              fontDefinitions: [
+                { path: './assets/fonts/NotoSansEthiopic-Regular.ttf', weight: 400 },
+                { path: './assets/fonts/NotoSansEthiopic-Bold.ttf', weight: 700 },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    [
+      'expo-splash-screen',
+      {
+        backgroundColor: '#015484',
+        image: './assets/app/splash-icon.png',
+        imageWidth: 200,
+        resizeMode: 'contain',
+      },
+    ],
+    'expo-web-browser',
+    'expo-sqlite',
+    'expo-camera',
+  ],
   extra: {
     router: {},
   },

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -8,10 +9,9 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
-import { useAuth } from '@/auth/useAuth';
-import { useAuthActions } from '@/api/queries/auth';
-import { startVisitorVerification, confirmVisitorVerification } from '@/api/queries/auth';
+import { useAuthActions, startVisitorVerification, confirmVisitorVerification } from '@/api/queries/auth';
 import { isApiError } from '@/api/errors';
+import { ASSETS } from '@/constants/assets';
 import { colors, spacing } from '@/theme';
 
 export default function VisitorVerifyScreen() {
@@ -65,6 +65,11 @@ export default function VisitorVerifyScreen() {
   return (
     <Screen>
       <View style={styles.header}>
+        <Image
+          source={ASSETS.brand.aauLogo}
+          style={styles.logo}
+          accessibilityLabel={t('aau_logo_alt', 'Addis Ababa University')}
+        />
         <Text style={styles.title}>{t('museumName', 'ZNHM Ticketing')}</Text>
         <LanguageToggle />
       </View>
@@ -139,6 +144,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: { fontSize: 22, fontWeight: '700', color: colors.brandPrimary },
+  logo: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
