@@ -77,26 +77,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/forgot-password/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * @description POST /auth/forgot-password -- Staff only (FR-ACC-006). Always 200;
-         *     see services.request_password_reset for why.
-         */
-        post: operations["v1_auth_forgot_password_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/auth/login/": {
         parameters: {
             query?: never;
@@ -106,7 +86,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description POST /auth/login -- Staff only (FR-ACC-002, FR-ACC-005). */
+        /**
+         * @description POST /auth/login -- the single front-door sign-in for every role
+         *     (FR-ACC-002, FR-ACC-005, revised). Email + password only; the caller's
+         *     `role` is returned on `user` and the client routes from there.
+         */
         post: operations["v1_auth_login_create"];
         delete?: never;
         options?: never;
@@ -125,15 +109,8 @@ export interface paths {
         put?: never;
         /**
          * @description POST /auth/logout -- clears the refresh-token cookie so the browser
-         *     stops presenting it. Note: this does not blacklist the token
-         *     server-side -- SIMPLE_JWT.BLACKLIST_AFTER_ROTATION=True already assumes
-         *     that, but `rest_framework_simplejwt.token_blacklist` isn't in
-         *     INSTALLED_APPS (config/settings/base.py), so today every rotation's
-         *     `refresh.blacklist()` call is silently swallowed (simplejwt only
-         *     defines that method when the app is installed, and the rotation code
-         *     catches the resulting AttributeError). Worth installing + migrating
-         *     that app separately so old refresh tokens are actually invalidated,
-         *     not just no-longer-cookied on this device.
+         *     stops presenting it. Server-side refresh-token revocation is handled by
+         *     SIMPLE_JWT rotation/blacklist semantics, not this view.
          */
         post: operations["v1_auth_logout_create"];
         delete?: never;
@@ -152,96 +129,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * @description POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py),
-         *     shared by both credential paths (Sec 4.1).
+         * @description POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py).
          *
          *     Reads the refresh token from the httpOnly cookie set by `_auth_response`
          *     above instead of requiring it in the request body -- the frontend never
-         *     holds or sends the refresh token itself (cookies.py). Re-sets the
-         *     cookie with the rotated token on success, per SIMPLE_JWT's
-         *     ROTATE_REFRESH_TOKENS.
+         *     holds or sends the refresh token itself (cookies.py). Re-sets the cookie
+         *     with the rotated token on success, per SIMPLE_JWT's ROTATE_REFRESH_TOKENS.
          */
         post: operations["v1_auth_refresh_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/reset-password/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description POST /auth/reset-password -- Staff only (FR-ACC-006). */
-        post: operations["v1_auth_reset_password_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/visitor/verify/confirm/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * @description POST /auth/visitor/verify/confirm -- completes Visitor verification
-         *     and issues the same token pair Staff login does (Sec 4.1).
-         */
-        post: operations["v1_auth_visitor_verify_confirm_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/visitor/verify/email/{token}/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * @description GET /auth/visitor/verify/email/{token} -- the secondary/fallback
-         *     verification channel (Sec 4.1 step 2). Opening this link marks
-         *     `email_verified_at` but never issues a session on its own; only the
-         *     OTP path above does that.
-         */
-        get: operations["v1_auth_visitor_verify_email_retrieve"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/visitor/verify/start/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * @description POST /auth/visitor/verify/start (FR-ACC-001, FR-ACC-003, FR-ACC-004).
-         *     Used for both a first-time booking and a returning Visitor looking up
-         *     their history -- there is no separate "login" for a Visitor.
-         */
-        post: operations["v1_auth_visitor_verify_start_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1277,19 +1172,260 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/_allauth/browser/v1/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an account (unified, all roles). [browser client]
+         * @description django-allauth headless endpoint (browser client). The browser client authenticates via allauth's session cookie; no tokens are returned here.
+         */
+        post: operations["headless_browser_signup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/browser/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authenticate; `data.user` carries the role. [browser client]
+         * @description django-allauth headless endpoint (browser client). The browser client authenticates via allauth's session cookie; no tokens are returned here.
+         */
+        post: operations["headless_browser_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/browser/v1/auth/email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify an email with the 6-digit code or emailed link token. [browser client]
+         * @description django-allauth headless endpoint (browser client). The browser client authenticates via allauth's session cookie; no tokens are returned here.
+         */
+        post: operations["headless_browser_email_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/browser/v1/auth/email/verify/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend the verification email/code. [browser client]
+         * @description django-allauth headless endpoint (browser client). The browser client authenticates via allauth's session cookie; no tokens are returned here.
+         */
+        post: operations["headless_browser_email_verify_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/browser/v1/auth/password/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a password-reset email (code + link). [browser client]
+         * @description django-allauth headless endpoint (browser client). The browser client authenticates via allauth's session cookie; no tokens are returned here.
+         */
+        post: operations["headless_browser_password_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/browser/v1/auth/password/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete a password reset with the code or link token. [browser client]
+         * @description django-allauth headless endpoint (browser client). The browser client authenticates via allauth's session cookie; no tokens are returned here.
+         */
+        post: operations["headless_browser_password_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/app/v1/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an account (unified, all roles). [app client]
+         * @description django-allauth headless endpoint (app client). `meta.access_token` and `meta.refresh_token` carry the app's SimpleJWT.
+         */
+        post: operations["headless_app_signup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/app/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authenticate; `data.user` carries the role. [app client]
+         * @description django-allauth headless endpoint (app client). `meta.access_token` and `meta.refresh_token` carry the app's SimpleJWT.
+         */
+        post: operations["headless_app_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/app/v1/auth/email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify an email with the 6-digit code or emailed link token. [app client]
+         * @description django-allauth headless endpoint (app client). `meta.access_token` and `meta.refresh_token` carry the app's SimpleJWT.
+         */
+        post: operations["headless_app_email_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/app/v1/auth/email/verify/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend the verification email/code. [app client]
+         * @description django-allauth headless endpoint (app client). `meta.access_token` and `meta.refresh_token` carry the app's SimpleJWT.
+         */
+        post: operations["headless_app_email_verify_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/app/v1/auth/password/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a password-reset email (code + link). [app client]
+         * @description django-allauth headless endpoint (app client). `meta.access_token` and `meta.refresh_token` carry the app's SimpleJWT.
+         */
+        post: operations["headless_app_password_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/_allauth/app/v1/auth/password/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete a password reset with the code or link token. [app client]
+         * @description django-allauth headless endpoint (app client). `meta.access_token` and `meta.refresh_token` carry the app's SimpleJWT.
+         */
+        post: operations["headless_app_password_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
-         * @description `UserProfile` (Document 04) -- Visitor and Staff share one shape; a
-         *     Visitor's password-adjacent fields are simply never populated.
+         * @description `UserProfile` (Document 04) -- all four roles share one shape.
          *
          *     `email_verified_at`/`phone_verified_at` are exposed (read-only) so the
-         *     frontend can gate a Visitor's flow -- e.g. requiring email verification
-         *     right after OTP confirmation (FR-ACC-003) -- without having to guess at
+         *     frontend can gate a Visitor's flow without having to guess at
          *     verification state or discover it only when a later action (like
-         *     `create_booking`) rejects it.
+         *     `create_booking`) rejects it. Email verification itself is tracked by
+         *     django-allauth's `EmailAddress.verified` (the authoritative source for
+         *     the headless flows); these columns are retained for backward
+         *     compatibility.
          */
         Account: {
             /** Format: uuid */
@@ -1873,11 +2009,6 @@ export interface components {
         FlagMismatchRequest: {
             note?: string | null;
         };
-        /** @description `ForgotPasswordRequest` -- Staff only (FR-ACC-006). */
-        ForgotPassword: {
-            /** Format: email */
-            email: string;
-        };
         /**
          * @description * `daily` - daily
          *     * `weekly` - weekly
@@ -1888,6 +2019,53 @@ export interface components {
         GroupVsIndividualSplit: {
             group: number;
             individual: number;
+        };
+        /** @description django-allauth headless envelope. `data` carries the affected resources (e.g. `user`); `meta` carries out-of-band values -- for the `app` client this includes the app's SimpleJWT as `access_token` + `refresh_token`. */
+        HeadlessAuthResponse: {
+            /** @example 200 */
+            status?: number;
+            data?: {
+                [key: string]: unknown;
+            };
+            /** @description `access_token` / `refresh_token` are present only for `/_allauth/app/v1/...` requests. */
+            meta?: {
+                [key: string]: unknown;
+            };
+        };
+        HeadlessErrorResponse: {
+            /** @example 400 */
+            status?: number;
+            errors?: {
+                code?: string;
+                param?: string | null;
+                message?: string;
+            }[];
+        };
+        HeadlessLoginRequest: {
+            /** Format: email */
+            email: string;
+            /** Format: password */
+            password: string;
+        };
+        HeadlessRequestPasswordResetRequest: {
+            /** Format: email */
+            email: string;
+        };
+        HeadlessResetPasswordRequest: {
+            key: string;
+            /** Format: password */
+            password: string;
+        };
+        HeadlessSignupRequest: {
+            /** Format: email */
+            email: string;
+            full_name?: string;
+            /** Format: password */
+            password: string;
+        };
+        HeadlessVerifyEmailRequest: {
+            /** @description The 6-digit code or the link token from the verification email. */
+            key: string;
         };
         /**
          * @description `Institution` (UAT round 1). Read-only -- there is no
@@ -1972,6 +2150,15 @@ export interface components {
          * @enum {string}
          */
         LanguagePreferenceEnum: "en" | "am";
+        /**
+         * @description `LoginRequest` -- the single front-door sign-in for every role
+         *     (visitor / cashier / museum_manager / platform_admin).
+         */
+        Login: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
         /**
          * @description `NotificationPreference` (Document 04) -- FR-NOTIFY-PREF-001. All
          *     four fields are always present in a response and all four are required
@@ -2209,11 +2396,6 @@ export interface components {
             /** Format: date */
             from: string;
         };
-        /** @description `ResetPasswordRequest` -- Staff only (FR-ACC-006). */
-        ResetPassword: {
-            token: string;
-            new_password: string;
-        };
         RevenuePeriodBucket: {
             /** Format: date */
             bucketStart: string;
@@ -2260,12 +2442,6 @@ export interface components {
             full_name: string;
             role: components["schemas"]["StaffRoleEnum"];
         };
-        /** @description `LoginRequest` -- Staff only (FR-ACC-002, FR-ACC-005). */
-        StaffLogin: {
-            /** Format: email */
-            email: string;
-            password: string;
-        };
         /**
          * @description * `cashier` - Cashier
          *     * `museum_manager` - Museum Manager
@@ -2299,29 +2475,6 @@ export interface components {
             access: string;
             /** @description Only present when the request carries `X-Client-Platform: expo`. */
             refresh_token?: string;
-        };
-        /** @description `VisitorVerifyConfirmRequest`. */
-        VisitorVerifyConfirm: {
-            /** Format: uuid */
-            verification_id: string;
-            otp_code: string;
-        };
-        /**
-         * @description `VisitorVerifyStartRequest` (Document 04) -- FR-ACC-001, FR-ACC-003.
-         *     No password field exists here or anywhere in the Visitor path.
-         */
-        VisitorVerifyStart: {
-            /** Format: email */
-            email: string;
-            phone: string;
-            /** @default  */
-            full_name?: string;
-            language_preference?: components["schemas"]["LanguagePreferenceEnum"];
-        };
-        VisitorVerifyStartResponse: {
-            /** Format: uuid */
-            verification_id: string;
-            otp_expires_in_seconds: number;
         };
         /**
          * @description The `voucher` object (Phase 6, UAT round 1): every field the
@@ -2493,31 +2646,6 @@ export interface operations {
             };
         };
     };
-    v1_auth_forgot_password_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ForgotPassword"];
-                "application/x-www-form-urlencoded": components["schemas"]["ForgotPassword"];
-                "multipart/form-data": components["schemas"]["ForgotPassword"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetailResponse"];
-                };
-            };
-        };
-    };
     v1_auth_login_create: {
         parameters: {
             query?: never;
@@ -2530,9 +2658,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StaffLogin"];
-                "application/x-www-form-urlencoded": components["schemas"]["StaffLogin"];
-                "multipart/form-data": components["schemas"]["StaffLogin"];
+                "application/json": components["schemas"]["Login"];
+                "application/x-www-form-urlencoded": components["schemas"]["Login"];
+                "multipart/form-data": components["schemas"]["Login"];
             };
         };
         responses: {
@@ -2597,105 +2725,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetailResponse"];
-                };
-            };
-        };
-    };
-    v1_auth_reset_password_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResetPassword"];
-                "application/x-www-form-urlencoded": components["schemas"]["ResetPassword"];
-                "multipart/form-data": components["schemas"]["ResetPassword"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetailResponse"];
-                };
-            };
-        };
-    };
-    v1_auth_visitor_verify_confirm_create: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Caller platform. `expo` returns the refresh token in the response body (auth responses) and accepts it in the request body (refresh); `web` (default) uses the httpOnly refresh cookie. */
-                "X-Client-Platform"?: "expo" | "web";
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VisitorVerifyConfirm"];
-                "application/x-www-form-urlencoded": components["schemas"]["VisitorVerifyConfirm"];
-                "multipart/form-data": components["schemas"]["VisitorVerifyConfirm"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthResponse"];
-                };
-            };
-        };
-    };
-    v1_auth_visitor_verify_email_retrieve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetailResponse"];
-                };
-            };
-        };
-    };
-    v1_auth_visitor_verify_start_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VisitorVerifyStart"];
-                "application/x-www-form-urlencoded": components["schemas"]["VisitorVerifyStart"];
-                "multipart/form-data": components["schemas"]["VisitorVerifyStart"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VisitorVerifyStartResponse"];
                 };
             };
         };
@@ -3820,6 +3849,394 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedBookingList"];
+                };
+            };
+        };
+    };
+    headless_browser_signup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessSignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_browser_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_browser_email_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessVerifyEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_browser_email_verify_resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_browser_password_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessRequestPasswordResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_browser_password_reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_app_signup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessSignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_app_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_app_email_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessVerifyEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_app_email_verify_resend: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_app_password_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessRequestPasswordResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
+                };
+            };
+        };
+    };
+    headless_app_password_reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeadlessResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessAuthResponse"];
+                };
+            };
+            /** @description Validation error (allauth `{status, errors}`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadlessErrorResponse"];
                 };
             };
         };

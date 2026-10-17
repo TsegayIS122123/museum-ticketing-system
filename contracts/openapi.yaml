@@ -185,40 +185,13 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/auth/forgot-password/:
-    post:
-      operationId: v1_auth_forgot_password_create
-      description: |-
-        POST /auth/forgot-password -- Staff only (FR-ACC-006). Always 200;
-        see services.request_password_reset for why.
-      tags:
-      - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ForgotPassword'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ForgotPassword'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ForgotPassword'
-        required: true
-      security:
-      - TokenVersionAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetailResponse'
-          description: ''
   /api/v1/auth/login/:
     post:
       operationId: v1_auth_login_create
-      description: POST /auth/login -- Staff only (FR-ACC-002, FR-ACC-005).
+      description: |-
+        POST /auth/login -- the single front-door sign-in for every role
+        (FR-ACC-002, FR-ACC-005, revised). Email + password only; the caller's
+        `role` is returned on `user` and the client routes from there.
       parameters:
       - in: header
         name: X-Client-Platform
@@ -237,13 +210,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StaffLogin'
+              $ref: '#/components/schemas/Login'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/StaffLogin'
+              $ref: '#/components/schemas/Login'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/StaffLogin'
+              $ref: '#/components/schemas/Login'
         required: true
       security:
       - TokenVersionAuth: []
@@ -255,7 +228,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
               examples:
-                StaffLogin(mock):
+                SignIn(mock):
                   value:
                     access_token: mock-access-token
                     user:
@@ -266,23 +239,18 @@ paths:
                       role: museum_manager
                       language_preference: en
                       active: true
+                      email_verified_at: null
+                      phone_verified_at: null
                       created_at: '2026-01-01T00:00:00Z'
-                  summary: Staff login (mock)
+                  summary: Sign in (mock)
           description: ''
   /api/v1/auth/logout/:
     post:
       operationId: v1_auth_logout_create
       description: |-
         POST /auth/logout -- clears the refresh-token cookie so the browser
-        stops presenting it. Note: this does not blacklist the token
-        server-side -- SIMPLE_JWT.BLACKLIST_AFTER_ROTATION=True already assumes
-        that, but `rest_framework_simplejwt.token_blacklist` isn't in
-        INSTALLED_APPS (config/settings/base.py), so today every rotation's
-        `refresh.blacklist()` call is silently swallowed (simplejwt only
-        defines that method when the app is installed, and the rotation code
-        catches the resulting AttributeError). Worth installing + migrating
-        that app separately so old refresh tokens are actually invalidated,
-        not just no-longer-cookied on this device.
+        stops presenting it. Server-side refresh-token revocation is handled by
+        SIMPLE_JWT rotation/blacklist semantics, not this view.
       tags:
       - v1
       security:
@@ -298,14 +266,12 @@ paths:
     post:
       operationId: v1_auth_refresh_create
       description: |-
-        POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py),
-        shared by both credential paths (Sec 4.1).
+        POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py).
 
         Reads the refresh token from the httpOnly cookie set by `_auth_response`
         above instead of requiring it in the request body -- the frontend never
-        holds or sends the refresh token itself (cookies.py). Re-sets the
-        cookie with the rotated token on success, per SIMPLE_JWT's
-        ROTATE_REFRESH_TOKENS.
+        holds or sends the refresh token itself (cookies.py). Re-sets the cookie
+        with the rotated token on success, per SIMPLE_JWT's ROTATE_REFRESH_TOKENS.
       parameters:
       - in: header
         name: X-Client-Platform
@@ -345,133 +311,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DetailResponse'
-          description: ''
-  /api/v1/auth/reset-password/:
-    post:
-      operationId: v1_auth_reset_password_create
-      description: POST /auth/reset-password -- Staff only (FR-ACC-006).
-      tags:
-      - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ResetPassword'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ResetPassword'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ResetPassword'
-        required: true
-      security:
-      - TokenVersionAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetailResponse'
-          description: ''
-  /api/v1/auth/visitor/verify/confirm/:
-    post:
-      operationId: v1_auth_visitor_verify_confirm_create
-      description: |-
-        POST /auth/visitor/verify/confirm -- completes Visitor verification
-        and issues the same token pair Staff login does (Sec 4.1).
-      parameters:
-      - in: header
-        name: X-Client-Platform
-        schema:
-          type: string
-          enum:
-          - expo
-          - web
-          default: web
-        description: Caller platform. `expo` returns the refresh token in the response
-          body (auth responses) and accepts it in the request body (refresh); `web`
-          (default) uses the httpOnly refresh cookie.
-      tags:
-      - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VisitorVerifyConfirm'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/VisitorVerifyConfirm'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/VisitorVerifyConfirm'
-        required: true
-      security:
-      - TokenVersionAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-          description: ''
-  /api/v1/auth/visitor/verify/email/{token}/:
-    get:
-      operationId: v1_auth_visitor_verify_email_retrieve
-      description: |-
-        GET /auth/visitor/verify/email/{token} -- the secondary/fallback
-        verification channel (Sec 4.1 step 2). Opening this link marks
-        `email_verified_at` but never issues a session on its own; only the
-        OTP path above does that.
-      parameters:
-      - in: path
-        name: token
-        schema:
-          type: string
-        required: true
-      tags:
-      - v1
-      security:
-      - TokenVersionAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetailResponse'
-          description: ''
-  /api/v1/auth/visitor/verify/start/:
-    post:
-      operationId: v1_auth_visitor_verify_start_create
-      description: |-
-        POST /auth/visitor/verify/start (FR-ACC-001, FR-ACC-003, FR-ACC-004).
-        Used for both a first-time booking and a returning Visitor looking up
-        their history -- there is no separate "login" for a Visitor.
-      tags:
-      - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VisitorVerifyStart'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/VisitorVerifyStart'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/VisitorVerifyStart'
-        required: true
-      security:
-      - TokenVersionAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VisitorVerifyStartResponse'
           description: ''
   /api/v1/availability/:
     get:
@@ -1941,19 +1780,339 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedBookingList'
           description: ''
+  /_allauth/browser/v1/auth/signup:
+    post:
+      operationId: headless_browser_signup
+      tags:
+      - auth (allauth headless)
+      summary: Create an account (unified, all roles). [browser client]
+      description: django-allauth headless endpoint (browser client). The browser
+        client authenticates via allauth's session cookie; no tokens are returned
+        here.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessSignupRequest'
+        required: true
+  /_allauth/browser/v1/auth/login:
+    post:
+      operationId: headless_browser_login
+      tags:
+      - auth (allauth headless)
+      summary: Authenticate; `data.user` carries the role. [browser client]
+      description: django-allauth headless endpoint (browser client). The browser
+        client authenticates via allauth's session cookie; no tokens are returned
+        here.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessLoginRequest'
+        required: true
+  /_allauth/browser/v1/auth/email/verify:
+    post:
+      operationId: headless_browser_email_verify
+      tags:
+      - auth (allauth headless)
+      summary: Verify an email with the 6-digit code or emailed link token. [browser
+        client]
+      description: django-allauth headless endpoint (browser client). The browser
+        client authenticates via allauth's session cookie; no tokens are returned
+        here.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessVerifyEmailRequest'
+        required: true
+  /_allauth/browser/v1/auth/email/verify/resend:
+    post:
+      operationId: headless_browser_email_verify_resend
+      tags:
+      - auth (allauth headless)
+      summary: Resend the verification email/code. [browser client]
+      description: django-allauth headless endpoint (browser client). The browser
+        client authenticates via allauth's session cookie; no tokens are returned
+        here.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+  /_allauth/browser/v1/auth/password/request:
+    post:
+      operationId: headless_browser_password_request
+      tags:
+      - auth (allauth headless)
+      summary: Request a password-reset email (code + link). [browser client]
+      description: django-allauth headless endpoint (browser client). The browser
+        client authenticates via allauth's session cookie; no tokens are returned
+        here.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessRequestPasswordResetRequest'
+        required: true
+  /_allauth/browser/v1/auth/password/reset:
+    post:
+      operationId: headless_browser_password_reset
+      tags:
+      - auth (allauth headless)
+      summary: Complete a password reset with the code or link token. [browser client]
+      description: django-allauth headless endpoint (browser client). The browser
+        client authenticates via allauth's session cookie; no tokens are returned
+        here.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessResetPasswordRequest'
+        required: true
+  /_allauth/app/v1/auth/signup:
+    post:
+      operationId: headless_app_signup
+      tags:
+      - auth (allauth headless)
+      summary: Create an account (unified, all roles). [app client]
+      description: django-allauth headless endpoint (app client). `meta.access_token`
+        and `meta.refresh_token` carry the app's SimpleJWT.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessSignupRequest'
+        required: true
+  /_allauth/app/v1/auth/login:
+    post:
+      operationId: headless_app_login
+      tags:
+      - auth (allauth headless)
+      summary: Authenticate; `data.user` carries the role. [app client]
+      description: django-allauth headless endpoint (app client). `meta.access_token`
+        and `meta.refresh_token` carry the app's SimpleJWT.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessLoginRequest'
+        required: true
+  /_allauth/app/v1/auth/email/verify:
+    post:
+      operationId: headless_app_email_verify
+      tags:
+      - auth (allauth headless)
+      summary: Verify an email with the 6-digit code or emailed link token. [app client]
+      description: django-allauth headless endpoint (app client). `meta.access_token`
+        and `meta.refresh_token` carry the app's SimpleJWT.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessVerifyEmailRequest'
+        required: true
+  /_allauth/app/v1/auth/email/verify/resend:
+    post:
+      operationId: headless_app_email_verify_resend
+      tags:
+      - auth (allauth headless)
+      summary: Resend the verification email/code. [app client]
+      description: django-allauth headless endpoint (app client). `meta.access_token`
+        and `meta.refresh_token` carry the app's SimpleJWT.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+  /_allauth/app/v1/auth/password/request:
+    post:
+      operationId: headless_app_password_request
+      tags:
+      - auth (allauth headless)
+      summary: Request a password-reset email (code + link). [app client]
+      description: django-allauth headless endpoint (app client). `meta.access_token`
+        and `meta.refresh_token` carry the app's SimpleJWT.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessRequestPasswordResetRequest'
+        required: true
+  /_allauth/app/v1/auth/password/reset:
+    post:
+      operationId: headless_app_password_reset
+      tags:
+      - auth (allauth headless)
+      summary: Complete a password reset with the code or link token. [app client]
+      description: django-allauth headless endpoint (app client). `meta.access_token`
+        and `meta.refresh_token` carry the app's SimpleJWT.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessAuthResponse'
+        '400':
+          description: Validation error (allauth `{status, errors}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeadlessErrorResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeadlessResetPasswordRequest'
+        required: true
 components:
   schemas:
     Account:
       type: object
       description: |-
-        `UserProfile` (Document 04) -- Visitor and Staff share one shape; a
-        Visitor's password-adjacent fields are simply never populated.
+        `UserProfile` (Document 04) -- all four roles share one shape.
 
         `email_verified_at`/`phone_verified_at` are exposed (read-only) so the
-        frontend can gate a Visitor's flow -- e.g. requiring email verification
-        right after OTP confirmation (FR-ACC-003) -- without having to guess at
+        frontend can gate a Visitor's flow without having to guess at
         verification state or discover it only when a later action (like
-        `create_booking`) rejects it.
+        `create_booking`) rejects it. Email verification itself is tracked by
+        django-allauth's `EmailAddress.verified` (the authoritative source for
+        the headless flows); these columns are retained for backward
+        compatibility.
       properties:
         id:
           type: string
@@ -3222,15 +3381,6 @@ components:
           type: string
           nullable: true
           maxLength: 1000
-    ForgotPassword:
-      type: object
-      description: '`ForgotPasswordRequest` -- Staff only (FR-ACC-006).'
-      properties:
-        email:
-          type: string
-          format: email
-      required:
-      - email
     GranularityEnum:
       enum:
       - daily
@@ -3251,6 +3401,94 @@ components:
       required:
       - group
       - individual
+    HeadlessAuthResponse:
+      type: object
+      description: django-allauth headless envelope. `data` carries the affected resources
+        (e.g. `user`); `meta` carries out-of-band values -- for the `app` client this
+        includes the app's SimpleJWT as `access_token` + `refresh_token`.
+      properties:
+        status:
+          type: integer
+          example: 200
+        data:
+          type: object
+          additionalProperties: true
+        meta:
+          type: object
+          additionalProperties: true
+          description: '`access_token` / `refresh_token` are present only for `/_allauth/app/v1/...`
+            requests.'
+    HeadlessErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              param:
+                type: string
+                nullable: true
+              message:
+                type: string
+    HeadlessLoginRequest:
+      type: object
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    HeadlessRequestPasswordResetRequest:
+      type: object
+      required:
+      - email
+      properties:
+        email:
+          type: string
+          format: email
+    HeadlessResetPasswordRequest:
+      type: object
+      required:
+      - key
+      - password
+      properties:
+        key:
+          type: string
+        password:
+          type: string
+          format: password
+    HeadlessSignupRequest:
+      type: object
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        password:
+          type: string
+          format: password
+    HeadlessVerifyEmailRequest:
+      type: object
+      required:
+      - key
+      properties:
+        key:
+          type: string
+          description: The 6-digit code or the link token from the verification email.
     Institution:
       type: object
       description: |-
@@ -3448,6 +3686,21 @@ components:
       description: |-
         * `en` - English
         * `am` - Amharic
+    Login:
+      type: object
+      description: |-
+        `LoginRequest` -- the single front-door sign-in for every role
+        (visitor / cashier / museum_manager / platform_admin).
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - email
+      - password
     NotificationPreference:
       type: object
       description: |-
@@ -3873,18 +4126,6 @@ components:
       - revenueByCategory
       - to
       - visitorCountsByGroup
-    ResetPassword:
-      type: object
-      description: '`ResetPasswordRequest` -- Staff only (FR-ACC-006).'
-      properties:
-        token:
-          type: string
-        new_password:
-          type: string
-          writeOnly: true
-      required:
-      - new_password
-      - token
     RevenuePeriodBucket:
       type: object
       properties:
@@ -3985,19 +4226,6 @@ components:
       - email
       - full_name
       - role
-    StaffLogin:
-      type: object
-      description: '`LoginRequest` -- Staff only (FR-ACC-002, FR-ACC-005).'
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          writeOnly: true
-      required:
-      - email
-      - password
     StaffRoleEnum:
       enum:
       - cashier
@@ -4061,52 +4289,6 @@ components:
             expo`.'
       required:
       - access
-    VisitorVerifyConfirm:
-      type: object
-      description: '`VisitorVerifyConfirmRequest`.'
-      properties:
-        verification_id:
-          type: string
-          format: uuid
-        otp_code:
-          type: string
-          maxLength: 6
-          minLength: 6
-      required:
-      - otp_code
-      - verification_id
-    VisitorVerifyStart:
-      type: object
-      description: |-
-        `VisitorVerifyStartRequest` (Document 04) -- FR-ACC-001, FR-ACC-003.
-        No password field exists here or anywhere in the Visitor path.
-      properties:
-        email:
-          type: string
-          format: email
-        phone:
-          type: string
-          maxLength: 32
-        full_name:
-          type: string
-          default: ''
-          maxLength: 255
-        language_preference:
-          $ref: '#/components/schemas/LanguagePreferenceEnum'
-      required:
-      - email
-      - phone
-    VisitorVerifyStartResponse:
-      type: object
-      properties:
-        verification_id:
-          type: string
-          format: uuid
-        otp_expires_in_seconds:
-          type: integer
-      required:
-      - otp_expires_in_seconds
-      - verification_id
     Voucher:
       type: object
       description: |-
