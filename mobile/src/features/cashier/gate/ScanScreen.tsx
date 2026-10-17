@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -11,7 +12,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { LookupField } from './LookupField';
 import { BookingResult } from './BookingResult';
 import { useGateLookup } from './useGateLookup';
-import { BOOKING_REFERENCE_REGEX } from '@/constants/config';
+import { isValidReference } from '@/utils/reference';
 import { useEnqueueCheckIn, useProcessSyncQueue } from '@/features/cashier/offline/useOfflineSync';
 import { useOffline } from '@/features/shared/useOffline';
 
@@ -39,7 +40,7 @@ export function ScanScreen() {
     (data: string) => {
       if (scanLock) return;
       const ref = data.trim().toUpperCase();
-      if (!BOOKING_REFERENCE_REGEX.test(ref)) return;
+      if (!isValidReference(ref)) return;
       if (lastScanRef.current === ref) return;
       lastScanRef.current = ref;
       setScanLock(true);

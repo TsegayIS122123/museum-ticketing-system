@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
-import { colors, spacing, typography } from '@/theme';
-import { BOOKING_REFERENCE_REGEX } from '@/constants/config';
+import { spacing } from '@/theme';
+import { isValidReference } from '@/utils/reference';
 
 interface LookupFieldProps {
   onSubmit: (reference: string) => void;
@@ -19,7 +19,7 @@ export function LookupField({ onSubmit, loading = false }: LookupFieldProps) {
 
   const handleSubmit = () => {
     const ref = value.trim().toUpperCase();
-    if (!BOOKING_REFERENCE_REGEX.test(ref)) {
+    if (!isValidReference(ref)) {
       setError(t('invalidReference', 'Enter a valid 8-character reference (e.g., K7M2QP4A).'));
       return;
     }
