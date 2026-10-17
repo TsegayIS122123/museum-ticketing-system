@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useAuth } from '@/lib/auth/auth-context';
 import type { UserRole } from '@/lib/auth/roles';
-import { isStaff } from '@/lib/auth/roles';
+import { getPostLoginPath } from '@/lib/auth/roles';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,7 +16,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({
   children,
   allowedRoles,
-  redirectTo = '/verify',
+  redirectTo = '/signin',
 }: ProtectedRouteProps) {
   const { t, locale } = useTranslation();
   const router = useRouter();
@@ -31,18 +31,10 @@ export function ProtectedRoute({
     }
 
     if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-      // Redirect to appropriate dashboard based on role
-      if (user.role === 'visitor') {
-        router.push(`/${locale}/`);
-      } else if (user.role === 'cashier') {
-        router.push(`/${locale}/staff/gate`);
-      } else if (user.role === 'museum_manager') {
-        router.push(`/${locale}/staff/dashboard`);
-      } else if (user.role === 'platform_admin') {
-        router.push(`/${locale}/staff/admin/staff`);
-      } else {
-        router.push(`/${locale}/`);
-      }
+      // Send the wrong-role user to their own home: a visitor bounced off a
+      // staff page goes back to the public site, staff go to their dashboard
+      // (getPostLoginPath owns that mapping).
+      router.push(user.role === 'visitor' ? `/${locale}` : getPostLoginPath(locale, user.role));
     }
   }, [isAuthenticated, isLoading, user, allowedRoles, locale, router, redirectTo]);
 

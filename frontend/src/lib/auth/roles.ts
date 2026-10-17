@@ -33,12 +33,12 @@ export function getRoleDisplayName(role: UserRole, t?: (key: string) => string):
 }
 
 export function getStaffRoutes(role: UserRole): string[] {
-  const baseRoutes = ['/staff/login'];
-  
+  const baseRoutes = ['/signin'];
+
   if (role === 'cashier') {
     return [...baseRoutes, '/staff/gate', '/staff/settlement'];
   }
-  
+
   if (role === 'museum_manager') {
     return [
       ...baseRoutes,
@@ -49,10 +49,27 @@ export function getStaffRoutes(role: UserRole): string[] {
       '/staff/reports',
     ];
   }
-  
+
   if (role === 'platform_admin') {
     return [...baseRoutes, '/staff/admin/staff'];
   }
-  
+
   return baseRoutes;
+}
+
+// Where a role lands after signing in at the single front door
+// (/{lang}/signin). The server returns `user.role`; the *client* routes from
+// it (FR-ACC-002) -- this is the one place that mapping lives, so SignInForm
+// and ProtectedRoute can't drift apart.
+export function getPostLoginPath(locale: string, role: UserRole): string {
+  switch (role) {
+    case 'cashier':
+      return `/${locale}/staff/gate`;
+    case 'museum_manager':
+      return `/${locale}/staff/dashboard`;
+    case 'platform_admin':
+      return `/${locale}/staff/admin/staff`;
+    default:
+      return `/${locale}/bookings`;
+  }
 }

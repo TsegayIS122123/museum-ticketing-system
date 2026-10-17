@@ -24,9 +24,9 @@ export function GroupVisitRequestForm({ onSuccess }: GroupVisitRequestFormProps)
   const router = useRouter();
 
   // Login gating lives in app/[lang]/group-visits/new/page.tsx (it sends
-  // visitors to /verify?redirect=/group-visits/new and only mounts this
-  // form once they're verified). A second redirect here used a different
-  // query param and could race the page's, so it was removed.
+  // signed-out visitors to /signin and unverified ones to /verify-email, and
+  // only mounts this form once they're verified). A second redirect here used
+  // a different query param and could race the page's, so it was removed.
   const [categories, setCategories] = useState<Category[]>([]);
   useEffect(() => {
     getCategories()

@@ -1,0 +1,18 @@
+import { Suspense } from 'react';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { SignUpForm } from '@/features/account/components/SignUpForm';
+
+export default function RegisterPage() {
+  return (
+    <div className="min-h-screen flex flex-col" data-surface="visitor">
+      <PublicHeader />
+      <main className="flex-1 flex items-center justify-center px-4 py-12">
+        {/* SignUpForm reads ?redirect= via useSearchParams, which requires a
+            Suspense boundary for static rendering. */}
+        <Suspense fallback={null}>
+          <SignUpForm />
+        </Suspense>
+      </main>
+    </div>
+  );
+}

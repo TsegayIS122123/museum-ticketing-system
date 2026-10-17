@@ -7,8 +7,20 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        // Staff tools and anything behind a visitor's own account.
-        disallow: ['/en/staff', '/am/staff', '/en/bookings', '/am/bookings', '/en/settings', '/am/settings', '/en/verify', '/am/verify', '/en/reset-password', '/am/reset-password'],
+        // Staff tools, a visitor's own account, and every auth screen
+        // (signin/register/verification/password recovery) -- there is no
+        // search value in indexing a login form.
+        disallow: [
+          '/en/staff', '/am/staff',
+          '/en/bookings', '/am/bookings',
+          '/en/settings', '/am/settings',
+          '/en/signin', '/am/signin',
+          '/en/register', '/am/register',
+          '/en/verify', '/am/verify',
+          '/en/verify-email', '/am/verify-email',
+          '/en/forgot-password', '/am/forgot-password',
+          '/en/reset-password', '/am/reset-password',
+        ],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

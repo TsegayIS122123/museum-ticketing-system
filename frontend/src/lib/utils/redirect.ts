@@ -2,24 +2,36 @@
  * Post-login redirect helpers.
  *
  * A visitor who taps "Book a visit" while signed out is sent to
- * `/{locale}/verify?redirect=/book` (or `/group-visits/new` for a school).
- * After identity verification she should land on that page directly, not on
- * the generic bookings list.
+ * `/{locale}/signin?redirect=/book` (or `/group-visits/new` for a school).
+ * After signing in she should land on that page directly, not on the
+ * generic bookings list.
  */
 
 const STORAGE_KEY = 'museum:post-verify-redirect';
 // The email-confirmation link opens in a new tab, possibly a while after the
-// visitor left /verify, so the intent has to outlive the page (and tab) but
+// visitor left /register, so the intent has to outlive the page (and tab) but
 // not linger forever -- a stale one would hijack some later, unrelated login.
 const TTL_MS = 30 * 60 * 1000;
 
 const LOCALE_PREFIX = /^\/(en|am)(?=\/|$)/;
 
+// Auth pages a redirect must never target: sending the user back to a sign-in
+// / verification screen from within the post-login redirect would loop.
+const AUTH_PATH_PREFIXES = [
+  '/verify',
+  '/signin',
+  '/register',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
+];
+
 /**
  * Accepts only same-site, in-app paths (`/book`, `/en/group-visits/new`,
  * `/book?x=1`) and returns them locale-prefixed for `locale`. Anything
  * else -- absolute URLs, protocol-relative `//evil.com`, backslash tricks,
- * the verify page itself (redirect loop) -- yields `null`.
+ * the auth pages themselves (redirect loop), staff areas (they have their
+ * own landing) -- yields `null`.
  */
 export function safeRedirectPath(raw: string | null | undefined, locale: string): string | null {
   if (!raw) return null;
@@ -29,7 +41,9 @@ export function safeRedirectPath(raw: string | null | undefined, locale: string)
 
   path = path.replace(LOCALE_PREFIX, '') || '/';
   if (!path.startsWith('/')) path = `/${path}`;
-  if (path === '/verify' || path.startsWith('/verify/') || path.startsWith('/verify?')) return null;
+  if (AUTH_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`))) {
+    return null;
+  }
   if (path === '/staff' || path.startsWith('/staff/')) return null;
 
   return `/${locale}${path === '/' ? '' : path}`;

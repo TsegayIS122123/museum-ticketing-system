@@ -23,7 +23,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
     if (isLoading || isPublicRoute) return;
 
     if (!isAuthenticated || !user || !isStaff(user.role)) {
-      router.push(`/${locale}/staff/login`);
+      router.push(`/${locale}/signin`);
     }
   }, [isAuthenticated, isLoading, user, locale, router, isPublicRoute]);
 

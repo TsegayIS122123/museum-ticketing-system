@@ -225,6 +225,111 @@ async function downloadFile(path: string): Promise<Blob> {
   return response.blob();
 }
 
+// The API origin without the `/api/v1` suffix -- django-allauth's headless
+// endpoints are mounted at the site root (`/_allauth/...`), not under the
+// versioned API prefix (config/urls.py).
+const API_ORIGIN = API_BASE.replace(/\/api\/v1\/?$/, '');
+
+function currentLocale(): string {
+  if (typeof window === 'undefined') return 'en';
+  const match = window.location.pathname.match(/^\/(en|am)/);
+  return match ? match[1] : 'en';
+}
+
+// django-allauth's error envelope is `{status, errors:[{code,param,message}]}`
+// -- nothing like this app's own `{error:{code,message,fieldErrors}}`
+// (apps/core/exceptions.py). Normalize it into the same `ApiError` every
+// other call site already understands, so `isApiError`/`.message` keep
+// working and callers don't need a second error type.
+function headlessError(data: unknown): ApiError {
+  const payload = data as { errors?: Array<{ code?: string; param?: string; message?: string }>; detail?: string };
+  const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+  const first = errors[0];
+  const fieldErrors = errors.length
+    ? Object.fromEntries(
+        errors.filter((e) => e.param).map((e) => [e.param as string, e.message ?? 'Invalid value'])
+      )
+    : undefined;
+  return new ApiError({
+    error: {
+      code: (first?.code || 'error').toUpperCase(),
+      message: first?.message || payload?.detail || 'An unexpected error occurred',
+      fieldErrors,
+    },
+  });
+}
+
+// Calls django-allauth's headless **app** client (/_allauth/app/v1/...).
+// The app client is `csrf_exempt` and token-based (allauth/headless/
+// internal/decorators.py's `app_view`), unlike the browser client which
+// requires a cross-origin CSRF token the web app cannot read. That makes it
+// the right choice for both the web frontend (whose session still comes from
+// POST /auth/login/, so it simply ignores the returned `meta` tokens) and
+// mobile (which reads them). Note: allauth paths have NO trailing slash, so
+// this deliberately does not reuse normalizePath.
+//
+// Status semantics (verified against the running backend): 200 = success;
+// 401 = allauth's "not authenticated" envelope, which is the *expected*
+// success shape for signup-pending-verification and for a completed password
+// reset (both carry `data.flows`/`meta` and no `errors`); 400 with an `errors`
+// array = validation failure; 409 (`{status}`) = invalid/expired key or an
+// absent/reset verification process. So only throw when `errors` is present,
+// or on a 4xx/5xx that isn't 401.
+export async function headlessRequest<T>(
+  path: string,
+  body?: unknown,
+  options?: { sessionToken?: string }
+): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept-Language': currentLocale(),
+  };
+  // Continues an allauth app-client flow (email verification / resend). The
+  // token is minted by `meta.session_token` on the signup response and is the
+  // app client's alternative to the browser client's session cookie.
+  if (options?.sessionToken) {
+    headers['X-Session-Token'] = options.sessionToken;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_ORIGIN}/_allauth/app/v1${path}`, {
+      method: 'POST',
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include',
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error(
+      'Network error - could not reach the server. Please check your connection and try again.'
+    );
+  }
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('Invalid response from server');
+  }
+
+  const envelope = data as { errors?: unknown[] };
+  if (Array.isArray(envelope?.errors) && envelope.errors.length > 0) {
+    throw headlessError(data);
+  }
+
+  if (response.ok || response.status === 401) {
+    return data as T;
+  }
+
+  throw new ApiError({
+    error: {
+      code: `HTTP_${response.status}`,
+      message: 'This request is invalid or has expired. Please try again.',
+    },
+  });
+}
+
 export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: 'GET' }),
   downloadFile,

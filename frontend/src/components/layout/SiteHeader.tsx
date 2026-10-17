@@ -89,12 +89,9 @@ export function SiteHeader() {
 
   const profilePath = `/${locale}/settings/account`;
 
-  // "Visitor verification" is how a signed-out visitor logs in (email +
-  // phone -> OTP) -- it has nothing left to offer someone who's already
-  // authenticated, and showing "Verify" to an already-verified visitor
-  // reads as a broken nav item ("verify" *what*, exactly?). So it only
-  // ever appears here for a signed-out visitor; once logged in, this
-  // link simply drops out of both the desktop nav and the mobile panel.
+  // FR-ACC-002: one front door for every role. A signed-out visitor sees the
+  // Sign In / Create account pair (there is no separate staff login any more);
+  // once authenticated they collapse away, leaving the visitor's own actions.
   const navLinks = isStaffArea || isStaffUser
     ? []
     : [
@@ -102,7 +99,10 @@ export function SiteHeader() {
         { href: `/${locale}/bookings`, label: t('footer_manage_bookings') || 'Manage bookings' },
         ...(isAuthenticated
           ? []
-          : [{ href: `/${locale}/verify`, label: t('footer_visitor_verification') || 'Visitor verification' }]),
+          : [
+              { href: `/${locale}/signin`, label: t('sign_in') || 'Sign In' },
+              { href: `/${locale}/register`, label: t('sign_up') || 'Create account' },
+            ]),
       ];
 
   const displayName = user ? (user.full_name || user.email) : '';

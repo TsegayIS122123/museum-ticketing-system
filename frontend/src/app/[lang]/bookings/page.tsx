@@ -47,7 +47,7 @@ export default function MyBookingsPage() {
     if (authLoading) return;
 
     if (!isAuthenticated) {
-      router.push(`/${locale}/verify`);
+      router.push(`/${locale}/signin`);
       return;
     }
 

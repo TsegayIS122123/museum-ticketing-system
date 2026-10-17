@@ -14,18 +14,18 @@ export default function NewGroupVisitPage() {
 
   // Same gate as book/page.tsx, and for the same reason: create_booking
   // (this form's booking_type=GROUP goes through the same service call
-  // as an individual booking) requires email_verified_at too, not just
-  // phone/OTP. Checking it here sends an unverified visitor to /verify
-  // before she fills out the group-visit form, not after.
+  // as an individual booking) requires email_verified_at too. A signed-out
+  // visitor goes to the front door (/signin); one who is signed in but not
+  // yet verified goes to /verify-email -- both with a return path.
   useEffect(() => {
     if (isLoading) return;
 
     if (!isAuthenticated) {
-      router.push(`/${locale}/verify?redirect=/group-visits/new`);
+      router.push(`/${locale}/signin?redirect=/group-visits/new`);
       return;
     }
     if (user && !user.email_verified_at) {
-      router.push(`/${locale}/verify?redirect=/group-visits/new`);
+      router.push(`/${locale}/verify-email?redirect=/group-visits/new`);
     }
   }, [isAuthenticated, isLoading, user, locale, router]);
 

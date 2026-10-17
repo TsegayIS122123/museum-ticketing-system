@@ -5,16 +5,19 @@ import { usePathname } from 'next/navigation';
 import { setAccessToken, clearAuthTokens, refreshAccessToken } from '@/lib/api/client';
 import { apiClient } from '@/lib/api/client';
 
-// Routes that exist specifically for a visitor with NO valid session --
-// credential recovery and the login form itself. Attempting a silent
-// refresh here is never useful (a signed-in visitor has no reason to be
-// on /forgot-password or /reset-password) and, if a stale refresh-token
-// cookie happens to be present, adds a pointless failed /auth/refresh/
-// call to every page load. Matched with a trailing-segment check so it
-// still hits under any `/{lang}/...` prefix (e.g. `/en/staff/login`).
+// Routes that exist specifically for someone with NO valid session --
+// credential recovery and the sign-in/sign-up forms themselves. Attempting a
+// silent refresh here is never useful (a signed-in user has no reason to be
+// on /signin, /register, /verify-email, /forgot-password or /reset-password)
+// and, if a stale refresh-token cookie happens to be present, adds a
+// pointless failed /auth/refresh/ call to every page load. Matched with a
+// trailing-segment check so it still hits under any `/{lang}/...` prefix
+// (e.g. `/en/signin`).
 const PUBLIC_AUTH_ROUTE_SEGMENTS = [
-  '/staff/login',
-  '/staff/forgot-password',
+  '/signin',
+  '/register',
+  '/verify-email',
+  '/forgot-password',
   '/reset-password',
 ];
 
@@ -35,10 +38,11 @@ interface User {
   role: 'visitor' | 'cashier' | 'museum_manager' | 'platform_admin';
   language_preference: 'en' | 'am';
   active: boolean;
-  // Both null until proven -- a Visitor's `verify` flow (OTP) sets
-  // phone_verified_at immediately, but email_verified_at only flips once
-  // the emailed magic link is opened (features/account/api.ts's
-  // confirmEmailVerification). Staff accounts never set either.
+  // Both null until proven. For self-registered accounts email_verified_at
+  // flips when django-allauth confirms the address (code or link); it is
+  // kept in sync by apps.accounts.signals. phone_verified_at is retained for
+  // the historical schema but is no longer set anywhere (the email+password
+  // model dropped phone verification), and staff accounts never set either.
   email_verified_at: string | null;
   phone_verified_at: string | null;
   created_at: string;

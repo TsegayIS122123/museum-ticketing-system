@@ -1,18 +1,25 @@
-import { Suspense } from 'react';
-import { VisitorVerifyForm } from '@/features/account/components/VisitorVerifyForm';
-import { PublicHeader } from '@/components/layout/PublicHeader';
+import { redirect } from 'next/navigation';
 
-export default function VerifyPage() {
-  return (
-    <div className="min-h-screen flex flex-col" data-surface="visitor">
-      <PublicHeader />
-      <main className="flex-1 flex items-center justify-center px-4 py-12">
-        {/* VisitorVerifyForm reads ?redirect= via useSearchParams, which
-            needs a Suspense boundary for static rendering. */}
-        <Suspense fallback={null}>
-          <VisitorVerifyForm />
-        </Suspense>
-      </main>
-    </div>
-  );
+// Legacy alias. `/verify` was the visitor phone-OTP entry point; the unified
+// email+password sign-in replaces it at `/signin` (FR-ACC-002). Bookmarks and
+// any stale `?redirect=` links (e.g. from the "Book a visit" bounce) are
+// forwarded, not 404'd.
+export default async function VerifyRedirectPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { lang } = await params;
+  const sp = await searchParams;
+
+  const query = new URLSearchParams();
+  const redirectTarget = sp.redirect ?? sp.next;
+  if (typeof redirectTarget === 'string' && redirectTarget) {
+    query.set('redirect', redirectTarget);
+  }
+  const qs = query.toString();
+
+  redirect(`/${lang}/signin${qs ? `?${qs}` : ''}`);
 }
