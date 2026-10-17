@@ -11,7 +11,7 @@ const HOME_BY_ROLE: Record<Role, string> = {
 };
 
 export function homeForRole(role: Role): string {
-  return HOME_BY_ROLE[role] ?? '/(auth)/visitor-verify';
+  return HOME_BY_ROLE[role] ?? '/(auth)/sign-in';
 }
 
 export function RequireRole({
@@ -23,7 +23,7 @@ export function RequireRole({
 }) {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
-  if (!user) return <Redirect href="/(auth)/visitor-verify" />;
+  if (!user) return <Redirect href="/(auth)/sign-in" />;
   if (user.role !== role) return <Redirect href={homeForRole(user.role) as any} />;
   return <>{children}</>;
 }

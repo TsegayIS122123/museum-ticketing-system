@@ -14,7 +14,7 @@ export default function Index() {
     if (user) {
       router.replace(homeForRole(user.role) as any);
     } else {
-      router.replace('/(auth)/visitor-verify');
+      router.replace('/(auth)/sign-in');
     }
   }, [user, isLoading, router]);
 

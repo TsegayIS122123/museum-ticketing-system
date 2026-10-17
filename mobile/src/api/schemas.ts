@@ -16,6 +16,8 @@ export const userProfileSchema = z.object({
   role: roleEnum,
   language_preference: z.enum(['en', 'am']),
   active: z.boolean(),
+  email_verified_at: z.string().nullable().optional(),
+  phone_verified_at: z.string().nullable().optional(),
   created_at: z.string().optional(),
 });
 
@@ -25,10 +27,36 @@ export const authResponseSchema = z.object({
   user: userProfileSchema,
 });
 
-export const visitorVerifyStartSchema = z.object({
-  verification_id: z.string(),
-  otp_expires_in_seconds: z.number(),
+// django-allauth's headless envelope (/_allauth/app/v1/...). `data.user` is
+// the full Account profile (AccountHeadlessAdapter); `data.flows` describes
+// what the client may do next (returned on an unauthenticated response); and
+// `meta` carries the app's SimpleJWT (access_token / refresh_token) plus the
+// `session_token` that continues the email-verification flow.
+export const headlessFlowSchema = z.object({
+  id: z.string(),
+  is_pending: z.boolean().optional(),
+});
+
+export const headlessEnvelopeSchema = z.object({
+  status: z.number(),
+  data: z
+    .object({
+      user: userProfileSchema.optional(),
+      flows: z.array(headlessFlowSchema).optional(),
+    })
+    .passthrough()
+    .optional(),
+  meta: z
+    .object({
+      access_token: z.string().optional(),
+      refresh_token: z.string().optional(),
+      session_token: z.string().optional(),
+      is_authenticated: z.boolean().optional(),
+    })
+    .passthrough()
+    .optional(),
 });
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
+export type HeadlessEnvelope = z.infer<typeof headlessEnvelopeSchema>;

@@ -9,13 +9,16 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
-import { staffLogin, useAuthActions } from '@/api/queries/auth';
+import { login, useAuthActions } from '@/api/queries/auth';
 import { isApiError } from '@/api/errors';
 import { homeForRole } from '@/auth/guards';
 import { ASSETS } from '@/constants/assets';
 import { colors, spacing } from '@/theme';
 
-export default function StaffLoginScreen() {
+// The single front-door sign-in for every role (FR-ACC-002, FR-ACC-005):
+// email + password only, and the server decides where you land via
+// `user.role`. Replaces the old staff-only screen.
+export default function SignInScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { signIn } = useAuthActions();
@@ -29,7 +32,7 @@ export default function StaffLoginScreen() {
     setError('');
     setBusy(true);
     try {
-      const res = await staffLogin({ email, password });
+      const res = await login({ email, password });
       await signIn({
         accessToken: res.access_token,
         refreshToken: res.refresh_token ?? '',
@@ -51,7 +54,7 @@ export default function StaffLoginScreen() {
           style={styles.logo}
           accessibilityLabel={t('aau_logo_alt', 'Addis Ababa University')}
         />
-        <Text style={styles.title}>{t('staffLogin', 'Staff login')}</Text>
+        <Text style={styles.title}>{t('sign_in', 'Sign In')}</Text>
         <LanguageToggle />
       </View>
 
@@ -71,14 +74,15 @@ export default function StaffLoginScreen() {
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button
-          label={busy ? t('loading', 'Loading…') : t('signIn', 'Sign in')}
+          label={busy ? t('loading', 'Loading…') : t('sign_in', 'Sign In')}
           onPress={handleLogin}
           loading={busy}
         />
+        <Text style={styles.footnote}>{t('no_account_yet', "Don't have an account?")}</Text>
         <Button
-          label={t('back', 'Back')}
+          label={t('sign_up', 'Create account')}
           variant="secondary"
-          onPress={() => router.push('/(auth)/visitor-verify')}
+          onPress={() => router.push('/(auth)/register')}
         />
       </Card>
     </Screen>
@@ -95,4 +99,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: colors.brandPrimary },
   logo: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface },
   error: { color: colors.danger, marginVertical: spacing.sm },
+  footnote: {
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
 });
