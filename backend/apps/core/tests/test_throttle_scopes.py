@@ -9,12 +9,10 @@ from apps.institutions.views import InstitutionLookupView
 def test_every_public_guessing_endpoint_declares_a_configured_scope():
     rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
     views = [
-        account_views.RequestOTPView,
-        account_views.VerifyOTPView,
-        account_views.VerifyMagicLinkView,
-        account_views.StaffLoginView,
-        account_views.RequestPasswordResetView,
-        account_views.ConfirmPasswordResetView,
+        # The unified sign-in is the only remaining DRF auth endpoint that
+        # can be brute-forced; register / email-verify / password-reset are
+        # allauth endpoints at /_allauth/ (not DRF views).
+        account_views.LoginView,
         InstitutionLookupView,
     ]
     for view in views:

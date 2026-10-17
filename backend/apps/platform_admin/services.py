@@ -96,14 +96,13 @@ def create_staff_account(*, actor, email, full_name, role, phone=""):
     )
 
     # Imported here, not at module load, so tests can patch
-    # apps.accounts.services.request_password_reset directly (mirrors
-    # accounts/services.py's own lazy import of send_notification, for
-    # the same reason). FR-ACC-006's flow, not a new one: sends the same
-    # "set/reset your password" email a Staff member requests themselves,
-    # so the new account's very first password is chosen by its owner.
-    from apps.accounts.services import request_password_reset
+    # apps.accounts.services.send_password_setup_email directly (mirrors
+    # accounts/services.py's own lazy imports, for the same reason). Reuses
+    # allauth's password-reset flow rather than a new one: the new account's
+    # very first password is chosen by its owner, never by the Platform Admin.
+    from apps.accounts.services import send_password_setup_email
 
-    request_password_reset(email=account.email)
+    send_password_setup_email(account=account)
 
     return account
 

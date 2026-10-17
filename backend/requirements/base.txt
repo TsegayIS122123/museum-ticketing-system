@@ -33,3 +33,4 @@ requests>=2.31
 # 003, FR-SETTLE-002/004) -- rendered once at issuance and stored in object
 # storage, never regenerated (ADR-009).
 reportlab>=4.2
+django-allauth==65.20.0

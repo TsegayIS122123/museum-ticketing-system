@@ -1,6 +1,11 @@
 """
 HTTP concerns only: routing to a service call, permission checks, and
 response status codes. No business logic here (Design Spec Sec 3.1).
+
+The account lifecycle (register / email-verify / password-reset) is served by
+django-allauth at /_allauth/ (see config/settings/base.py); this module keeps
+only the app's own session endpoints -- the unified sign-in, refresh, logout,
+and the shared profile endpoint.
 """
 
 from drf_spectacular.utils import (
@@ -21,24 +26,17 @@ from .cookies import REFRESH_COOKIE_NAME, clear_refresh_cookie, set_refresh_cook
 from .serializers import (
     AccountSerializer,
     AccountUpdateSerializer,
-    ForgotPasswordSerializer,
-    ResetPasswordSerializer,
-    StaffLoginSerializer,
-    VisitorVerifyConfirmSerializer,
-    VisitorVerifyStartSerializer,
+    LoginSerializer,
 )
 
-# `AuthResponse` (Document 04) -- the access token + profile shape shared
-# by every flow that ends in a session (Visitor OTP confirm, Staff
-# login). The refresh token is NOT part of this response body for web
-# clients -- it's set as an httpOnly cookie instead (see cookies.py) so it
-# survives a full page navigation (e.g. leaving for Chapa's hosted
+# `AuthResponse` (Document 04) -- the access token + profile shape returned
+# by the unified sign-in. The refresh token is NOT part of this response body
+# for web clients -- it's set as an httpOnly cookie instead (see cookies.py)
+# so it survives a full page navigation (e.g. leaving for Chapa's hosted
 # checkout and coming back) without ever being readable by frontend JS.
-# Native clients (Expo) cannot rely on cookie persistence, so they opt
-# into receiving the refresh token in the body via the X-Client-Platform
-# request header (see `_client_wants_refresh_in_body`).
-# Declared here rather than in serializers.py since it's never used to
-# parse a request, only to document `_auth_response`'s output below.
+# Native clients (Expo) cannot rely on cookie persistence, so they opt into
+# receiving the refresh token in the body via the X-Client-Platform request
+# header (see `_client_wants_refresh_in_body`).
 AuthResponseSerializer = inline_serializer(
     name="AuthResponse",
     fields={
@@ -59,11 +57,10 @@ DetailResponseSerializer = inline_serializer(
 )
 
 # Shared across every endpoint that can issue or rotate a session token
-# (Staff login, Visitor OTP confirm, token refresh). A native client sends
-# `X-Client-Platform: expo` to receive the refresh token in the JSON body
-# instead of (or in addition to) the httpOnly cookie it cannot durably
-# keep. Absent / any other value means "web" and preserves the existing
-# cookie-only contract.
+# (sign-in, token refresh). A native client sends `X-Client-Platform: expo`
+# to receive the refresh token in the JSON body instead of (or in addition
+# to) the httpOnly cookie it cannot durably keep. Absent / any other value
+# means "web" and preserves the cookie-only contract.
 X_CLIENT_PLATFORM_PARAM = OpenApiParameter(
     name="X-Client-Platform",
     location=OpenApiParameter.HEADER,
@@ -96,12 +93,10 @@ def _client_wants_refresh_in_body(request):
 
 
 def _auth_response(account, refresh, request):
-    """`AuthResponse` (Document 04) -- shared by every flow that ends in a
-    session, Visitor OTP confirm and Staff login alike (Sec 4.1). Mints
-    the response body (access token + profile) and, for web callers,
-    attaches the refresh token to the response as an httpOnly cookie
-    rather than handing it to the frontend directly. Native callers
-    (`X-Client-Platform: expo`) get it in the body instead."""
+    """`AuthResponse` (Document 04). Mints the response body (access token +
+    profile) and, for web callers, attaches the refresh token to the response
+    as an httpOnly cookie rather than handing it to the frontend directly.
+    Native callers (`X-Client-Platform: expo`) get it in the body instead."""
     payload = {
         "access_token": str(refresh.access_token),
         "user": AccountSerializer(account).data,
@@ -115,85 +110,21 @@ def _auth_response(account, refresh, request):
     return response
 
 
-class RequestOTPView(APIView):
-    """POST /auth/visitor/verify/start (FR-ACC-001, FR-ACC-003, FR-ACC-004).
-    Used for both a first-time booking and a returning Visitor looking up
-    their history -- there is no separate "login" for a Visitor."""
-
-    permission_classes = [permissions.AllowAny]
-    throttle_scope = "otp-request"
-
-    @extend_schema(
-        request=VisitorVerifyStartSerializer,
-        responses=inline_serializer(
-            name="VisitorVerifyStartResponse",
-            fields={
-                "verification_id": serializers.UUIDField(),
-                "otp_expires_in_seconds": serializers.IntegerField(),
-            },
-        ),
-    )
-    def post(self, request):
-        serializer = VisitorVerifyStartSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        account, otp_expires_in_seconds = services.start_visitor_verification(
-            **serializer.validated_data
-        )
-        return Response(
-            {
-                "verification_id": account.id,
-                "otp_expires_in_seconds": otp_expires_in_seconds,
-            }
-        )
-
-
-class VerifyOTPView(APIView):
-    """POST /auth/visitor/verify/confirm -- completes Visitor verification
-    and issues the same token pair Staff login does (Sec 4.1)."""
-
-    permission_classes = [permissions.AllowAny]
-    throttle_scope = "otp-verify"
-
-    @extend_schema(
-        request=VisitorVerifyConfirmSerializer,
-        responses=AuthResponseSerializer,
-        parameters=[X_CLIENT_PLATFORM_PARAM],
-    )
-    def post(self, request):
-        serializer = VisitorVerifyConfirmSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        account, refresh = services.confirm_visitor_verification(**serializer.validated_data)
-        return _auth_response(account, refresh, request)
-
-
-class VerifyMagicLinkView(APIView):
-    """GET /auth/visitor/verify/email/{token} -- the secondary/fallback
-    verification channel (Sec 4.1 step 2). Opening this link marks
-    `email_verified_at` but never issues a session on its own; only the
-    OTP path above does that."""
-
-    permission_classes = [permissions.AllowAny]
-    throttle_scope = "otp-verify"
-
-    @extend_schema(responses=DetailResponseSerializer)
-    def get(self, request, token):
-        services.confirm_email_verification(token=token)
-        return Response({"detail": "Email verified."})
-
-
-class StaffLoginView(APIView):
-    """POST /auth/login -- Staff only (FR-ACC-002, FR-ACC-005)."""
+class LoginView(APIView):
+    """POST /auth/login -- the single front-door sign-in for every role
+    (FR-ACC-002, FR-ACC-005, revised). Email + password only; the caller's
+    `role` is returned on `user` and the client routes from there."""
 
     permission_classes = [permissions.AllowAny]
     throttle_scope = "login"
 
     @extend_schema(
-        request=StaffLoginSerializer,
+        request=LoginSerializer,
         responses=AuthResponseSerializer,
         parameters=[X_CLIENT_PLATFORM_PARAM],
         examples=[
             OpenApiExample(
-                "Staff login (mock)",
+                "Sign in (mock)",
                 value={
                     "access_token": "mock-access-token",
                     "user": {
@@ -204,6 +135,8 @@ class StaffLoginView(APIView):
                         "role": "museum_manager",
                         "language_preference": "en",
                         "active": True,
+                        "email_verified_at": None,
+                        "phone_verified_at": None,
                         "created_at": "2026-01-01T00:00:00Z",
                     },
                 },
@@ -212,39 +145,10 @@ class StaffLoginView(APIView):
         ],
     )
     def post(self, request):
-        serializer = StaffLoginSerializer(data=request.data)
+        serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        account, refresh = services.staff_login(**serializer.validated_data)
+        account, refresh = services.authenticate(**serializer.validated_data)
         return _auth_response(account, refresh, request)
-
-
-class RequestPasswordResetView(APIView):
-    """POST /auth/forgot-password -- Staff only (FR-ACC-006). Always 200;
-    see services.request_password_reset for why."""
-
-    permission_classes = [permissions.AllowAny]
-    throttle_scope = "password-reset-request"
-
-    @extend_schema(request=ForgotPasswordSerializer, responses=DetailResponseSerializer)
-    def post(self, request):
-        serializer = ForgotPasswordSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        services.request_password_reset(**serializer.validated_data)
-        return Response({"detail": "If that email is on file, a reset link has been sent."})
-
-
-class ConfirmPasswordResetView(APIView):
-    """POST /auth/reset-password -- Staff only (FR-ACC-006)."""
-
-    permission_classes = [permissions.AllowAny]
-    throttle_scope = "password-reset-confirm"
-
-    @extend_schema(request=ResetPasswordSerializer, responses=DetailResponseSerializer)
-    def post(self, request):
-        serializer = ResetPasswordSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        services.reset_password(**serializer.validated_data)
-        return Response({"detail": "Password updated."})
 
 
 class CurrentUserView(APIView):
@@ -266,14 +170,12 @@ class CurrentUserView(APIView):
 
 
 class CookieTokenRefreshView(TokenRefreshView):
-    """POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py),
-    shared by both credential paths (Sec 4.1).
+    """POST /auth/refresh/ -- mounted at the root urlconf (config/urls.py).
 
     Reads the refresh token from the httpOnly cookie set by `_auth_response`
     above instead of requiring it in the request body -- the frontend never
-    holds or sends the refresh token itself (cookies.py). Re-sets the
-    cookie with the rotated token on success, per SIMPLE_JWT's
-    ROTATE_REFRESH_TOKENS.
+    holds or sends the refresh token itself (cookies.py). Re-sets the cookie
+    with the rotated token on success, per SIMPLE_JWT's ROTATE_REFRESH_TOKENS.
     """
 
     permission_classes = [permissions.AllowAny]
@@ -319,12 +221,6 @@ class CookieTokenRefreshView(TokenRefreshView):
             # Expired/invalid/already-rotated token -- clear the cookie so
             # the browser stops presenting a dead token on every subsequent
             # page load, and let the frontend fall back to a normal login.
-            #
-            # NOTE: this must be `return response`, not `raise InvalidToken`.
-            # Raising discards this `response` object (and the delete-cookie
-            # header set on it below) in favor of a fresh response built by
-            # DRF's exception handler, so the stale cookie never actually
-            # gets cleared and the browser keeps re-sending it forever.
             response = Response(
                 {"detail": "Refresh token invalid or expired."},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -345,16 +241,8 @@ class CookieTokenRefreshView(TokenRefreshView):
 
 class LogoutView(APIView):
     """POST /auth/logout -- clears the refresh-token cookie so the browser
-    stops presenting it. Note: this does not blacklist the token
-    server-side -- SIMPLE_JWT.BLACKLIST_AFTER_ROTATION=True already assumes
-    that, but `rest_framework_simplejwt.token_blacklist` isn't in
-    INSTALLED_APPS (config/settings/base.py), so today every rotation's
-    `refresh.blacklist()` call is silently swallowed (simplejwt only
-    defines that method when the app is installed, and the rotation code
-    catches the resulting AttributeError). Worth installing + migrating
-    that app separately so old refresh tokens are actually invalidated,
-    not just no-longer-cookied on this device.
-    """
+    stops presenting it. Server-side refresh-token revocation is handled by
+    SIMPLE_JWT rotation/blacklist semantics, not this view."""
 
     permission_classes = [permissions.AllowAny]
     authentication_classes = []

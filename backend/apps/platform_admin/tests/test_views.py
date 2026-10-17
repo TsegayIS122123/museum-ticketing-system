@@ -97,7 +97,7 @@ def test_create_staff_rejected_for_cashier():
     assert response.status_code == 403
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_allowed_for_platform_admin(mock_reset):
     client = _authed_client(_make_admin())
 
@@ -111,7 +111,7 @@ def test_create_staff_allowed_for_platform_admin(mock_reset):
     assert Account.objects.filter(email="new-cashier@example.com", role="cashier").exists()
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_rejects_visitor_role(mock_reset):
     client = _authed_client(_make_admin())
 
@@ -124,7 +124,7 @@ def test_create_staff_rejects_visitor_role(mock_reset):
     assert response.status_code == 400
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_conflict_on_duplicate_email(mock_reset):
     _make_staff(Account.Role.CASHIER, email="taken@example.com")
     client = _authed_client(_make_admin())

@@ -15,6 +15,12 @@ from .base import env
 DEBUG = False
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 
+# Real SMTP in production (Mailgun/Resend/etc. via EMAIL_HOST + credentials
+# from the secrets manager). Base defaults to the console backend, which is
+# correct for development only -- email verification and password-reset links
+# must actually be delivered here.
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True

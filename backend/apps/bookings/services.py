@@ -251,12 +251,15 @@ def create_booking(
     needs it for reconciliation (see `Booking.group_tin`'s own field
     comment). It's never set for an individual booking.
     """
-    if not visitor.email_verified_at or not visitor.phone_verified_at:
-        # FR-ACC-003: both must be verified before an online booking can
-        # proceed -- there is no separate account-creation step besides
-        # completing FR-ACC-001's OTP-and-email-link verification.
+    if not visitor.email_verified_at:
+        # FR-ACC-003 (revised): the account must have a verified email before
+        # an online booking can proceed. Phone is no longer verified -- the
+        # passwordless phone-OTP visitor flow was replaced by unified
+        # email+password, and allauth's email verification is the only proof
+        # of ownership collected at signup (Account.email_verified_at is kept
+        # in sync with allauth's EmailAddress by apps.accounts.signals).
         raise ValidationError(
-            "Both your email and phone must be verified before you can book online."
+            "Please verify your email address before you can book online."
         )
 
     if booking_type == Booking.BookingType.GROUP and not group_name:

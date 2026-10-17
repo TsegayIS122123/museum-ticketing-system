@@ -33,8 +33,7 @@ class Conflict(APIException):
 def _flatten_first_message(detail) -> str | None:
     """DRF's `exc.detail` is either a plain string/list (non-field errors)
     or a dict of `{field: [messages]}` (serializer field errors -- e.g.
-    ResetPasswordSerializer.validate_new_password's validate_password()
-    call). `str(exc)` on the dict case prints Python's raw repr --
+    AccountUpdateSerializer's field-level validation). `str(exc)` on the dict case prints Python's raw repr --
     "{'new_password': [ErrorDetail(string='...', code='...')]}" -- which
     is what a client would otherwise show verbatim. Pull out the first
     real message instead so `message` is always human-readable, in either

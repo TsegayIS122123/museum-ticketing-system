@@ -58,7 +58,7 @@ def test_list_staff_orders_most_recently_created_first():
 # --------------------------------------------------------------------------
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_account_provisions_cashier(mock_reset):
     actor = _make_admin()
 
@@ -76,7 +76,7 @@ def test_create_staff_account_provisions_cashier(mock_reset):
     assert not account.has_usable_password()
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_account_sends_set_password_link(mock_reset):
     actor = _make_admin()
 
@@ -84,10 +84,10 @@ def test_create_staff_account_sends_set_password_link(mock_reset):
         actor=actor, email="cashier@example.com", full_name="New Cashier", role=Account.Role.CASHIER
     )
 
-    mock_reset.assert_called_once_with(email=account.email)
+    mock_reset.assert_called_once_with(account=account)
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_account_writes_audit_log(mock_reset):
     actor = _make_admin()
 
@@ -104,7 +104,7 @@ def test_create_staff_account_writes_audit_log(mock_reset):
     assert entry.metadata == {"role": Account.Role.MUSEUM_MANAGER}
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_account_rejects_visitor_role(mock_reset):
     actor = _make_admin()
 
@@ -114,7 +114,7 @@ def test_create_staff_account_rejects_visitor_role(mock_reset):
         )
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_account_rejects_platform_admin_role(mock_reset):
     actor = _make_admin()
 
@@ -124,7 +124,7 @@ def test_create_staff_account_rejects_platform_admin_role(mock_reset):
         )
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_account_rejects_duplicate_email(mock_reset):
     actor = _make_admin()
     _make_staff(Account.Role.CASHIER, email="taken@example.com")
@@ -135,7 +135,7 @@ def test_create_staff_account_rejects_duplicate_email(mock_reset):
         )
 
 
-@mock.patch("apps.accounts.services.request_password_reset")
+@mock.patch("apps.accounts.services.send_password_setup_email")
 def test_create_staff_account_rejects_duplicate_phone(mock_reset):
     actor = _make_admin()
     _make_staff(Account.Role.CASHIER, email="a@example.com")

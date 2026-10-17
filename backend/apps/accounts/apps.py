@@ -12,3 +12,6 @@ class AccountsConfig(AppConfig):
         # imported somewhere for the extension's metaclass registration to
         # run; ready() is the standard place for that kind of side effect.
         from . import schema  # noqa: F401
+        # Connects the allauth `email_confirmed` receiver that keeps
+        # Account.email_verified_at in sync (signals.py).
+        from . import signals  # noqa: F401

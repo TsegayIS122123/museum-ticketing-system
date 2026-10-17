@@ -23,6 +23,14 @@ urlpatterns = [
     path("readyz", health.readiness, name="readyz"),
     path("admin/", admin.site.urls),
 
+    # django-allauth headless -- register / email-verify (link + 6-digit
+    # code) / password-request / password-reset, none of which are DRF
+    # views. Mounted at the root (not under /api/v1) per Document 04, and
+    # documented in the contract. Only app clients (`/_allauth/app/v1/...`)
+    # receive the app's SimpleJWT in the response `meta`; the browser client
+    # uses the session cookie (see apps/accounts/headless.py).
+    path("_allauth/", include("allauth.headless.urls")),
+
     # Contract-first: the schema is introspected from the actual views/
     # serializers below and exported to ../contracts/openapi.yaml via
     # `scripts/export_contract.sh`. That file is what frontend/ builds its

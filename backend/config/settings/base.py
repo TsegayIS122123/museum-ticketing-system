@@ -38,6 +38,9 @@ DJANGO_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # django-allauth's EmailAddress model (and account lifecycle) requires
+    # the sites framework -- SITE_ID below.
+    "django.contrib.sites",
 ]
 
 THIRD_PARTY_APPS = [
@@ -45,6 +48,12 @@ THIRD_PARTY_APPS = [
     "rest_framework_simplejwt",
     "corsheaders",
     "drf_spectacular",
+    # Unified email + password account lifecycle (register / email
+    # verification by link + code / password reset), exposed headless-only
+    # at /_allauth/ -- see the allauth block further down.
+    "allauth",
+    "allauth.account",
+    "allauth.headless",
     "django_celery_beat",
     "django_celery_results",
     # Re-enable when object storage comes back (see base.py's Object
@@ -81,6 +90,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # django-allauth requires its account middleware directly after
+    # AuthenticationMiddleware (it adds request.user-dependent state used by
+    # the headless flows).
+    "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -109,6 +122,19 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 AUTH_USER_MODEL = "accounts.Account"
+
+# django.contrib.sites -- required by allauth (EmailAddress / absolute
+# links). A single site; the actual domain doesn't matter because every
+# frontend link is built from HEADLESS_FRONTEND_URLS below.
+SITE_ID = 1
+
+# ModelBackend stays for the Django admin-site login (createsuperuser);
+# allauth's backend authenticates the unified email+password flow (and is
+# what the headless endpoints use).
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
 
 # --------------------------------------------------------------------------
 # Database -- configured per-environment via DATABASE_URL (Sec 3.2, Doc 08)
@@ -205,18 +231,15 @@ REST_FRAMEWORK = {
     ),
     # Sec 6.7. Views opt in per-endpoint via `throttle_scope`; a view with
     # no `throttle_scope` attribute is unaffected regardless of this list.
+    # The unified email+password login is the only remaining DRF auth
+    # endpoint that can be brute-forced (register / email-verify /
+    # password-reset are allauth endpoints at /_allauth/, throttled by
+    # allauth's own checks rather than DRF's scoped throttle).
     "DEFAULT_THROTTLE_RATES": {
         "login": "5/15m",
-        "otp-request": "5/15m",
-        "password-reset-request": "5/15m",
         # FR-BOOK-001/003: capped per account/IP against fraudulent
         # AwaitingPayment/PendingApproval bookings (Sec 6.7).
         "booking-create": "10/15m",
-        # Phase 8: guessing endpoints. A 6-digit OTP / reset token is only
-        # as strong as the number of tries an attacker gets, so verifying
-        # one is limited per IP just like requesting one is.
-        "otp-verify": "10/15m",
-        "password-reset-confirm": "10/15m",
         # TIN autofill: only fires on a full 10-digit TIN after a debounce,
         # so a person typing never gets near this; a script enumerating
         # TINs to harvest school names does.
@@ -238,6 +261,19 @@ SPECTACULAR_SETTINGS = {
                     "digital ticketing track.",
     "VERSION": "0.2.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # django-allauth's headless `/auth/*` endpoints are not DRF views we own
+    # (see apps/accounts/schema.py), so they're appended to the generated
+    # schema by this postprocessing hook -- keeping them in the published
+    # contract (Document 04) rather than a hand-maintained duplicate.
+    # NOTE: assigning POSTPROCESSING_HOOKS *replaces* drf-spectacular's
+    # default list, so its own enum hook
+    # (drf_spectacular.hooks.postprocess_schema_enums) MUST be listed too --
+    # otherwise every `ENUM_NAME_OVERRIDES` name silently stops being applied
+    # and enums stay inlined (which is what broke the generated TS types).
+    "POSTPROCESSING_HOOKS": [
+        "apps.accounts.schema.inject_headless_auth_paths",
+        "drf_spectacular.hooks.postprocess_schema_enums",
+    ],
     # apps.platform_admin.serializers.StaffCreateSerializer/StaffUpdateSerializer
     # both have a `role` field restricted to {cashier, museum_manager} --
     # distinct from Account.Role's own four-way `role` enum (RoleEnum,
@@ -457,6 +493,62 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Museum Ticketing <no-reply@museum.example>")
+
+
+# --------------------------------------------------------------------------
+# django-allauth -- unified email + password account model (all four roles).
+#
+# Replaces the old split model (passwordless Visitor OTP vs Staff password):
+# every account now registers and signs in with email + password, and proves
+# ownership of its email through a single verification email that carries
+# BOTH a 6-digit code and a clickable link. allauth owns the account
+# lifecycle (register, email-verify, password-reset); the app's own
+# SimpleJWT session endpoints are unchanged (apps/accounts/views.py) and the
+# headless token strategy below re-uses them (apps/accounts/headless.py).
+# --------------------------------------------------------------------------
+
+ACCOUNT_LOGIN_METHODS = {"email"}
+# password1/password2 are allauth's names for the password + confirmation
+# pair (never the legacy "password" field).
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+# Send a 6-digit code alongside the confirmation link in the same email.
+ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
+# allauth's default user code is 8 alphanumeric characters (dashed); the SRS
+# (FR-ACC-003) specifies a 6-DIGIT numeric code, so pin the format. The email
+# template prints this code verbatim, and the link still carries the same
+# flow's key, so both channels remain valid.
+ACCOUNT_EMAIL_VERIFICATION_BY_CODE_FORMAT = {"numeric": True, "length": 6}
+# Adds the required `full_name` to the signup payload (Account.full_name is
+# NOT NULL; allauth has no built-in notion of it).
+ACCOUNT_SIGNUP_FORM_CLASS = "apps.accounts.forms.AccountSignupForm"
+
+# Headless-only: allauth serves no server-rendered pages -- only the JSON
+# API mounted at /_allauth/ (config/urls.py). The custom adapter returns the
+# app's Account profile; the custom token strategy mints the app's existing
+# SimpleJWT session tokens and exposes them in the headless `meta`.
+HEADLESS_ONLY = True
+HEADLESS_CLIENTS = ("browser", "app")
+HEADLESS_ADAPTER = "apps.accounts.headless.AccountHeadlessAdapter"
+HEADLESS_TOKEN_STRATEGY = "apps.accounts.headless.SimpleJWTTokenStrategy"
+
+# Links embedded in verification / password-reset emails point at the
+# Next.js app. `{key}` is substituted by allauth; EMAIL_LINK_LANG chooses the
+# locale segment (`/<lang>/...`) since allauth can't know the reader's
+# language at send time.
+_EMAIL_LINK_LANG = env("EMAIL_LINK_LANG", default="en")
+HEADLESS_FRONTEND_URLS = {
+    "account_confirm_email": (
+        f"{PUBLIC_WEB_BASE_URL}/{_EMAIL_LINK_LANG}/verify-email?token={{key}}"
+    ),
+    "account_reset_password": f"{PUBLIC_WEB_BASE_URL}/{_EMAIL_LINK_LANG}/reset-password",
+    "account_reset_password_from_key": (
+        f"{PUBLIC_WEB_BASE_URL}/{_EMAIL_LINK_LANG}/reset-password?token={{key}}"
+    ),
+    "account_signup": f"{PUBLIC_WEB_BASE_URL}/{_EMAIL_LINK_LANG}/register",
+}
 
 
 # --------------------------------------------------------------------------
