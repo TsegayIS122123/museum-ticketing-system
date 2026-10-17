@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
-import { colors, radius, spacing, typography } from '@/theme';
+import { colors, spacing, typography } from '@/theme';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatEtb } from '@/utils/money';
 import { formatDateOnly } from '@/utils/dates';
@@ -14,7 +15,7 @@ interface BookingCardProps {
 }
 
 export function BookingCard({ booking }: BookingCardProps) {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const router = useRouter();
   const isAm = i18n.language === 'am';
 

@@ -85,24 +85,30 @@ The mobile client is defined by the platform's architecture decision records:
 
 ### 2.2 Identifiers and scheme
 
-`mobile/app.json` carries the product identifiers:
+`mobile/app.config.ts` carries the product identifiers (TypeScript config, so the icon/splash paths and the device fonts can be expressed as a single source of truth):
 
-```json
+```ts
+// mobile/app.config.ts
 {
-  "expo": {
-    "name": "ZNHM Ticketing",
-    "slug": "znhm-ticketing",
-    "scheme": "znhm",
-    "ios":      { "bundleIdentifier": "et.aau.znhm.ticketing", "supportsTablet": true },
-    "android":  { "package": "et.aau.znhm.ticketing" },
-    "userInterfaceStyle": "light",
-    "plugins": ["expo-router", "expo-secure-store", "expo-camera", "expo-sqlite"],
-    "extra": { "router": {} }
-  }
+  name: 'ZNHM Ticketing',
+  slug: 'znhm-ticketing',
+  scheme: 'znhm',
+  version: '0.1.0',
+  icon: './assets/app/icon.png',
+  ios:     { bundleIdentifier: 'et.aau.znhm.ticketing', supportsTablet: true },
+  android: { package: 'et.aau.znhm.ticketing', permissions: ['CAMERA'] },
+  userInterfaceStyle: 'light',
+  web: { bundler: 'metro', output: 'single' },
+  plugins: [
+    'expo-router', 'expo-secure-store', 'expo-localization',
+    'expo-font', 'expo-splash-screen', 'expo-web-browser',
+    'expo-sqlite', 'expo-camera',
+  ],
+  extra: { router: {} },
 }
 ```
 
-The app boots through the Expo Router entrypoint (`"main": "expo-router/entry"`), so the role route groups in §6 are the app's navigation surface. The `expo-camera` plugin supplies `ios.infoPlist.NSCameraUsageDescription` and `android.permissions.CAMERA`, with the bilingual purpose string from §9.4.
+The app boots through the Expo Router entrypoint (`"main": "expo-router/entry"`), so the role route groups in §6 are the app's navigation surface. The `expo-camera` plugin supplies `ios.infoPlist.NSCameraUsageDescription` and `android.permissions.CAMERA`, with the bilingual purpose string from §9.4. The `expo-font` plugin bundles the Noto Sans Ethiopic TTFs for Amharic (§9.2) and `expo-splash-screen` configures the splash image, background and resize mode.
 
 ### 2.3 Catalogs
 
@@ -220,7 +226,7 @@ The application **has no database of its own**. The backend's tables (`account`,
 
 ### 4.2 Cached scope
 
-Exactly one entity is cached: the **Visitor's own confirmed booking, for display and offline reference only.**
+Exactly one entity is cached: the **Visitor's own confirmed booking, for display and offline reference only.** The local ticket cache stores no visitor contact details and the SQLite file is not encrypted.
 
 | Capability | Cached? | Reason |
 |---|---|---|
@@ -360,62 +366,62 @@ Reports are range-driven with seven presets or explicit `from`/`to`, computed in
 
 ```
 mobile/
-├── App.tsx                        # providers only; routes live in app/
-├── index.ts                       # registers expo-router/entry
-├── app.json                       # ZNHM identifiers, znhm scheme, config plugins
+├── app.config.ts                  # ZNHM identifiers, znhm scheme, config plugins
 ├── .env.example                   # EXPO_PUBLIC_API_URL
 ├── eas.json                       # EAS build profiles
+├── jest.setup.js                  # pins TZ=Africa/Addis_Ababa for tests
+├── package.json                   # deps + `test` script (jest-expo)
+├── tsconfig.json                  # strict; @/* -> ./src/*
+├── assets/
+│   ├── app/                       # icon, splash-icon, adaptive icons, favicon
+│   ├── brand/aau-logo.png
+│   ├── fonts/NotoSansEthiopic-{Regular,Bold}.ttf
+│   └── images/hero-walia-ibex.jpg
 ├── src/
 │   ├── api/
 │   │   ├── client.ts              # Axios instance, interceptors, inFlightRefresh
-│   │   ├── endpoints.ts           # every path, grouped by role
-│   │   ├── generated/
-│   │   │   └── schema.d.ts        # openapi-typescript output (do not hand-edit)
+│   │   ├── errors.ts              # ApiError, normalizeError, isApiError
+│   │   ├── generated/schema.d.ts  # openapi-typescript output (do not hand-edit)
 │   │   ├── schemas.ts             # Zod envelopes (User, Booking, Payment…)
 │   │   └── queries/               # TanStack Query hooks per domain
 │   ├── auth/
-│   │   ├── AuthProvider.tsx       # session state, bootstrap, role
-│   │   ├── useAuth.ts
+│   │   ├── AuthProvider.tsx       # session state, restore, role
 │   │   ├── guards.tsx             # <RequireRole role="cashier">
-│   │   └── session.ts             # secure-store read/write/clear
-│   ├── components/
-│   │   ├── ui/                    # Button, Card, Input, Badge, EmptyState,
-│   │   │                          # ErrorState, Skeleton, Sheet, Toast
-│   │   ├── BookingSummary.tsx  AvailabilityCalendar.tsx
-│   │   ├── QRCode.tsx             # real QR via react-native-qrcode-svg
-│   │   └── Scanner.tsx            # expo-camera, Cashier only
+│   │   ├── session.ts             # secure-store read/write/clear
+│   │   └── useAuth.ts
+│   ├── components/ui/             # Button, Card, Divider, LanguageToggle,
+│   │                              # Screen, SectionTitle, StatCard, StatusBadge, TextField
+│   ├── constants/
+│   │   ├── assets.ts              # bundled asset require() registry
+│   │   ├── brand.ts               # museum name, tagline, contacts
+│   │   └── config.ts              # API URL, roles, statuses
 │   ├── database/
-│   │   ├── schema.ts              # CREATE TABLE cached_ticket
-│   │   ├── tickets.ts             # upsert / evict / purge
-│   │   └── index.ts
+│   │   ├── index.ts               # open DB, run migrations
+│   │   ├── schema.ts              # cached_ticket, cashier_bookings, sync_queue
+│   │   ├── tickets.ts             # visitor ticket cache (upsert / evict / purge)
+│   │   ├── offline-bookings.ts    # cashier booking cache (reserved; unused)
+│   │   └── sync-queue.ts          # offline check-in queue
 │   ├── features/
-│   │   ├── visitor/               # verify, browse, book, pay, tickets,
-│   │   │                          # cancel, reschedule, refund, profile
-│   │   ├── cashier/               # gate, scan, check-in, voucher, settlement
+│   │   ├── visitor/               # home, browse, book, pay, tickets
+│   │   ├── cashier/               # gate, offline, voucher, settlement
 │   │   ├── manager/               # dashboard, categories, availability,
-│   │   │                          # correction, reports
-│   │   ├── admin/                 # staff CRUD, audit log
-│   │   └── shared/                # language toggle, offline banner, reports
+│   │   │                          # bookings, refunds, reports
+│   │   ├── admin/                 # staff, audit, reports
+│   │   └── shared/                # OfflineBanner, useOffline
 │   ├── i18n/
 │   │   ├── index.ts               # i18next init
-│   │   ├── locales/{en,am}/common.json
-│   │   └── keys.ts                # typed key union
-│   ├── navigation/
-│   │   ├── routes.ts              # role -> routes
-│   │   └── linking.ts             # znhm:// parsing
+│   │   └── locales/{en,am}/common.json
 │   ├── theme/
 │   │   ├── colors.ts  spacing.ts  typography.ts
-│   ├── utils/
-│   │   ├── dates.ts               # time-zone-safe helpers
-│   │   ├── money.ts               # decimal-string arithmetic
-│   │   └── reference.ts           # 8-char reference validation
-│   └── constants/
-│       ├── config.ts              # API URL, roles, statuses
-│       └── queryKeys.ts
-└── __tests__/                     # mobile unit tests
+│   │   └── index.ts               # barrel re-export
+│   └── utils/
+│       ├── dates.ts               # time-zone-safe helpers
+│       ├── money.ts               # decimal-string arithmetic
+│       ├── reference.ts           # 8-char reference validation
+│       └── __tests__/             # jest unit tests (money, dates, reference)
 ```
 
-**Route tree.** Role groups are directories; each has its own `_layout.tsx` guard, and `(tabs)` lives only under `(visitor)` because a Cashier/Manager/Admin home is a dashboard, not a tab bar.
+**Route tree.** Role groups are directories; each has its own `_layout.tsx` guard. `(visitor)`, `(manager)` and `(admin)` each carry a `(tabs)` group; `(cashier)` is a flat stack because its home is a dashboard, not a tab bar.
 
 ```
 app/
@@ -425,42 +431,38 @@ app/
 ├── (auth)/
 │   ├── _layout.tsx
 │   ├── visitor-verify.tsx
-│   ├── staff-login.tsx
-│   └── language.tsx
+│   └── staff-login.tsx
 ├── (visitor)/
-│   ├── _layout.tsx                # RequireRole visitor + (tabs)
-│   ├── (tabs)/_layout.tsx
-│   ├── (tabs)/index.tsx           # home
-│   ├── (tabs)/book.tsx
-│   ├── (tabs)/tickets.tsx
-│   ├── (tabs)/profile.tsx
+│   ├── _layout.tsx                # RequireRole visitor
+│   ├── (tabs)/
+│   │   ├── _layout.tsx
+│   │   ├── index.tsx              # home
+│   │   ├── book.tsx
+│   │   ├── tickets.tsx
+│   │   └── profile.tsx
 │   ├── book/new.tsx               # 3-step wizard (§5.1)
 │   ├── book/payment.tsx
-│   ├── bookings/[id]/index.tsx    # ticket + QR
-│   ├── bookings/[id]/cancel.tsx
-│   ├── bookings/[id]/reschedule.tsx
-│   ├── bookings/[id]/refund.tsx
-│   ├── group-visit.tsx
-│   └── settings/notifications.tsx
+│   └── bookings/[id]/index.tsx    # ticket + QR (cancel/reschedule are modals)
 ├── (cashier)/
 │   ├── _layout.tsx                # RequireRole cashier
-│   ├── index.tsx  scan.tsx  gate.tsx
+│   ├── index.tsx  scan.tsx
 │   ├── settlement/index.tsx  settlement/history.tsx
-│   └── vouchers/[id].tsx
+│   └── vouchers/[bookingId].tsx
 ├── (manager)/
 │   ├── _layout.tsx                # RequireRole museum_manager
-│   ├── index.tsx  categories.tsx  availability.tsx
-│   ├── bookings/index.tsx  bookings/[id].tsx
-│   ├── refunds.tsx
-│   └── reports/{index,[report]}.tsx
+│   └── (tabs)/
+│       ├── _layout.tsx
+│       ├── index.tsx  categories.tsx  availability.tsx
+│       ├── bookings.tsx  refunds.tsx  reports.tsx
 └── (admin)/
     ├── _layout.tsx                # RequireRole platform_admin
-    ├── index.tsx  staff.tsx  staff/[id].tsx
-    ├── audit.tsx
-    └── reports/                   # shared implementation with (manager)
+    └── (tabs)/
+        ├── _layout.tsx
+        ├── index.tsx  reports.tsx  audit.tsx
 ```
 
-Report screens are shared between `(manager)` and `(admin)` through `features/shared/`, since the API grants both roles access.
+Report screens under `(manager)` and `(admin)` are backed by separate `features/{manager,admin}/reports/` implementations, since the two roles are granted different report capabilities by the API.
+
 
 ---
 

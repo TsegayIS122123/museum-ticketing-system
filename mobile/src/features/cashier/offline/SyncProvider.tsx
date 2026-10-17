@@ -1,7 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { getPendingSyncCount } from './useOfflineSync';
-import { useProcessSyncQueue } from './useOfflineSync';
+import { getPendingSyncCount , useProcessSyncQueue } from './useOfflineSync';
 
 interface SyncContextValue {
   pendingCount: number;

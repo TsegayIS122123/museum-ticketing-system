@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 

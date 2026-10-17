@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useTranslation } from 'react-i18next';
-import { addDays, format, isSameDay, startOfDay } from 'date-fns';
+import { addDays, format, startOfDay } from 'date-fns';
 
 import { Screen } from '@/components/ui/Screen';
 import { Card } from '@/components/ui/Card';
@@ -9,7 +10,6 @@ import { Button } from '@/components/ui/Button';
 import { colors, radius, spacing, typography } from '@/theme';
 import { useAvailabilityRange, useSetAvailability } from '@/api/queries/manager-availability';
 import { toIsoDate } from '@/utils/dates';
-import { Pressable } from 'react-native';
 
 export function AvailabilityScreen() {
   const { t } = useTranslation();

@@ -59,7 +59,7 @@ export async function initDatabase(): Promise<void> {
     await getDb();
   } catch (err) {
     // Non-fatal: the cache is best-effort.
-    // eslint-disable-next-line no-console
+     
     console.warn('[database] failed to init SQLite:', err);
   }
 }

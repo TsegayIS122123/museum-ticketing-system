@@ -213,7 +213,6 @@ export async function mirrorMyBookingsToCache(bookings: MyBooking[]): Promise<vo
       categoryNameAm: firstItem?.categoryNameAm ?? null,
       quantity: b.bookedQuantity ?? firstItem?.quantity ?? null,
       totalEtb: b.totalAmountEtb,
-      payload: b,
     });
   }
 }
@@ -224,7 +223,7 @@ export async function mirrorSingleBookingToCache(booking: {
   status: string;
   visitDate: string;
   totalAmountEtb: string;
-  items?: Array<{ categoryNameEn?: string; categoryNameAm?: string; quantity?: number }>;
+  items?: { categoryNameEn?: string; categoryNameAm?: string; quantity?: number }[];
 }): Promise<void> {
   const { cacheTicket } = await import('@/database/tickets');
   const firstItem = booking.items?.[0];
@@ -237,6 +236,5 @@ export async function mirrorSingleBookingToCache(booking: {
     categoryNameAm: firstItem?.categoryNameAm ?? null,
     quantity: firstItem?.quantity ?? null,
     totalEtb: booking.totalAmountEtb,
-    payload: booking,
   });
 }

@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { colors, radius, spacing, typography } from '@/theme';
 
 interface StepIndicatorProps {

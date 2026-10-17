@@ -23,7 +23,7 @@ import type { BookingResponse } from "@/api/queries/bookings";
 
 type Tab = "flagged" | "all";
 
-const STATUSES: Array<NonNullable<ManagerBookingsFilters["status"]>> = [
+const STATUSES: NonNullable<ManagerBookingsFilters["status"]>[] = [
   "awaiting_payment",
   "pending",
   "visited",

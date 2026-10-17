@@ -1,5 +1,7 @@
-import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
-import { colors, spacing } from '@/theme';
+import { StyleSheet, TextInput, TextInputProps, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
+import { useTranslation } from 'react-i18next';
+import { colors, spacing, typography } from '@/theme';
 
 interface TextFieldProps extends TextInputProps {
   label?: string;
@@ -7,11 +9,13 @@ interface TextFieldProps extends TextInputProps {
 }
 
 export function TextField({ label, error, style, ...props }: TextFieldProps) {
+  const { i18n } = useTranslation();
+  const isAm = i18n.language === 'am';
   return (
     <View style={styles.wrap}>
       {label && <Text style={styles.label}>{label}</Text>}
       <TextInput
-        style={[styles.input, !!error && styles.inputError, style]}
+        style={[styles.input, isAm && styles.ethiopic, !!error && styles.inputError, style]}
         placeholderTextColor={colors.textMuted}
         {...props}
       />
@@ -35,4 +39,5 @@ const styles = StyleSheet.create({
   },
   inputError: { borderColor: colors.danger },
   error: { fontSize: 12, color: colors.danger },
+  ethiopic: { fontFamily: typography.fontFamily.ethiopic },
 });

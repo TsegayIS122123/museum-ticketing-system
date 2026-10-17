@@ -27,7 +27,6 @@ interface TicketInput {
   categoryNameAm?: string | null;
   quantity?: number | null;
   totalEtb?: string | null;
-  payload: unknown;
 }
 
 /**
@@ -69,7 +68,9 @@ export async function cacheTicket(input: TicketInput): Promise<void> {
       input.categoryNameAm ?? null,
       input.quantity ?? null,
       input.totalEtb ?? null,
-      JSON.stringify(input.payload),
+      // The raw booking payload is not read back anywhere and would persist
+      // visitor PII (name/email/phone) in plaintext. Store an empty object.
+      '{}',
       Date.now(),
     ]
   );

@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Card } from '@/components/ui/Card';
 import type { StaffAccount } from '@/api/queries/admin-staff';

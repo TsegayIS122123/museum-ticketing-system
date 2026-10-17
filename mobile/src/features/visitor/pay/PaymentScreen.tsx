@@ -4,9 +4,9 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -15,7 +15,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { colors, spacing, typography } from '@/theme';
 import { openChapaCheckout } from './checkout';
-import { useBookingPolling, type Booking } from '@/api/queries/payments';
+import { useBookingPolling } from '@/api/queries/payments';
 import { formatEtb } from '@/utils/money';
 import { formatDateOnly } from '@/utils/dates';
 

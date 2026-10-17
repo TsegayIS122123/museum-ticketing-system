@@ -3,9 +3,9 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -21,8 +21,7 @@ import { formatDateOnly } from '@/utils/dates';
 import { TicketQR } from './TicketQR';
 import { CancelModal } from './CancelModal';
 import { RescheduleModal } from './RescheduleModal';
-import { readCachedTicket, type CachedTicket } from '@/database/tickets';
-import { useOffline } from '@/features/shared/useOffline';
+import { type CachedTicket } from '@/database/tickets';
 
 interface ViewModel {
   id: string;
@@ -30,7 +29,7 @@ interface ViewModel {
   status: string;
   visitDate: string;
   totalAmountEtb: string;
-  items?: Array<{ categoryNameEn?: string; categoryNameAm?: string; quantity?: number }>;
+  items?: { categoryNameEn?: string; categoryNameAm?: string; quantity?: number }[];
   fromCache: boolean;
 }
 
@@ -40,7 +39,6 @@ export function TicketDetail() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : null;
   const isAm = i18n.language === 'am';
-  const offline = useOffline();
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -51,7 +49,6 @@ export function TicketDetail() {
     isLoading,
     isError,
     refetch,
-    failureCount,
   } = useQuery({
     queryKey: ['booking', id],
     queryFn: () => fetchBooking(id!),

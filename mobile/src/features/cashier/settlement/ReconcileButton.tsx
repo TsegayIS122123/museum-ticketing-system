@@ -1,8 +1,9 @@
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography } from '@/theme';
 import { useReconcile, type Reconciliation } from '@/api/queries/settlement';
 import { isApiError } from '@/api/errors';
 import { useOffline } from '@/features/shared/useOffline';

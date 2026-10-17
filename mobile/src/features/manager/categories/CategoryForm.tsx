@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';

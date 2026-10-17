@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useEffect, useState } from 'react';
 import { apiClient } from '@/api/client';
 import { userProfileSchema, type UserProfile } from '@/api/schemas';
+import { evictAllTickets } from '@/database/tickets';
 import { clearTokens, getAccessToken, setTokens } from './session';
 
 interface AuthState {
@@ -70,6 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Best effort — clear locally regardless
     }
     await clearTokens();
+    // Drop the locally cached ticket (the visitor's own bookings) so cached
+    // data does not survive a logout on a shared device.
+    await evictAllTickets();
     setUser(null);
   };
 

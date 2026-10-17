@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useTranslation } from 'react-i18next';
 import { colors, spacing, typography } from '@/theme';
 
@@ -8,7 +9,6 @@ export function StatusMixCard({
   mix: { pending: number; visited: number; cancelled: number; refunded: number };
 }) {
   const { t } = useTranslation();
-  const total = mix.pending + mix.visited + mix.cancelled + mix.refunded || 1;
 
   const rows = [
     { key: 'pending', label: t('pending', 'Pending'), color: '#1E40AF' },

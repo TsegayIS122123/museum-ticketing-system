@@ -35,3 +35,4 @@ out/
 patches/
 # Local working notes — do NOT commit. Delete when the mobile build is done.
 docs/temp_not_push_github_later_to_delete.md
+.expo/

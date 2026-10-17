@@ -15,7 +15,7 @@ export interface CachedCashierBooking {
 }
 
 export async function upsertCashierBookings(
-  bookings: Array<Omit<CachedCashierBooking, 'downloadedAt'>>
+  bookings: Omit<CachedCashierBooking, 'downloadedAt'>[]
 ): Promise<void> {
   if (!isSqliteAvailable()) return;
   const db = await getDb();

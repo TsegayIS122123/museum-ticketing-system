@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';

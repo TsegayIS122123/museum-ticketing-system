@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { StyleSheet, ViewStyle } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { Card } from './Card';
 import { colors, spacing, typography } from '@/theme';
 

@@ -1,9 +1,9 @@
-import axios, { AxiosInstance } from 'axios';
+import { create, type AxiosInstance } from 'axios';
 import { API_BASE_URL } from '@/constants/config';
-import { ApiError, normalizeError } from './errors';
+import { normalizeError } from './errors';
 import { getAccessToken, refreshAccessToken } from '@/auth/session';
 
-export const apiClient: AxiosInstance = axios.create({
+export const apiClient: AxiosInstance = create({
   baseURL: API_BASE_URL,
   timeout: 20_000,
   headers: {
