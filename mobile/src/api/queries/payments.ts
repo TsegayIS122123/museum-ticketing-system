@@ -62,7 +62,3 @@ export function useBookingPolling(
     retry: 1,
   });
 }
-
-export async function fetchBookingOnce(id: string): Promise<Booking> {
-  return fetchBooking(id);
-}

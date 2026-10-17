@@ -217,24 +217,3 @@ export async function mirrorMyBookingsToCache(bookings: MyBooking[]): Promise<vo
   }
 }
 
-export async function mirrorSingleBookingToCache(booking: {
-  id: string;
-  reference: string;
-  status: string;
-  visitDate: string;
-  totalAmountEtb: string;
-  items?: { categoryNameEn?: string; categoryNameAm?: string; quantity?: number }[];
-}): Promise<void> {
-  const { cacheTicket } = await import('@/database/tickets');
-  const firstItem = booking.items?.[0];
-  await cacheTicket({
-    reference: booking.reference,
-    bookingId: booking.id,
-    status: booking.status,
-    visitDate: booking.visitDate,
-    categoryNameEn: firstItem?.categoryNameEn ?? null,
-    categoryNameAm: firstItem?.categoryNameAm ?? null,
-    quantity: firstItem?.quantity ?? null,
-    totalEtb: booking.totalAmountEtb,
-  });
-}

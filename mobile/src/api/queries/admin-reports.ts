@@ -19,8 +19,6 @@ import { apiClient } from '@/api/client';
 
 const granularitySchema = z.enum(['daily', 'weekly', 'monthly']);
 
-export type Granularity = z.infer<typeof granularitySchema>;
-
 // ---------- attendance ----------
 
 const attendanceByCategorySchema = z.object({
@@ -242,47 +240,6 @@ export function useInstitutionsReport(from?: string, to?: string) {
   return useQuery({
     queryKey: ['admin-institutions', from, to],
     queryFn: () => fetchInstitutions(from, to),
-    staleTime: 60_000,
-  });
-}
-
-const institutionVisitSchema = z.object({
-  bookingId: z.string().uuid(),
-  reference: z.string(),
-  visitDate: z.string(),
-  checkedInAt: z.string().nullable(),
-  headcountByCategory: z.record(z.string(), z.number()),
-  bookedQuantity: z.number(),
-  attendedQuantity: z.number().nullable(),
-  amountEtb: z.string(),
-  ifmisDocumentNo: z.string().nullable(),
-  ifmisVoucherReference: z.string().nullable(),
-});
-
-const institutionDetailSchema = z.object({
-  institution: z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    nameAm: z.string().nullable(),
-    tin: z.string().nullable(),
-  }),
-  from: z.string().nullable(),
-  to: z.string().nullable(),
-  visits: z.array(institutionVisitSchema),
-});
-
-export type InstitutionDetail = z.infer<typeof institutionDetailSchema>;
-
-export async function fetchInstitutionDetail(id: string) {
-  const res = await apiClient.get(`/reports/institutions/${id}/`);
-  return institutionDetailSchema.parse(res.data);
-}
-
-export function useInstitutionDetail(id: string | null) {
-  return useQuery({
-    queryKey: ['admin-institution', id],
-    queryFn: () => fetchInstitutionDetail(id!),
-    enabled: !!id,
     staleTime: 60_000,
   });
 }

@@ -1,5 +1,3 @@
-import { z } from 'zod';
-import { apiClient } from '@/api/client';
 import { isApiError } from '@/api/errors';
 import { checkInBooking } from './gate';
 
@@ -79,60 +77,4 @@ export async function syncCheckIn(payload: SyncCheckInPayload): Promise<SyncResu
     }
     throw err;
   }
-}
-
-// ---------- offline seed ----------
-// `GET /bookings/` is the real Staff listing (the same one the Manager
-// bookings screen reads) and it paginates through
-// `EnvelopeLimitOffsetPagination`, so the runtime shape is always
-// `{ data, meta }` even though the contract points the 200 at the single
-// `Booking` schema -- see `manager-bookings.ts` for the same note.
-
-const cashierBookingSchema = z.object({
-  id: z.string().uuid(),
-  reference: z.string(),
-  status: z.string(),
-  visitDate: z.string(),
-  bookingType: z.enum(['individual', 'group']).optional(),
-  groupName: z.string().nullable().optional(),
-  bookedQuantity: z.number().optional(),
-  items: z.array(z.any()).optional(),
-  totalAmountEtb: z.string().optional(),
-});
-
-export type CashierBookingRow = z.infer<typeof cashierBookingSchema>;
-
-const cashierBookingsEnvelopeSchema = z.object({
-  data: z.array(cashierBookingSchema),
-  meta: z.object({
-    limit: z.number(),
-    offset: z.number(),
-    total: z.number(),
-  }),
-});
-
-/**
- * Download the bookings the Cashier will need at the gate for one visit
- * date, to seed the offline cache. The API filters by a single
- * `visitDate`, so a range means one call per day.
- *
- * The rows are the contract's own `Booking` shape (camelCase); the
- * SQLite store takes a flat subset, so the seed path maps them through
- * `database/offline-bookings.ts`'s `upsertCashierBookings`. No screen
- * calls this yet -- the offline gate lookup (Phase 8) is its intended
- * caller, and until then the gate screen is online-only.
- */
-export async function downloadCashierBookings(params: {
-  visitDate: string;
-  limit?: number;
-  offset?: number;
-}): Promise<CashierBookingRow[]> {
-  const res = await apiClient.get('/bookings/', {
-    params: {
-      visitDate: params.visitDate,
-      limit: params.limit,
-      offset: params.offset,
-    },
-  });
-  return cashierBookingsEnvelopeSchema.parse(res.data).data;
 }

@@ -88,37 +88,6 @@ export async function evictAllTickets(): Promise<void> {
   await db.runAsync(`DELETE FROM ${CACHE_TABLE}`);
 }
 
-export async function readCachedTicket(reference: string): Promise<CachedTicket | null> {
-  if (!isSqliteAvailable()) return null;
-  const db = await getDb();
-  const row = await db.getFirstAsync<{
-    reference: string;
-    booking_id: string;
-    status: string;
-    visit_date: string;
-    category_name_en: string | null;
-    category_name_am: string | null;
-    quantity: number | null;
-    total_etb: string | null;
-    payload_json: string;
-    synced_at: number;
-  }>(`SELECT * FROM ${CACHE_TABLE} WHERE reference = ?`, [reference]);
-
-  if (!row) return null;
-  return {
-    reference: row.reference,
-    bookingId: row.booking_id,
-    status: row.status,
-    visitDate: row.visit_date,
-    categoryNameEn: row.category_name_en,
-    categoryNameAm: row.category_name_am,
-    quantity: row.quantity,
-    totalEtb: row.total_etb,
-    payloadJson: row.payload_json,
-    syncedAt: row.synced_at,
-  };
-}
-
 export async function listCachedTickets(): Promise<CachedTicket[]> {
   if (!isSqliteAvailable()) return [];
   const db = await getDb();

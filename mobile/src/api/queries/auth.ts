@@ -1,5 +1,5 @@
 import { apiClient } from '@/api/client';
-import { authResponseSchema, visitorVerifyStartSchema, userProfileSchema } from '@/api/schemas';
+import { authResponseSchema, visitorVerifyStartSchema } from '@/api/schemas';
 import { useAuth } from '@/auth/useAuth';
 
 export async function startVisitorVerification(input: {
@@ -23,11 +23,6 @@ export async function confirmVisitorVerification(input: {
 export async function staffLogin(input: { email: string; password: string }) {
   const res = await apiClient.post('/auth/login/', input);
   return authResponseSchema.parse(res.data);
-}
-
-export async function fetchCurrentUser() {
-  const res = await apiClient.get('/users/me/');
-  return userProfileSchema.parse(res.data);
 }
 
 export function useAuthActions() {

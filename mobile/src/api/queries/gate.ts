@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiClient } from '@/api/client';
 
@@ -38,15 +38,6 @@ export type GateBooking = z.infer<typeof bookingLookupSchema>;
 export async function lookupBooking(reference: string): Promise<GateBooking> {
   const res = await apiClient.get('/bookings/lookup/', { params: { reference } });
   return bookingLookupSchema.parse(res.data);
-}
-
-export function useBookingLookup(reference: string | null) {
-  return useQuery({
-    queryKey: ['gate-lookup', reference],
-    queryFn: () => lookupBooking(reference!),
-    enabled: !!reference,
-    retry: 0,
-  });
 }
 
 // ---------- check-in ----------
