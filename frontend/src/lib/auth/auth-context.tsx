@@ -39,7 +39,7 @@ interface User {
   language_preference: 'en' | 'am';
   active: boolean;
   // Both null until proven. For self-registered accounts email_verified_at
-  // flips when django-allauth confirms the address (code or link); it is
+  // flips when django-allauth confirms the address by code; it is
   // kept in sync by apps.accounts.signals. phone_verified_at is retained for
   // the historical schema but is no longer set anywhere (the email+password
   // model dropped phone verification), and staff accounts never set either.

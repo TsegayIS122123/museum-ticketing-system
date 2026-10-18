@@ -1,71 +1,59 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { GraduationCap, User } from 'lucide-react';
-import { Modal } from '@/components/ui/Modal';
+import { GraduationCap } from 'lucide-react';
+import { useAuth } from '@/lib/auth/auth-context';
 
 interface BookVisitCTAProps {
   lang: 'en' | 'am';
   labels: {
     bookNow: string;
-    modalTitle: string;
     schoolTitle: string;
-    schoolDescription: string;
-    personalTitle: string;
-    personalDescription: string;
   };
 }
 
-// UAT round 1: the landing page's quiet secondary "planning a school
-// visit?" text link was going unnoticed. Replaced with one prominent
-// button that opens a modal offering the school and personal paths as
-// two visually equal choices, instead of one primary button and one
-// easy-to-miss link. `/group-visits/new` and `/book` still work as
-// direct URLs on their own -- this modal is only an extra entry point
-// into them, never a gate in front of them.
+// The landing page's primary action. It is auth-aware on purpose: a
+// signed-out visitor is sent to the single front door with `?redirect=/book`
+// so the sign-in screen can hand her straight back to the booking wizard
+// afterwards, while a signed-in visitor goes to the wizard directly. (The
+// wizard and the group form both re-check this themselves -- this is only the
+// entry point, never the gate.)
+//
+// The school / institution path stays a visible button next to it rather than
+// a quiet text link (UAT round 1: the old text link went unnoticed) and it is
+// auth-aware the same way, pointing at /signin?redirect=/group-visits/new.
 export function BookVisitCTA({ lang, labels }: BookVisitCTAProps) {
-  const [open, setOpen] = useState(false);
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // While the session is still restoring (`isLoading`), don't paint a link
+  // that may be wrong a moment later: assume signed-out, which is the
+  // harmless destination -- /signin forwards an already-signed-in user on to
+  // the redirect target, so nobody is ever stuck on the sign-in form.
+  const signedIn = isAuthenticated && !isLoading;
+
+  const bookHref = signedIn
+    ? `/${lang}/book`
+    : `/${lang}/signin?redirect=${encodeURIComponent('/book')}`;
+  const schoolHref = signedIn
+    ? `/${lang}/group-visits/new`
+    : `/${lang}/signin?redirect=${encodeURIComponent('/group-visits/new')}`;
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="btn-sun inline-flex min-h-[52px] w-full max-w-xs cursor-pointer items-center justify-center gap-2 rounded-full px-8 py-3 text-base font-bold sm:w-auto sm:max-w-none focus:outline-none focus:ring-4 focus:ring-sun-300 focus:ring-offset-2"
+    <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start">
+      <Link
+        href={bookHref}
+        className="btn-sun inline-flex min-h-[52px] w-full max-w-xs items-center justify-center gap-2 rounded-full px-8 py-3 text-base font-bold sm:w-auto sm:max-w-none focus:outline-none focus:ring-4 focus:ring-sun-300 focus:ring-offset-2"
       >
         {labels.bookNow}
-      </button>
+      </Link>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={labels.modalTitle} className="sm:max-w-2xl">
-        {/* `sm:grid-cols-2` stacks the two choices on mobile (Phase 4's
-            "stack on mobile, tap targets >= 44px" requirement) and sits
-            them side by side, visually equal, from `sm` up. */}
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Link
-            href={`/${lang}/group-visits/new`}
-            onClick={() => setOpen(false)}
-            className="lift flex flex-col gap-1.5 rounded-2xl border-2 border-stone-200 bg-white p-5 min-h-[44px] hover:border-brand-primary hover:bg-primary-50/60 focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <span className="flex items-center gap-2 font-semibold text-stone-900">
-              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sun-400 to-sun-600 text-white shadow"><GraduationCap className="w-5 h-5" /></span>
-              {labels.schoolTitle}
-            </span>
-            <span className="text-sm text-stone-500">{labels.schoolDescription}</span>
-          </Link>
-          <Link
-            href={`/${lang}/book`}
-            onClick={() => setOpen(false)}
-            className="lift flex flex-col gap-1.5 rounded-2xl border-2 border-stone-200 bg-white p-5 min-h-[44px] hover:border-brand-primary hover:bg-primary-50/60 focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <span className="flex items-center gap-2 font-semibold text-stone-900">
-              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-primary-500 text-white shadow"><User className="w-5 h-5" /></span>
-              {labels.personalTitle}
-            </span>
-            <span className="text-sm text-stone-500">{labels.personalDescription}</span>
-          </Link>
-        </div>
-      </Modal>
-    </>
+      <Link
+        href={schoolHref}
+        className="inline-flex min-h-[52px] w-full max-w-xs items-center justify-center gap-2 rounded-full border-2 border-brand-primary/25 bg-white/85 px-6 py-3 text-base font-semibold text-brand-primary transition-colors hover:border-brand-primary/50 hover:bg-white sm:w-auto sm:max-w-none focus:outline-none focus:ring-4 focus:ring-primary-200 focus:ring-offset-2"
+      >
+        <GraduationCap className="h-5 w-5" aria-hidden="true" />
+        {labels.schoolTitle}
+      </Link>
+    </div>
   );
 }

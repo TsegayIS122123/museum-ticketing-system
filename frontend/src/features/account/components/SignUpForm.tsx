@@ -15,8 +15,8 @@ import { rememberHeadlessSession, signUp } from '../api';
 import { signUpSchema } from '../schemas';
 
 // Self-registration (FR-ACC-001, revised). Creates the Account through
-// django-allauth's headless app client and immediately emails BOTH a 6-digit
-// code and a confirmation link. The account is not signed in yet -- allauth
+// django-allauth's headless app client and immediately emails a 6-digit
+// verification code. The account is not signed in yet -- allauth
 // parks it in the "verify_email" flow and returns a `meta.session_token`,
 // which is stashed so the verify-email page can continue the same flow.
 // (Self-registration only ever produces a visitor; staff are made by an

@@ -28,12 +28,12 @@ import { verifyEmailCodeSchema } from '../schemas';
 
 type Status = 'code' | 'verifying' | 'success';
 
-// FR-ACC-003 (revised): the verification email carries BOTH a 6-digit code
-// and a link (`/{lang}/verify-email?token=<key>`, HEADLESS_FRONTEND_URLS in
-// settings). This page serves both: `?token=` is redeemed automatically on
-// arrival, and the code can be typed here. "Resend" re-issues the email
-// (allauth's email/verify/resend, which takes no body and resumes the
-// pending flow from the stashed session_token).
+// FR-ACC-003 (revised): the verification email carries a 6-digit code. This
+// page is the code-entry screen; it also still redeems a `?token=` value
+// (`/{lang}/verify-email?token=<key>`, HEADLESS_FRONTEND_URLS in settings)
+// when one is present, though the shipped email contains only the code.
+// "Resend" re-issues the email (allauth's email/verify/resend, which takes
+// no body and resumes the pending flow from the stashed session_token).
 //
 // allauth's app client is token-based, so this page needs the
 // `meta.session_token` minted at signup (features/account/api.ts,
@@ -266,7 +266,7 @@ export function VerifyEmailForm() {
       <form onSubmit={handleSubmitCode} className="space-y-4">
         <TextField
           id="code"
-          label={t('otp_code') || 'One-Time Code'}
+          label={t('otp_code') || 'Verification Code'}
           type="text"
           inputMode="numeric"
           placeholder="123456"

@@ -51,11 +51,7 @@ export default async function LandingPage({ params }: LandingPageProps) {
                 lang={lang}
                 labels={{
                   bookNow: t.book_now,
-                  modalTitle: t.choose_visit_type,
                   schoolTitle: t.school_visit_title,
-                  schoolDescription: t.school_visit_description,
-                  personalTitle: t.personal_visit_title,
-                  personalDescription: t.personal_visit_description,
                 }}
               />
             </div>
