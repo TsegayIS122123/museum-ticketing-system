@@ -150,7 +150,7 @@ Builds on the observability design already fixed in [Document 03, Section 6.6](0
 | API error rate | > 1% sustained 5 min | General health |
 | `payments` queue depth | Sustained growth beyond a defined backlog threshold | Risk to timely refund/receipt processing (NFR-CONSIST-001, NFR-IDEMPOTENT-001) |
 | Celery Beat missed run | Either daily job (Section 5.1) has not run in > 25 hours | FR-PAY-005 — a missed run means no-show notices and no-response refunds silently stop |
-| SMS gateway failure/dead-letter rate | Any sustained increase | Should page — the SMS gateway now also delivers the Visitor OTP that FR-ACC-001 requires to book at all, not only the FR-PAY-005 notice, so a sustained failure blocks new bookings outright and needs faster response than a notification-only degradation; the email channel (magic link) remains a fallback verification path but is not a substitute for a timely SMS OTP in the booking flow |
+| SMS gateway failure/dead-letter rate | Any sustained increase | Should page if SMS delivery degrades to the point it blocks booking notifications; verification no longer relies on SMS. |
 | Chapa webhook signature failures | Any sustained increase | Possible integration break or spoofing attempt against NFR-SEC-001 |
 | Chapa settlement-transfer failure | Any failure | Directly blocks the Cashier's FR-SETTLE-002 workflow; paged with urgency given the physical hand-off to Finance depends on it |
 | Failed login rate (aggregate) | Anomalous spike | Possible credential-stuffing signal against Visitor or staff accounts |
@@ -166,7 +166,7 @@ Alerts route to on-call per Section 8.
 
 **Logging.** Application logs go to stdout; the container runtime or log shipper owns retention. `LOG_LEVEL` (default `INFO`) sets the level for the project's own `apps.*` loggers, so an incident can be debugged with `LOG_LEVEL=DEBUG` and no code change. Django itself stays at `WARNING`, and `django.request` 5xx responses always surface (and reach Sentry when `SENTRY_DSN` is set). Application code logs identifiers only, never visitor PII.
 
-**Rate limits** (per IP, Redis-backed; Document 03 §6.7): `login` 5/15m, `otp-request` 5/15m, `password-reset-request` 5/15m, `booking-create` 10/15m, and, added in Phase 8, `otp-verify` 10/15m (OTP and magic-link verification), `password-reset-confirm` 10/15m and `institution-lookup` 30/15m (TIN autofill, to stop TIN enumeration). `apps/core/tests/test_throttle_scopes.py` fails if any of these endpoints loses its scope.
+**Rate limits** (per IP, Redis-backed; Document 03 §6.7): `login` 5/15m, `password-reset-request` 5/15m, `booking-create` 10/15m, and `institution-lookup` 30/15m (TIN autofill, to stop TIN enumeration). `apps/core/tests/test_throttle_scopes.py` fails if any of these endpoints loses its scope.
 
 **Production security posture** (`config/settings/production.py`): HTTPS redirect and HSTS (preload deliberately off until every subdomain is HTTPS), secure/HttpOnly/SameSite=Lax cookies, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, and `CSRF_TRUSTED_ORIGINS` mirroring `CORS_ALLOWED_ORIGINS`. Verify with `python manage.py check --deploy` against the production settings before each release; the only remaining expected warnings are `SECRET_KEY` strength when a throwaway key is used.
 

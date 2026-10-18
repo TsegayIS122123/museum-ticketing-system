@@ -74,30 +74,31 @@ Tables are grouped by the Django app that owns them, matching [Document 03, Sect
 
 #### `account`
 
-Implements FR-ACC-001 – FR-ACC-007. A single table serves both Visitor and Staff actors — there is
+Implements FR-ACC-001 – FR-ACC-007. A single table serves all four actors — there is
 no separate staff table — because [Document 03, Section 4.3](03-software-design-specification.md#43-authorization-model)
-treats authorization as a single-role-enum check, not a type hierarchy. Since [Document 03, Section 4.1](03-software-design-specification.md#41-authentication-mechanism)
-splits credentials by role (Visitors passwordless, Staff password-based), `password_hash` is
-nullable here and the ephemeral OTP/token columns exist only to support the Visitor verification
-flow — none of this is optional metadata, it is what FR-ACC-001/003/004/006 are implemented with.
+treats authorization as a single-role-enum check, not a type hierarchy. [Document 03, Section 4.1](03-software-design-specification.md#41-authentication-mechanism)
+uses one credential mechanism for every role (email + password), so `password` is populated for every
+account; the `phone_otp_*` and `email_verification_*` columns below are **legacy, nullable and
+unused** — the shipped flow verifies email through django-allauth's own `EmailAddress` table (see
+`email_verified_at` below), and no migration has yet been written to drop them.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | UUID | PK | |
-| `email` | CITEXT | `UNIQUE NOT NULL` | Case-insensitive, to prevent duplicate accounts differing only by case. For a Visitor this row is created (or matched) on first OTP verification, not on an explicit "sign up" action (FR-ACC-001). |
-| `phone` | TEXT | `UNIQUE` | Nullable at the schema level because `StaffCreateRequest` (Document 04) does not require it; required in practice for a Visitor by FR-ACC-001/003, enforced in `services.py`. |
-| `password_hash` | TEXT | `NULLABLE`, `CHECK (role = 'visitor' OR password_hash IS NOT NULL)` | Argon2. **Null for every Visitor account** — there is no Visitor password anywhere in this system (FR-ACC-001). Required for every Staff role, enforced by the check constraint rather than left to application code alone. |
+| `email` | CITEXT | `UNIQUE NOT NULL` | Case-insensitive, to prevent duplicate accounts differing only by case. The row is created on explicit sign-up (FR-ACC-001); `email` is the `USERNAME_FIELD` (there is no username column). |
+| `phone` | TEXT | `UNIQUE` | Nullable. A contact detail only — no registration, verification or booking gate depends on it (FR-ACC-001, FR-ACC-003). |
+| `password` | CHAR(128) | `NULLABLE`, `CHECK (role = 'visitor' OR password IS NOT NULL)` | Argon2 (`AbstractBaseUser.password`). Set for every account, Visitor included (FR-ACC-001). The check constraint still permits NULL for a visitor row, but the shipped sign-up flow never leaves it null. |
 | `full_name` | TEXT | `NOT NULL` | |
 | `role` | TEXT | `CHECK (role IN ('visitor','cashier','museum_manager','platform_admin')) NOT NULL DEFAULT 'visitor'` | The single flag [Document 03 §4.3](03-software-design-specification.md#43-authorization-model)'s `HasStaffRole` permission class checks. |
 | `language_preference` | TEXT | `CHECK (language_preference IN ('en','am')) NOT NULL DEFAULT 'en'` | Stored on the account, not the session, so it follows the Visitor between Web and Mobile (FR-LOC-001, Document 03 §6.4). |
-| `email_verified_at` | TIMESTAMPTZ | | Nullable. Both this and `phone_verified_at` must be non-null before a booking can proceed to payment (FR-ACC-003). For a Visitor, set by the OTP/email-link confirmation in Document 03 §4.1.1, not by a password-signup step. |
-| `phone_verified_at` | TIMESTAMPTZ | | See above. |
-| `phone_otp_hash` | TEXT | `NULLABLE` | Hash of the current outstanding SMS OTP (Document 03 §4.1.1). Cleared on successful verification or expiry; never stored in plaintext or logged. |
-| `phone_otp_expires_at` | TIMESTAMPTZ | `NULLABLE` | 10-minute expiry from issuance (FR-ACC-001). |
-| `phone_otp_attempts` | SMALLINT | `NOT NULL DEFAULT 0` | Incorrect-attempt counter for the current OTP, reset on reissue; backs the rate limit in Document 03 §6.7 so OTP guessing is bounded. |
-| `email_verification_token_hash` | TEXT | `NULLABLE` | Hash of the current single-use email magic-link token. Cleared once opened. |
-| `email_verification_expires_at` | TIMESTAMPTZ | `NULLABLE` | Expiry for the above, mirroring the OTP's short lifetime. |
-| `password_reset_token_hash` | TEXT | `NULLABLE` | Staff-only (FR-ACC-006). Hash of an outstanding password-reset token; always `NULL` for a Visitor account, since Visitors never have a password to reset. |
+| `email_verified_at` | TIMESTAMPTZ | | Nullable. Non-null is required before a booking can proceed to payment (FR-ACC-003); phone verification is not. This is a **synced read-model**: django-allauth's `EmailAddress.verified` is the source of truth, and the `email_confirmed` signal copies the timestamp here (`accounts/signals.py`). The booking gate in `bookings/services.py` reads this column. |
+| `phone_verified_at` | TIMESTAMPTZ | | Legacy/unused. Not a booking gate, and not set by any shipped flow. |
+| `phone_otp_hash` | TEXT | `NULLABLE` | Legacy, nullable, unused — no shipped flow issues an SMS OTP. Retained to avoid a destructive migration. |
+| `phone_otp_expires_at` | TIMESTAMPTZ | `NULLABLE` | Legacy, nullable, unused. |
+| `phone_otp_attempts` | SMALLINT | `NOT NULL DEFAULT 0` | Legacy, unused. Retained to avoid a destructive migration. |
+| `email_verification_token_hash` | TEXT | `NULLABLE` | Legacy, nullable, unused — the shipped email-verification token lives in allauth's tables, not here. |
+| `email_verification_expires_at` | TIMESTAMPTZ | `NULLABLE` | Legacy, nullable, unused. |
+| `password_reset_token_hash` | TEXT | `NULLABLE` | Legacy, nullable, unused — the shipped password-reset token lives in allauth's tables. The flow (FR-ACC-006) applies to every role. |
 | `password_reset_expires_at` | TIMESTAMPTZ | `NULLABLE` | Expiry for the above. |
 | `active` | BOOLEAN | `NOT NULL DEFAULT true` | Deactivating a staff account (`DELETE /admin/staff/{id}`) sets this to `false`; the row is never removed, since it may already be `checked_in_by_user_id` on historical bookings. |
 | `token_version` | INTEGER | `NOT NULL DEFAULT 0` | Incremented to invalidate all outstanding access tokens for this account without waiting for their 15-minute expiry (ADR-002). |
@@ -106,13 +107,13 @@ flow — none of this is optional metadata, it is what FR-ACC-001/003/004/006 ar
 **Indexes:** unique on `email`; unique on `phone` (partial, `WHERE phone IS NOT NULL`); (`role`) partial `WHERE active` for staff listing (`GET /admin/staff`).
 
 **Why one Visitor account row always exists, even for a "one-time" booker:** FR-ACC-003 requires a
-verified email and phone before payment, and `booking.visitor_id` is a `NOT NULL` FK to `account.id`
-(Section 3.3) — so every paid booking already has an `account` row behind it, for every Visitor,
-with no separate "create an account" action and no distinct guest-vs-account code path. A repeat
-visitor (e.g., a school that books every term) is simply matched to the same `account.id` on each
-re-verification by email/phone (Document 03 §4.1.1) and their history is there automatically — this
-is what keeps per-category and per-booking analytics (§7, `FR-REPORT-*`) able to include every
-Visitor, one-time or repeat, directly implementing FR-ACC-007.
+verified email before payment, and `booking.visitor_id` is a `NOT NULL` FK to `account.id`
+(Section 3.3) — so every paid booking already has an `account` row behind it, for every Visitor.
+Sign-up is explicit (`/_allauth/app/v1/auth/signup`) and happens once, before the first booking;
+there is no distinct guest-vs-account code path. A repeat visitor (e.g., a school that books every
+term) signs in to the same `account.id` with the same email + password (Document 03 §4.1.1) and their
+history is there automatically — this is what keeps per-category and per-booking analytics (§7,
+`FR-REPORT-*`) able to include every Visitor, one-time or repeat, directly implementing FR-ACC-007.
 
 ### 3.2 `catalog` app
 
@@ -347,7 +348,7 @@ Backs FR-NOTIFY-PREF-001 and NFR-NOTIFY-001. Exactly one row per account.
 
 #### `audit_log`
 
-Implements NFR-AUDIT-001, backing [Document 03, Section 6.6](03-software-design-specification.md#66-observability). This table has no `updated_at` and no service-layer update path — rows are inserted only.
+Implements NFR-AUDIT-001, backing [Document 03, Section 6.6](03-software-design-specification.md#66-observability). Audit records are append-only: a row is written once and is never updated; there is no `updated_at` column and no update path in the service layer.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|

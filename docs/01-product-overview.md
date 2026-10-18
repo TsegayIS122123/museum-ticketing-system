@@ -50,6 +50,8 @@ ZNHM Ticketing replaces the museum's ad-hoc, in-person ticketing with a single d
 
 The product is built for the museum and its visitors specifically; it is not a general-purpose ticketing service for arbitrary venues.
 
+Accounts work the same way for every role: one email + password account, verified by email, and one sign-in page — the platform then routes each user by their role.
+
 ## 4. Target users
 
 The platform serves the museum's own staff and the visitors who use it. It is a single-venue system with four fixed roles.

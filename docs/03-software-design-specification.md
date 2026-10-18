@@ -191,87 +191,93 @@ Unlike a multi-organization platform, this system serves **exactly one venue**. 
 
 ### 4.1 Authentication mechanism
 
-Visitor and Staff accounts use **two different credential mechanisms**, per FR-ACC-001/005/006, but
-both land on the same **stateless JWT** (`djangorestframework-simplejwt`) once authenticated, so the
-rest of the API (§4.3, and every other module) checks one uniform token regardless of which flow
-issued it:
+All four roles — Visitor, Cashier, Museum Manager and Platform Admin — authenticate the same way:
+an email address and a password (FR-ACC-001). There is no second credential mechanism and no
+separate staff login endpoint. Once authenticated, every account lands on the same **stateless JWT**
+(`djangorestframework-simplejwt`), so the rest of the API (§4.3, and every other module) checks one
+uniform token regardless of which endpoint issued it:
 
 - **Access token:** 15-minute expiry, `Authorization: Bearer` header. Contains `user_id` and `token_version` only — no role claims, so a role change is re-checked against the database on every request rather than trusted from an old token.
 - **Refresh token:** 30-day expiry, rotated on every use.
 
-**Client platform header (`X-Client-Platform`, ADR-013).** `POST /auth/login/`, `POST
-/auth/visitor/verify/confirm/`, and `POST /auth/refresh/` accept an optional `X-Client-Platform`
+**Client platform header (`X-Client-Platform`, ADR-013).** `POST /api/v1/auth/login/` and
+`POST /api/v1/auth/refresh/` accept an optional `X-Client-Platform`
 request header:
 
 - Absent or `web`: the refresh token is delivered only as an HttpOnly cookie, exactly as a browser
 expects.
 - `expo`: the refresh token is additionally returned in the response body as `refresh_token`, and
-`POST /auth/refresh/` also accepts a `refresh_token` field in the request body. A React Native
+`POST /api/v1/auth/refresh/` also accepts a `refresh_token` field in the request body. A React Native
 client has no cookie jar, so it stores the refresh token in `expo-secure-store` and sends it back
 on refresh itself.
 
 A token-based (rather than cookie/session-based) scheme is required here specifically because there are **four clients** consuming the same API — Web, Mobile, and the Staff dashboard (Web and Mobile) — none of which can rely on a browser-managed session cookie uniformly (see ADR-002, ADR-013).
 
-**Visitor path — passwordless (FR-ACC-001, FR-ACC-003, FR-ACC-004):** no password is ever created,
-stored, or checked for a Visitor account.
+**Sign-in and password recovery.** `POST /api/v1/auth/login/` accepts `email` + `password` for any
+role and returns the app's `AuthResponse` (`{access_token, refresh_token?, user}`), with the refresh
+token also set as an HttpOnly cookie; it always answers with a generic "Invalid email or password"
+so account existence is never disclosed. Password recovery is the django-allauth flow:
+`POST /_allauth/app/v1/auth/password/request` (email only, always reports success) followed by
+`POST /_allauth/app/v1/auth/password/reset` (`key` + `password`).
 
-1. The Visitor supplies email + phone at the point of booking. The API generates a short-lived OTP
-   (6 digits, 10-minute expiry, rate-limited per NFR-SEC — see §6.7) and sends it by SMS, and
-   generates a signed, single-use email-verification token embedded in a link sent by email.
-2. The Visitor enters the SMS OTP in the booking flow (the common case, since it can be done in the
-   same session without switching apps); the email link is the fallback/secondary channel and also
-   marks `email_verified_at` if opened. Both `email_verified_at` and `phone_verified_at` must be
-   non-null before checkout is allowed (FR-ACC-003).
-3. On successful OTP confirmation, the API issues the same access/refresh token pair described
-   above, scoped to that Visitor's `account` row (created or matched by email, on first
-   verification). This is what lets a Visitor return later (FR-ACC-004): re-verifying the same
-   email or phone re-authenticates them into the same account and its booking history, with no
-   password ever in the loop.
-4. There is deliberately no Visitor "forgot password" flow (FR-ACC-006 is Staff-only) — if a Visitor
-   loses access, they simply repeat step 1–3 with the same email/phone.
+**Email verification (FR-ACC-001).** Registration (`/_allauth/app/v1/auth/signup`) creates the
+account in a pending state and sends one email carrying a 6-digit numeric code; that code verifies
+the address. The source of truth is django-allauth's `EmailAddress.verified`, and on the
+`email_confirmed` signal the account's `email_verified_at` is set if still null
+(`accounts/signals.py`) — that field, not the allauth row, is what the booking-payment gate checks
+(FR-ACC-003, `bookings/services.py`). There is no phone verification anywhere in registration or
+booking.
 
-**Staff path — password-based (FR-ACC-002, FR-ACC-005, FR-ACC-006):** unchanged from the original
-design. Cashier, Museum Manager, and Platform Admin accounts are provisioned by the Platform Admin
-with a temporary password, authenticate with `email + password` (Argon2-hashed, per Document 05
-§3.1), and can request a time-limited password-reset link by email (FR-ACC-006) — a conventional
-flow, kept because these are the same small group of people logging in daily to a system that moves
-money, not because it's the default for every account type in this system.
+**allauth as an envelope, not a token source.** Every allauth route is mounted at the root as
+`/_allauth/<client>/v1/...` and returns allauth's own `{status, data, meta}` envelope (published in
+the contract as the `Headless*` schemas). A custom token strategy
+(`accounts/headless.py::SimpleJWTTokenStrategy`) places the app's real SimpleJWT into
+`meta.access_token` / `meta.refresh_token` for the **app** client only, and a custom adapter
+(`accounts/headless.py::AccountHeadlessAdapter`) returns the full `Account` profile in `data.user`, so
+the verify response carries both the account and the tokens. The **app** client is used because
+`/_allauth/app/v1/...` is `csrf_exempt` and token-based, whereas the browser client requires a
+cross-origin CSRF token that web JS cannot read. **Verification does not establish a web session:**
+the browser client ignores the `meta` tokens and, after verifying, either refreshes the profile if
+already authenticated or shows a success panel with a **Sign In** button; mobile *can* sign in
+directly from the verify envelope's `meta` tokens. This is accepted: a cross-browser verification
+link answers 409 without a stage/session, so the page degrades to code entry or sign-in.
 
-### 4.1.1 Sequence — Visitor passwordless verification (FR-ACC-001, FR-ACC-003, FR-ACC-004)
+**Routing.** Sign-in returns `user.role` and the client routes to `/bookings` (Visitor),
+`/staff/gate` (Cashier), `/staff/dashboard` (Museum Manager) or `/staff/admin` (Platform Admin).
+There is no separate `/staff/login` page and no server-side redirect — the API enforces the role on
+every request, so this is URL-hiding and UX only, not a security boundary.
+
+### 4.1.1 Sequence — sign-up and email verification (FR-ACC-001, FR-ACC-003, FR-ACC-004)
 
 ```mermaid
 sequenceDiagram
-    actor V as Visitor
+    actor U as User (any role)
     participant W as Web/Mobile App
-    participant A as API (Accounts)
-    participant SMS as SMS Gateway
+    participant A as API (Accounts, /_allauth/app/v1)
     participant Mail as Email Provider
     participant D as PostgreSQL
 
-    V->>W: Enter email and phone at booking
-    W->>A: POST /auth/visitor/verify/start with email and phone
-    A->>D: Find or create account by email
-    A->>D: Store OTP hash and expiry
-    A->>D: Store email verification token hash and expiry
-    A->>SMS: Send OTP
-    A->>Mail: Send verification link
-    A-->>W: 200 verificationId
+    U->>W: Enter full name, email, password
+    W->>A: POST /_allauth/app/v1/auth/signup
+    A->>D: Find or create account by email (pending)
+    A->>Mail: Send one email carrying a 6-digit code
+    A-->>W: 401 pending envelope (data.flows + meta.session_token)
 
-    V->>W: Enter 6-digit OTP
-    W->>A: POST /auth/visitor/verify/confirm with verificationId and otpCode
-    A->>D: Check OTP hash, expiry, and attempt count
+    alt Code
+        U->>W: Enter 6-digit code
+        W->>A: POST /_allauth/app/v1/auth/email/verify with code
+    end
 
-    alt OTP valid
-        A->>D: Set phone_verified_at
-        A->>D: Set email_verified_at if link was already opened
-        A-->>W: 200 accessToken, refreshToken, user
-    else OTP invalid or expired
+    alt valid
+        A->>D: Set EmailAddress.verified; email_confirmed signal sets email_verified_at
+        A-->>W: 200 data.user + meta.access_token, meta.refresh_token
+    else invalid or expired
         A-->>W: 400 invalid or expired code
     end
 ```
 
-A returning Visitor (FR-ACC-004) runs the identical flow with the same email/phone — there is no
-separate "login" request, since verification *is* the login for a Visitor.
+Verification does not establish a web session (§4.1). A returning user (FR-ACC-004) signs in with the
+same email + password; the account and its booking history are already attached to it.
 
 ### 4.2 Sequence — booking payment confirmation (FR-PAY-001, FR-PAY-002, FR-PAY-004)
 
@@ -314,7 +320,7 @@ Server-side webhook verification is the only path that confirms a booking — th
 
 There is no scoped/multi-resource RBAC in this system — with one venue and four fixed roles, authorization is a single flag check:
 
-- **Visitor**: the implicit role of any authenticated account with no staff flag; can only act on their own bookings. A Visitor's authentication carries no password (§4.1), but the resulting access token is checked identically to a Staff token by every downstream permission class — passwordless is a credential-issuance difference only, not a second authorization path.
+- **Visitor**: the implicit role of any authenticated account with no staff flag; can only act on their own bookings. A Visitor authenticates exactly like any staff account (email + password, §4.1), so the resulting access token is checked identically by every downstream permission class — there is only one authorization path, not two.
 - **Cashier**, **Museum Manager**, **Platform Admin**: each staff account carries exactly one role (an enum field, not a boolean-per-role), checked by a single `HasStaffRole(role)` permission class.
 
 This is deliberately simpler than a scoped-RBAC design: there is no second venue, department, or organization for a role to be scoped *to* (contrast with ADR-004).

@@ -167,18 +167,17 @@ flowchart TB
 
 ### 3.2 Authentication model
 
-One credential pair, one token model (ADR-002), two login paths (Document 03 §4.1):
+One credential pair, one token model (ADR-002), one login path for all four roles (Document 03 §4.1):
 
-- **Visitor** — `POST /auth/visitor/verify/start/` → `{verification_id, otp_expires_in_seconds}` → 6-digit OTP, 10-minute expiry, 5 attempts, delivered by SMS plus a signed email magic link.
-- **Cashier / Manager / Admin** — `POST /auth/login/` with `email` + `password`.
+- **All roles** — `POST /auth/login/` with `email` + `password`. Registration and email verification (`POST /_allauth/app/v1/auth/signup`, then `email/verify`) go through django-allauth; a successful verify returns `meta.access_token` / `meta.refresh_token`, which the app signs in with directly.
 
 Tokens carry `user_id` and `token_version` and **no role claim**; the role is re-read from the database on every request. Lifetimes are access **15 minutes** and refresh **30 days**, rotated on use; `token_version` is bumped on password reset, invalidating all outstanding tokens.
 
 ### 3.3 Mobile refresh-token delivery
 
-A native client has no cookie jar, so the browser-only HttpOnly refresh cookie cannot restore a session after relaunch or refresh the 15-minute access token. The three auth endpoints therefore accept the optional `X-Client-Platform` header (ADR-013):
+A native client has no cookie jar, so the browser-only HttpOnly refresh cookie cannot restore a session after relaunch or refresh the 15-minute access token. The auth endpoints therefore accept the optional `X-Client-Platform` header (ADR-013):
 
-- `X-Client-Platform: expo` on `POST /auth/login/`, `POST /auth/visitor/verify/confirm/`, or `POST /auth/refresh/` returns `refresh_token` in the response body, and `POST /auth/refresh/` accepts a `refresh_token` field in its request body.
+- `X-Client-Platform: expo` on `POST /auth/login/` or `POST /auth/refresh/` returns `refresh_token` in the response body, and `POST /auth/refresh/` accepts a `refresh_token` field in its request body.
 - Without the header (or with `web`), the refresh token is delivered only as an HttpOnly cookie, exactly as the browser client expects.
 
 The app stores the token pair in `expo-secure-store` (§9.1) and never persists it anywhere less protected. This is what makes an app relaunch survivable and what the client-platform header exists for; the web cookie path is unchanged.
@@ -189,7 +188,7 @@ The app stores the token pair in `expo-secure-store` (§9.1) and never persists 
 flowchart TD
     START([App launch]) --> LOAD["Read access token from<br/>expo-secure-store"]
     LOAD --> HAS{"token present?"}
-    HAS -- no --> AUTH["Auth stack<br/>(verify or login)"]
+    HAS -- no --> AUTH["Auth stack<br/>(sign in)"]
     HAS -- yes --> ME["GET /users/me/"]
     ME --> OK{"200?"}
     OK -- no --> RT["POST /auth/refresh/<br/>once, using stored refresh"]
@@ -275,8 +274,8 @@ Each module is a client of the same authenticated API. The endpoint list reflect
 
 | Screen | Endpoint(s) | Notes |
 |---|---|---|
-| Verify identity | `POST /auth/visitor/verify/start/`, `POST /auth/visitor/verify/confirm/` | `email`, `phone`, optional `full_name`, optional `language_preference` |
-| Email-link status | — | Polls the confirm endpoint while the magic link is outstanding |
+| Sign in | `POST /auth/login/` | `email` + `password`; the response's `user.role` drives routing |
+| Register + verify email | `POST /_allauth/app/v1/auth/signup`, `email/verify`, `email/verify/resend` | The verification email carries a 6-digit code; the app's Verify email screen completes verification. The verify envelope's `meta` tokens sign the user in directly |
 | Browse categories | `GET /categories/` | Bilingual names from the API |
 | Availability | `GET /availability/?from=&to=` | Both params are required and documented in the contract. A date absent from the response is **open**, not closed |
 | Create booking | `POST /bookings/` | `booking_type` is **only** `individual` or `group`; a school visit is `group` + `institution` + `group_tin` |
@@ -289,7 +288,7 @@ Each module is a client of the same authenticated API. The endpoint list reflect
 | Refund request | `POST /bookings/{id}/refund-requests/` | Visitor-only |
 | Group / school visit | `GET /institutions/?tin=` | TIN lookup and validation |
 | Receipt | `GET /bookings/{id}/receipt/download/` | Shared via `expo-sharing` |
-| Profile | `GET /users/me/`, `PUT /users/me/` | `full_name`, `phone`, `language_preference`; changing phone clears `phone_verified_at` and re-triggers OTP |
+| Profile | `GET /users/me/`, `PUT /users/me/` | `full_name`, `phone`, `language_preference`; the phone number is a contact detail only and gates nothing |
 | Notification preferences | `GET`/`PUT /notifications/preferences/` | Channels and language (FR-NOTIFY-PREF-001) |
 
 Identity always comes from the JWT, never from the booking request. The booking wizard is **3 steps**, and there is no approval gate for individuals or groups — creation always yields `awaiting_payment`.
@@ -487,7 +486,7 @@ Generation consequences to design around:
 7. **Parameters are documented.** `GET /availability/` takes required `from` and `to`; `GET /bookings/` accepts `status`, `visitDate`, `bookingType`, and `flagged`.
 8. **`GET /users/me/` is snake_case**; everything else is camelCase.
 9. **Trailing slashes are mandatory** on every path.
-10. **Auth uses `X-Client-Platform`** on login, Visitor verify/confirm, and refresh (§3.3).
+10. **Auth uses `X-Client-Platform`** on login and refresh (§3.3).
 11. **Audit log and notification endpoints are available**: `GET /admin/audit-log/`, `GET`/`PUT /notifications/preferences/`, and `POST`/`DELETE /notifications/devices/`.
 12. **`GET /health/` sits outside the contract** — reachable at `/api/v1/health/`, useful for a connectivity probe.
 
@@ -533,7 +532,7 @@ The app is organized as a set of feature modules. Each is described by what it d
 
 | Module | What it does | FR IDs |
 |---|---|---|
-| **Authentication** | Visitor OTP verification, Staff password login, secure token storage, session bootstrap, refresh, logout, per-role guards, role routing | FR-ACC-001, FR-ACC-004, FR-ACC-005 |
+| **Authentication** | Email + password sign-up and sign-in, email verification (6-digit code), secure token storage, session bootstrap, refresh, logout, per-role guards, role routing | FR-ACC-001, FR-ACC-004, FR-ACC-005 |
 | **Booking** | Category browsing, availability calendar, 3-step booking wizard, pre-payment edit, group/school visit with TIN lookup, cancel, reschedule | FR-BOOK-001, FR-BOOK-003, FR-BOOK-005, FR-BOOK-007, FR-BOOK-008 |
 | **Payment** | Chapa checkout handoff in the in-app browser, polling until the webhook confirms, temporary receipt | FR-PAY-001 – FR-PAY-004 |
 | **Digital Ticket** | Booking list and detail, real QR code, receipt download, offline ticket vault | FR-BOOK-004, FR-QR-001 |

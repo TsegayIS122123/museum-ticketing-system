@@ -51,44 +51,53 @@ produces — from the first release. See §2.10.
 
 ### 2.1 Accounts & Auth
 
-**Design note (supersedes the original password-based design for Visitors):** industry practice for
+**Accounts.** Every account is created with an email address and a password, and is verified by email
+before the account is usable. There is no separate staff login page — one sign-in page serves all
+four roles. After sign-in the server returns `user.role` and the client routes the user to the
+correct experience: the booking pages for Visitors, and the staff pages for Cashiers, Museum Managers
+and Platform Admins. The API enforces the role on every request, so this is URL-hiding and UX only,
+not a security boundary.
+
+**Design note (accounts are unified across all four roles):** industry practice for
 attraction/museum ticketing (Section references gathered during requirements review: British Museum
 Shop's guest checkout, TicketingHub's magic-link booking management, Ticketure's ticket-tied digital
 tickets) and the museum's own personas — Hana booking once for a group of four, Ato Girma looking
-for a reference code, neither described as wanting a persistent login — point the same direction:
-most Visitors book once or twice and have nothing to gain from creating and remembering a password.
-Staff, by contrast, are a small group logging into a money-moving system daily and keep a
-conventional password login. The requirements below reflect this split.
+for a reference code, neither described as wanting a persistent login — the original review
+concluded that most Visitors book once or twice and have little to gain from remembering a
+password. That conclusion was **not** adopted: the shipped design uses one unified account model for
+all four roles, where every account is created with an email address and a password and must verify
+that email before it can be used (FR-ACC-001).
 
-**There is one Visitor flow, not two.** This is not a "guest checkout vs. account" choice the
-Visitor makes — every Visitor verifies with email + phone (FR-ACC-001) every time, and the system
-transparently matches that verification to an existing account or creates one. A first-time booker
-and a repeat visitor (e.g., a school that books every term, FR-ACC-004) go through the identical
-step; the only difference is that the repeat visitor's history is already there once they verify.
+**There is one flow, not two.** Registration, sign-in and password recovery are identical for every
+role. An account is created with email + password (FR-ACC-001), its email is verified with a 6-digit
+the verification email carries a 6-digit code, and sign-in returns `user.role` so the client routes the user to
+the matching experience (see *Accounts* above). A first-time booker and a repeat booker (e.g., a
+school that books every term, FR-ACC-004) sign in with the same email + password; the only
+difference is that the repeat booker's history is already there when they sign in.
 
-- **FR-ACC-001**: A Visitor verifies their identity **passwordlessly** at the point of booking — a
-  one-time code (OTP) sent by SMS to their phone, and a confirmation link sent by email — instead of
-  registering with a password. No Visitor password exists anywhere in the system.
+- **FR-ACC-001**: Users register with email + password. The email must be verified (the
+  verification email carries a 6-digit code) before the account is usable. No phone verification.
 - **FR-ACC-002**: Cashier and Museum Manager are staff accounts provisioned by the Platform Admin,
   not self-registered, each scoped to their role's permissions, and each authenticated with a
   password (FR-ACC-005/006) — this is unchanged by the Visitor-facing decision above.
-- **FR-ACC-003**: A valid, verified email **and** phone number are both required before a Visitor's
-  online booking can be paid for — both are needed because booking notices go out on both channels
-  (FR-PAY-005), and completing FR-ACC-001's OTP-and-email-link verification is what satisfies this
-  requirement; there is no separate account-creation step to complete in addition to it.
-- **FR-ACC-004**: A Visitor can look up and view their own booking history and receipts at any time
-  by re-verifying the same email or phone used at booking (a fresh OTP or magic link) — no password
-  to remember, and no separate "create an account" step, ever. There is only one path: the system
-  automatically matches a verification to an existing account by email/phone if one exists, or
-  creates one if it doesn't — so a first-time booker and a repeat visitor (e.g., a school
-  coordinator who books every term) go through the identical verification step, and the repeat
-  visitor simply sees their full history the moment they verify, with nothing to opt into.
+- **FR-ACC-003**: A verified email is required before a booking can be paid for — phone
+  verification is not required for registration or for booking (it is not a booking gate and there is
+  no separate account-creation step to complete in addition to sign-in). Booking notices still go out
+  on email (FR-PAY-005), and the payment gate checks that the account's email has been verified
+  under FR-ACC-001.
+- **FR-ACC-004**: A user can look up and view their own booking history and receipts at any time by
+  signing in with the same email + password they registered with (FR-ACC-001) — there is no
+  re-verification step and no separate "create an account" step: the account and its history are
+  attached to it from the moment the first booking is made, so a first-time booker and a repeat
+  booker (e.g., a school coordinator who books every term) go through the identical sign-in and the
+  repeat booker simply sees their full history, with nothing to opt into.
 - **FR-ACC-005**: Staff accounts (Cashier, Museum Manager, Platform Admin) authenticate with a
   password, since these are the same small group of people logging in daily to a system that moves
   money — the current JWT-based staff login is unchanged.
-- **FR-ACC-006**: A Staff member who forgets their password can request a reset link by email and
-  set a new password; this flow exists only for Staff — there is no equivalent for Visitors, since
-  Visitors never have a password to forget (FR-ACC-001).
+- **FR-ACC-006**: A user who forgets their password can enter their email on the forgot-password
+  page, receive a link by email, and set a new password from it. The flow is shared by every role —
+  there is no Staff-only variant — and always reports success whether or not the email matches an
+  account, so account existence is never disclosed.
 - **FR-ACC-007**: Every Visitor's booking and verification activity is recorded against their
   verified email and phone, whether they've booked once or many times — the account row and its
   history exist identically either way (FR-ACC-004) — so that reporting (§2.8) can include one-time

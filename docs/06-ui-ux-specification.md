@@ -93,17 +93,15 @@ flowchart LR
     Home["Browse Dates & Categories\n(FR-CAT-001, availability)"] --> Book["Start a Booking\n(FR-BOOK-001)"]
     Home --> Group["Request a Group/School Visit\n(FR-BOOK-003)"]
     Home --> Lookup["Look Up My Bookings\n(FR-ACC-004)"]
-    Book --> Verify["Verify Email & Phone\n(OTP + link, FR-ACC-001)"]
-    Group --> Verify
-    Lookup --> Verify
+    Book --> SignUp["Sign up / Sign in\n(email + password; email verification code, FR-ACC-001)"]
+    Group --> SignUp
+    Lookup --> SignUp
 ```
 
-A Visitor can browse dates, categories, and prices with no verification step at all; verification (an
-SMS OTP plus an email confirmation link — never a password, FR-ACC-001) is only required at the
+A Visitor can browse dates, categories, and prices with no verification step at all; sign-up or sign-in is only required at the
 point of actually booking, requesting a group visit, or looking up a past booking, matching the
-current walk-in experience of "look, then decide" as closely as a digital flow can. There is no
-"Login / Signup" screen for a Visitor — verifying *is* logging in (Document 03 §4.1.1), and the same
-`Verify` step serves a first-time booker and a returning one identically.
+current walk-in experience of "look, then decide" as closely as a digital flow can. All accounts —
+for every role — use the same email + password; email verification uses a 6-digit code (FR-ACC-001). There is one sign-in flow for every role.
 
 ### 4.2 Authenticated navigation (role-scoped)
 
@@ -117,11 +115,7 @@ There is no context switcher in this UI (Section 1.3) — the sidebar/menu a use
 | Staff Accounts | `Platform Admin` |
 | Account Settings, Language | All authenticated roles |
 
-A Visitor's "authenticated" state here means a verified session issued by the passwordless flow in
-Section 5.1 (FR-ACC-001), not a password login — the distinction matters only in how the session was
-obtained; once issued, the Visitor's navigation and permissions are identical to what they would be
-under any other credential scheme. Staff (`Cashier`, `Museum Manager`, `Platform Admin`) continue to
-authenticate with a password (FR-ACC-005).
+A Visitor's "authenticated" state here means a session issued by signing in with email + password (Document 03 §4.1); once issued, navigation and permissions are identical for all roles. All four roles share the same sign-in (FR-ACC-001).
 
 The web client serves both the public Visitor site and the internal Staff dashboard, split by route (`/staff/*` for Cashier/Museum Manager/Platform Admin), per [Document 03, Section 2.2](03-software-design-specification.md#22-level-2--container-diagram) — there is no separate staff deployable or subdomain.
 
@@ -135,9 +129,7 @@ Every screen lists the `FR-*`/`NFR-*` IDs it exposes and its rendering strategy 
 
 | Screen | Route (Web) | Rendering | Role(s) | FR IDs exposed |
 |---|---|---|---|---|
-| Verify to book / look up bookings (email + phone → OTP + link) | `/verify` | SSR | Public — Visitor only | FR-ACC-001, FR-ACC-003, FR-ACC-004 |
-| Staff log in (email + password) | `/staff/login` | SSR | Public (Staff only — Cashier, Museum Manager, Platform Admin) | FR-ACC-002, FR-ACC-005 |
-| Staff forgot / reset password | `/staff/forgot-password`, `/staff/reset-password` | SSR | Public (Staff only) | FR-ACC-006 |
+| Sign in / Register | `/signin`, `/register`, `/verify-email`, `/forgot-password` | SSR | Public (all roles) | FR-ACC-001, FR-ACC-003, FR-ACC-004, FR-ACC-006 |
 | Account settings (language, contact info) | `/settings/account` | CSR | All authenticated | FR-LOC-001 |
 
 There is no "Sign up" screen and no password field anywhere in the Visitor experience — `/verify`
@@ -145,7 +137,7 @@ is both the first-time and the returning-Visitor entry point (FR-ACC-001, FR-ACC
 only auth screen exposed to Visitors. Staff login remains a conventional email+password screen,
 now under its own `/staff/*` route since it no longer shares a screen with Visitor verification.
 
-The mobile app implements Verify and Account Settings natively for all four roles, routed after login (ADR-012; Document 09). Visitor verification and Staff login are the two entry screens; the mobile app then dispatches each account to its own role's experience.
+The mobile app implements Sign in, Sign up, Verify email, Account Settings natively for all four roles, routed after login (ADR-012; Document 09). One sign-in serves every role; the app routes by the returned `user.role`.
 
 ### 5.2 Catalog & Availability
 
@@ -254,7 +246,7 @@ The audit log is read-only by construction: it offers filters (actor, action, en
 flowchart TD
     A["Browse Dates & Categories\n/"] -->|"Book (FR-BOOK-001)"| B{"Date open for booking?\n(FR-BOOK-008)"}
     B -->|No| B1["Date shown closed — pick another"]
-    B -->|Yes| V["Verify email + phone\nSMS OTP + email link, no password\n(FR-ACC-001, FR-ACC-003)"]
+    B -->|Yes| V["Sign in / Register\n(email + password; email verification code)\n(FR-ACC-001, FR-ACC-003)"]
     V --> C["Checkout via Chapa\n(FR-PAY-001)"]
     C -->|"Payment confirmed server-side\n(FR-PAY-002)"| D["Booking Pending\nReference + temporary receipt shown"]
     D -->|"Present reference at gate"| E["Cashier check-in\n(FR-TICKET-001–003)"]
@@ -338,7 +330,7 @@ Mirrors the frontend module boundaries fixed in [Document 03, Section 7.3](03-so
 | Directory | Contents | Examples |
 |---|---|---|
 | `components/ui` | Feature-agnostic presentational primitives | Button, TextField, Select, DatePicker, Modal, Toast, LanguageToggle, StatusBadge, ErrorBanner |
-| `features/account` | Visitor passwordless verification, Staff password login/reset, settings | VisitorVerifyForm (email+phone, then OTP), StaffLoginForm, StaffForgotPasswordForm, LanguagePreferenceToggle |
+| `features/account` | Account sign-in/sign-up, email verification, password reset, settings | SignInForm, SignUpForm, VerifyEmailForm, LanguagePreferenceToggle |
 | `features/catalog` | Category browsing and Museum Manager category management | CategoryCard, CategoryEditor |
 | `features/booking` | Visitor booking flow and booking detail | DateCategoryPicker, BookingSummary, BookingDetailCard, CancelRescheduleControls |
 | `features/group-bookings` | Group/school request | GroupVisitRequestForm |
@@ -369,7 +361,7 @@ Document 02 does not enumerate dedicated accessibility (`NFR-ACC-*`) or usabilit
 ## 9. Localization and Bilingual UI
 
 - The language toggle (FR-LOC-001) is a two-state control (English / አማርኛ) in the global header on both Web and Mobile, persisted via the authenticated user's `language_preference` (Document 05 §3.1) so it follows the Visitor between the web site and the mobile app; for a Visitor browsing before verification (Section 5.1), the choice is held client-side for that session only.
-- The SMS OTP message and the email confirmation link (FR-ACC-001) are each sent in the Visitor's currently selected interface language, using the same bilingual template approach as every other generated notice (Document 03 §6.4) — a Visitor verifying in Amharic never receives an English-only OTP text.
+- The verification email carries a 6-digit code and is sent in the user's currently selected interface language, using the same bilingual template approach as every other generated notice (Document 03 §6.4). The SMS channel is not used for verification in the shipped design; any references to SMS OTP for verification are absent.
 - Every generated document — the temporary receipt (FR-PAY-002) and the Transfer Receipt (FR-SETTLE-004) — renders both languages together on the **same** document, including the amount in words in both Amharic and English (FR-LOC-003), matching the single-bilingual-template approach in [Document 03, Section 6.4](03-software-design-specification.md#64-internationalization-implementation-fr-loc-001004). The UI never offers a language toggle *on* a rendered receipt PDF — it is bilingual by construction, not by view state.
 - Any staff-editable text — category names (Section 5.2), the settlement transfer's purpose line (Document 05 §3.6) — is edited through two explicit input fields (English, Amharic) side by side in the relevant admin form, never a single field with a "translate" button, per FR-LOC-004's independent-maintainability requirement.
 - Because layouts must absorb the English/Amharic length variance (Section 3.1), no navigation label, button, or `StatusBadge` in the component library uses a fixed pixel width; all use intrinsic sizing with the minimum tap target from Section 8 regardless of label length.
@@ -393,8 +385,12 @@ Document 02 does not enumerate dedicated accessibility (`NFR-ACC-*`) or usabilit
 | Requirement | Screen(s) / Flow(s) |
 |---|---|
 | FR-ACC-001, FR-ACC-003, FR-ACC-004 | Section 5.1 (`/verify`), Section 5.3 (My Bookings) |
-| FR-ACC-002, FR-ACC-005, FR-ACC-006 | Section 5.1 (`/staff/login`, `/staff/forgot-password`, `/staff/reset-password`), Section 5.9 |
-| FR-ACC-007 | Section 5.8 (Reporting) — activity is attributable to a verified email/phone for every Visitor, one-time or repeat, since there is a single verification flow (Section 5.1) rather than a separate guest/account choice |
+| FR-ACC-001 | Section 5.1 | Account registration and sign-in for every role; email verified by 6-digit code |
+| FR-ACC-002 | Section 5.4 (Staff accounts) | Staff accounts are provisioned by Platform Admin |
+| FR-ACC-003 | Section 5.1, Section 5.4 | Email verification required before payment |
+| FR-ACC-004 | Section 5.1, Section 5.6 | Sign in with the same email + password; history attached to the account |
+| FR-ACC-005 | Section 5.1 | Staff authenticate with email + password (shared sign-in) |
+| FR-ACC-006 | Section 5.1 | Password reset available for every role; always reports success |
 | FR-CAT-001 – FR-CAT-003 | Section 5.2 |
 | FR-BOOK-001 | Section 5.3, Flow 6.1 |
 | FR-BOOK-002 | Section 5.3, Flow 6.1 |

@@ -27,6 +27,11 @@ context.
 - **API** (`backend/`) — the Django + DRF modular monolith both clients build
   against.
 
+All four roles share one account model — email + password, with the email verified by a 6-digit
+code — and one sign-in page. The client routes by the `user.role` the server returns, while the API
+enforces the role on every request, so the routing is URL-hiding and UX only, not a security
+boundary.
+
 ## Repository layout
 
 ```
