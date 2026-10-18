@@ -94,7 +94,7 @@ export function ReviewStep({
         </View>
         <View style={{ flex: 1 }}>
           <Button
-            label={isSubmitting ? t('loading', 'Loading…') : t('confirmAndPay', 'Confirm & Pay')}
+            label={isSubmitting ? t('processing', 'Processing...') : t('confirm', 'Confirm')}
             onPress={onConfirm}
             loading={isSubmitting}
             disabled={isSubmitting}

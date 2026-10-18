@@ -111,6 +111,11 @@ export default function RegisterScreen() {
           variant="secondary"
           onPress={() => router.replace('/(auth)/sign-in')}
         />
+        <Button
+          label={t('back', 'Back')}
+          variant="secondary"
+          onPress={() => router.replace('/(visitor)' as any)}
+        />
       </Card>
     </Screen>
   );

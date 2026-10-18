@@ -1,22 +1,52 @@
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { AppText as Text } from '@/components/ui/AppText';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { SectionTitle } from '@/components/ui/SectionTitle';
+import { LanguageToggle } from '@/components/ui/LanguageToggle';
+import { useAuth } from '@/auth/useAuth';
+import { homeForRole } from '@/auth/guards';
+import { ROLES } from '@/constants/config';
 import { colors, radius, spacing, typography } from '@/theme';
 import { BRAND } from '@/constants/brand';
 import { ASSETS } from '@/constants/assets';
 
+// The visitor home screen mirrors the web landing page: the same hero image and
+// promise, the same three-step explanation, and the same set of entry points.
+// The language toggle sits above the hero (not buried at the bottom) so the
+// EN/AM switch is visible the moment the screen opens, and the sign-in /
+// create-account pair only appears while signed out -- the single front door
+// for every role, exactly like the web header.
 export function HomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
+
+  // This screen is public, so it is also the one place a signed-in staff
+  // account could land on visitor ground (deep link, stale navigation state).
+  // Staff keep their own home, exactly as the old group-wide guard enforced.
+  if (user && user.role !== ROLES.VISITOR) {
+    return <Redirect href={homeForRole(user.role) as any} />;
+  }
+
+  // Signed out, "Book a visit" goes to the single sign-in front door (the web
+  // app does the same, via /signin?redirect=/book). Signed in, it opens the
+  // booking flow.
+  const bookHref = isAuthenticated ? '/(visitor)/book' : '/(auth)/sign-in';
 
   return (
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Top bar: brand + language toggle, always the first thing on screen */}
+        <View style={styles.topBar}>
+          <Text style={styles.topBarTitle}>{t('museumName', BRAND.museumName)}</Text>
+          <LanguageToggle />
+        </View>
+
         {/* Hero */}
         <View style={styles.hero}>
           <Image
@@ -48,8 +78,22 @@ export function HomeScreen() {
             <View style={styles.heroActions}>
               <Button
                 label={t('heroCta', 'Book a Visit Now')}
-                onPress={() => router.push('/(visitor)/book' as any)}
+                onPress={() => router.push(bookHref as any)}
               />
+              {!isAuthenticated && (
+                <View style={styles.authActions}>
+                  <Button
+                    label={t('signIn', 'Sign in')}
+                    variant="secondary"
+                    onPress={() => router.push('/(auth)/sign-in' as any)}
+                  />
+                  <Button
+                    label={t('sign_up', 'Create account')}
+                    variant="secondary"
+                    onPress={() => router.push('/(auth)/register' as any)}
+                  />
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -80,15 +124,18 @@ export function HomeScreen() {
         {/* Featured exhibit */}
         <View style={styles.section}>
           <SectionTitle title={t('galleryTitle', 'From the Collection')} />
-          <Pressable
-            style={styles.exhibitCard}
-            onPress={() => router.push('/(visitor)/book' as any)}
-          >
-            <Image source={ASSETS.images.heroWaliaIbex} style={styles.exhibitImage} accessibilityLabel={t('heroImageAlt', 'Walia Ibex at ZNHM')} />
-            <View style={styles.exhibitInfo}>
-              <Text style={styles.exhibitName}>{t('galleryWaliaIbexName', 'Walia Ibex')}</Text>
-              <Text style={styles.exhibitTag}>{t('galleryWaliaIbexTag', 'Mammal · Endemic to Ethiopia')}</Text>
-            </View>
+          <Pressable onPress={() => router.push(bookHref as any)}>
+            <Card padding={false} style={styles.exhibitCard}>
+              <Image
+                source={ASSETS.images.heroWaliaIbex}
+                style={styles.exhibitImage}
+                accessibilityLabel={t('heroImageAlt', 'Walia Ibex at ZNHM')}
+              />
+              <View style={styles.exhibitInfo}>
+                <Text style={styles.exhibitName}>{t('galleryWaliaIbexName', 'Walia Ibex')}</Text>
+                <Text style={styles.exhibitTag}>{t('galleryWaliaIbexTag', 'Mammal · Endemic to Ethiopia')}</Text>
+              </View>
+            </Card>
           </Pressable>
         </View>
       </ScrollView>
@@ -112,6 +159,23 @@ function Step({ n, title, body }: { n: number; title: string; body: string }) {
 
 const styles = StyleSheet.create({
   scroll: { paddingBottom: spacing.xxxl },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  topBarTitle: {
+    flexShrink: 1,
+    color: colors.brandPrimary,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+  },
   hero: { height: 420, position: 'relative', justifyContent: 'flex-end' },
   heroImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
   heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,20,40,0.55)' },
@@ -148,7 +212,8 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     marginTop: spacing.sm,
   },
-  heroActions: { marginTop: spacing.lg },
+  heroActions: { marginTop: spacing.lg, gap: spacing.sm },
+  authActions: { flexDirection: 'row', gap: spacing.sm },
   section: { padding: spacing.lg },
   stepRow: { flexDirection: 'row', marginBottom: spacing.lg, gap: spacing.md },
   stepChip: {
@@ -160,13 +225,7 @@ const styles = StyleSheet.create({
   stepNum: { color: colors.brandPrimary, fontWeight: '700' },
   stepTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.semibold, color: colors.text },
   stepBody: { fontSize: typography.sizes.sm, color: colors.textMuted, marginTop: 2, lineHeight: 20 },
-  exhibitCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  exhibitCard: { overflow: 'hidden' },
   exhibitImage: { width: '100%', height: 180 },
   exhibitInfo: { padding: spacing.md },
   exhibitName: { fontSize: typography.sizes.md, fontWeight: typography.weights.semibold, color: colors.text },

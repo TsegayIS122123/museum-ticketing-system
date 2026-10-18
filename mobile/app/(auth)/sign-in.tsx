@@ -18,6 +18,10 @@ import { colors, spacing } from '@/theme';
 // The single front-door sign-in for every role (FR-ACC-002, FR-ACC-005):
 // email + password only, and the server decides where you land via
 // `user.role`. Replaces the old staff-only screen.
+//
+// Reached from the public visitor home ("Sign in" / "Book a visit"), which is
+// why it keeps a way back there: without it, a guest who only wanted to look
+// around would have no exit but the OS back gesture.
 export default function SignInScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -83,6 +87,11 @@ export default function SignInScreen() {
           label={t('sign_up', 'Create account')}
           variant="secondary"
           onPress={() => router.push('/(auth)/register')}
+        />
+        <Button
+          label={t('back', 'Back')}
+          variant="secondary"
+          onPress={() => router.replace('/(visitor)' as any)}
         />
       </Card>
     </Screen>

@@ -14,7 +14,10 @@ export default function Index() {
     if (user) {
       router.replace(homeForRole(user.role) as any);
     } else {
-      router.replace('/(auth)/sign-in');
+      // Signed out: land on the public visitor home (the mobile landing page)
+      // rather than the sign-in form -- the same first impression the web app
+      // gives, with "Book a visit" / "Sign in" as the entry points.
+      router.replace('/(visitor)' as any);
     }
   }, [user, isLoading, router]);
 

@@ -6,25 +6,29 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { useAuth } from '@/auth/useAuth';
+import { RequireRole } from '@/auth/guards';
+import { ROLES } from '@/constants/config';
 import { colors, spacing, typography } from '@/theme';
 
 export default function ProfileTab() {
   const { t } = useTranslation();
   const { user, signOut } = useAuth();
   return (
-    <Screen>
-      <Card>
-        <Text style={styles.name}>{user?.full_name ?? user?.email}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
+    <RequireRole role={ROLES.VISITOR}>
+      <Screen>
+        <Card>
+          <Text style={styles.name}>{user?.full_name ?? user?.email}</Text>
+          <Text style={styles.email}>{user?.email}</Text>
 
-        <View style={styles.langRow}>
-          <Text style={styles.langLabel}>{t('language', 'Language')}</Text>
-          <LanguageToggle />
-        </View>
+          <View style={styles.langRow}>
+            <Text style={styles.langLabel}>{t('language', 'Language')}</Text>
+            <LanguageToggle />
+          </View>
 
-        <Button label={t('signOut', 'Sign out')} variant="secondary" onPress={signOut} />
-      </Card>
-    </Screen>
+          <Button label={t('signOut', 'Sign out')} variant="secondary" onPress={signOut} />
+        </Card>
+      </Screen>
+    </RequireRole>
   );
 }
 

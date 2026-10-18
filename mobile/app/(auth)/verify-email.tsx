@@ -20,8 +20,8 @@ import { colors, spacing } from '@/theme';
 // link that opens the web app). This screen redeems the typed code against the
 // pending flow's session token (minted at signup). For the app client a
 // successful verify returns the account plus the app's SimpleJWT in `meta`, so
-// we can sign the user straight in -- matching the visitor flow's old OTP step
-// but with email verification rather than phone OTP.
+// we can sign the user straight in. The 6-digit code arrives by email; there is
+// no phone/SMS step anywhere in the flow.
 export default function VerifyEmailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -168,7 +168,7 @@ export default function VerifyEmailScreen() {
         </Text>
 
         <TextField
-          label={t('otpCode', 'One-Time Code')}
+          label={t('otpCode', 'Verification code')}
           value={code}
           onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
           keyboardType="number-pad"
