@@ -4,24 +4,19 @@ accounts -- models
 Implements FR modules: FR-ACC
 Depends on: core
 
-Per Design Spec Sec 4.1: a single Account model serves all four roles via
-two different credential mechanisms:
-
-- Visitor: passwordless. No password ever set; identity is proven per-flow
-  by an OTP (SMS, 6 digits, 10-min expiry, rate-limited -- Sec 6.7) or a
-  magic link (email), and re-verifying the same email/phone is what lets a
-  returning Visitor be recognized (FR-ACC-004). No "forgot password" flow
-  applies to this path (FR-ACC-006 is Staff-only).
-- Staff (Cashier / Museum Manager / Platform Admin): conventional
-  password-based login, with a time-limited password-reset link by email
-  (FR-ACC-006).
+Per Design Spec Sec 4.1, a single Account model serves all four roles with
+one credential mechanism: email + password (FR-ACC-001). Email addresses are
+verified through django-allauth (with a 6-digit verification code). All
+roles share the same sign-in and password-reset flows; the role is stored on
+the account and used for routing and permission checks. There is no
+phone-based verification.
 
 AUTH_USER_MODEL = "accounts.Account" (config/settings/base.py) -- this must
 be the first app migrated (see README "Build order").
 
-Per ADR-002: a `token_version` column is what makes immediate access-token
-revocation possible despite stateless JWTs -- bump it to invalidate all of
-an account's outstanding access tokens (e.g. on password reset).
+Per ADR-002: a `token_version` column makes immediate access-token
+revocation possible despite stateless JWTs (incrementing it invalidates all
+outstanding access tokens for that account).
 
 See Document 05 for the authoritative column list (role, language
 preference, token_version, phone/email verification state, etc).
