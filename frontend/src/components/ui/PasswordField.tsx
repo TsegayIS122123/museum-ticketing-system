@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { InputHTMLAttributes } from 'react';
 
 interface PasswordFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
@@ -12,6 +13,7 @@ interface PasswordFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
 
 export function PasswordField({ label, error, className, id, ...props }: PasswordFieldProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div className="flex flex-col gap-1">
@@ -33,7 +35,8 @@ export function PasswordField({ label, error, className, id, ...props }: Passwor
         <button
           type="button"
           onClick={() => setIsVisible((visible) => !visible)}
-          aria-label={isVisible ? 'Hide password' : 'Show password'}
+          aria-label={isVisible ? t('hide_password') : t('show_password')}
+          aria-pressed={isVisible}
           className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-stone-500 hover:text-brand-primary"
         >
           {isVisible ? <EyeOff size={18} /> : <Eye size={18} />}
