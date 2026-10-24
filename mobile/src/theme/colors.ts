@@ -32,6 +32,10 @@ export const colors = {
 
   // Feedback
   success: '#10B981',
+  successDark: '#14532D',
+  successLight: '#DCFCE7',
+  dangerDark: '#7F1D1D',
+  dangerLight: '#FEE2E2',
   warning: '#0374B5', // aligned — web warning == primary
   danger: '#DC2626',
   focus: '#015484',

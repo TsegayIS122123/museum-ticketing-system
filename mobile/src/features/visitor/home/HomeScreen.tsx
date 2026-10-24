@@ -21,7 +21,7 @@ import { ASSETS } from '@/constants/assets';
 // EN/AM switch is visible the moment the screen opens, and the sign-in /
 // create-account pair only appears while signed out -- the single front door
 // for every role, exactly like the web header.
-export function HomeScreen() {
+function HomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
@@ -142,6 +142,8 @@ export function HomeScreen() {
     </Screen>
   );
 }
+
+export default HomeScreen;
 
 function Step({ n, title, body }: { n: number; title: string; body: string }) {
   return (

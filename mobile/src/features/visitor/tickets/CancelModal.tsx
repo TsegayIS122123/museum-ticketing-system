@@ -1,69 +1,37 @@
-import { Alert, Modal, StyleSheet, View } from 'react-native';
-import { AppText as Text } from '@/components/ui/AppText';
-import { useTranslation } from 'react-i18next';
-
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { colors, spacing, typography } from '@/theme';
-import { useCancelBooking } from '@/api/queries/bookings';
-import { isApiError } from '@/api/errors';
+import { Modal, Text, View, StyleSheet, Button } from 'react-native';
+import type { FC } from 'react';
 
 interface CancelModalProps {
   visible: boolean;
   bookingId: string;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess: () => void;
 }
 
-export function CancelModal({ visible, bookingId, onClose, onSuccess }: CancelModalProps) {
-  const { t } = useTranslation();
-  const cancel = useCancelBooking();
-
-  const handleConfirm = async () => {
-    try {
-      await cancel.mutateAsync(bookingId);
-      onClose();
-      onSuccess?.();
-    } catch (err) {
-      const msg = isApiError(err) ? err.message : t('commonErrorGeneric', 'Something went wrong');
-      Alert.alert(t('cancelFailed', 'Cancellation failed'), msg);
-    }
-  };
-
+const CancelModal: FC<CancelModalProps> = ({ visible, bookingId, onClose, onSuccess }) => {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <Card style={styles.dialog}>
-          <Text style={styles.title}>{t('cancelBookingTitle', 'Cancel this booking?')}</Text>
-          <Text style={styles.body}>
-            {t(
-              'cancelBookingBody',
-              'A full refund will be issued automatically. You cannot undo this.'
-            )}
-          </Text>
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <Text style={styles.title}>Cancel booking?</Text>
+          <Text style={styles.description}>This action cannot be undone.</Text>
           <View style={styles.actions}>
-            <View style={{ flex: 1 }}>
-              <Button label={t('back', 'Keep booking')} variant="secondary" onPress={onClose} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                label={t('cancelConfirm', 'Cancel booking')}
-                variant="danger"
-                onPress={handleConfirm}
-                loading={cancel.isPending}
-              />
-            </View>
+            <Button title="Keep booking" onPress={onClose} />
+            <Button title="Cancel booking" onPress={() => { onSuccess(); onClose(); }} color="#B91C1C" />
           </View>
-        </Card>
+        </View>
       </View>
     </Modal>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  dialog: { width: '100%', maxWidth: 420 },
-  title: { fontSize: typography.sizes.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
-  body: { fontSize: typography.sizes.sm, color: colors.textMuted, marginBottom: spacing.lg, lineHeight: 20 },
-  actions: { flexDirection: 'row', gap: spacing.md },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 20, width: '85%' },
+  title: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  description: { fontSize: 14, color: '#666', marginBottom: 20 },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
 });
+
+export { CancelModal };
+export default CancelModal;

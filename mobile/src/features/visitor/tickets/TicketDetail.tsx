@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   View,
@@ -15,6 +16,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { colors, spacing, typography } from '@/theme';
+import { apiClient } from '@/api/client';
+import { getAccessToken } from '@/auth/session';
 import { fetchBooking } from '@/api/queries/payments';
 import { formatEtb } from '@/utils/money';
 import { formatDateOnly } from '@/utils/dates';
@@ -109,7 +112,6 @@ export function TicketDetail() {
       </Screen>
     );
   }
-
   if (!vm) {
     return (
       <Screen>
@@ -128,7 +130,24 @@ export function TicketDetail() {
     );
   }
 
-  const canCancelOrReschedule = vm.status === 'pending' && !vm.fromCache;
+  const isAwaitingPayment = vm.status === 'awaiting_payment';
+  const isPaid = vm.status === 'pending' || vm.status === 'visited';
+  const canCancelOrReschedule = isPaid && !vm.fromCache;
+
+  const handleDownloadReceipt = async () => {
+    try {
+      const token = await getAccessToken();
+      await apiClient.get(`/api/v1/bookings/${vm.id}/receipt/download/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        responseType: 'blob',
+      });
+    } catch {
+      Alert.alert(
+        t('downloadReceiptFailed', 'Download failed'),
+        t('downloadReceiptFailedBody', 'Unable to download the receipt. Please try again.')
+      );
+    }
+  };
 
   return (
     <Screen>
@@ -146,7 +165,7 @@ export function TicketDetail() {
           <StatusBadge status={vm.status as any} />
         </View>
 
-        {vm.status === 'pending' ? (
+        {isPaid ? (
           <Card style={styles.qrCard}>
             <TicketQR reference={vm.reference} size={240} />
           </Card>
@@ -169,19 +188,37 @@ export function TicketDetail() {
             : null}
         </Card>
 
-        {canCancelOrReschedule ? (
+        {vm.status === 'awaiting_payment' ? (
+          <Button
+            label={t('payNow', 'Pay Now')}
+            onPress={() => router.push('/(visitor)/book/payment') as any}
+          />
+        ) : null}
+
+        {isPaid ? (
           <View style={styles.actions}>
-            <Button
-              label={t('rescheduleBooking', 'Reschedule')}
-              variant="secondary"
-              onPress={() => setRescheduleOpen(true)}
-            />
-            <View style={{ height: spacing.sm }} />
-            <Button
-              label={t('cancelBooking', 'Cancel booking')}
-              variant="danger"
-              onPress={() => setCancelOpen(true)}
-            />
+            {isAwaitingPayment ? null : (
+              <Button
+                label={t('downloadReceipt', 'Download Receipt')}
+                onPress={handleDownloadReceipt}
+              />
+            )}
+            {canCancelOrReschedule ? (
+              <>
+                <View style={{ height: spacing.sm }} />
+                <Button
+                  label={t('rescheduleBooking', 'Reschedule')}
+                  variant="secondary"
+                  onPress={() => setRescheduleOpen(true)}
+                />
+                <View style={{ height: spacing.sm }} />
+                <Button
+                  label={t('cancelBooking', 'Cancel booking')}
+                  variant="danger"
+                  onPress={() => setCancelOpen(true)}
+                />
+              </>
+            ) : null}
           </View>
         ) : null}
 

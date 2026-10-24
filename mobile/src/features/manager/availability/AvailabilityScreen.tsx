@@ -9,7 +9,6 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { colors, radius, spacing, typography } from '@/theme';
 import { useAvailabilityRange, useSetAvailability } from '@/api/queries/manager-availability';
-import { toIsoDate } from '@/utils/dates';
 
 export function AvailabilityScreen() {
   const { t } = useTranslation();
@@ -19,8 +18,8 @@ export function AvailabilityScreen() {
     () => Array.from({ length: horizon }, (_, i) => addDays(today, i)),
     [today]
   );
-  const fromIso = toIsoDate(today);
-  const toIso = toIsoDate(addDays(today, horizon - 1));
+  const fromIso = today.toISOString().split('T')[0];
+  const toIso = addDays(today, horizon - 1).toISOString().split('T')[0];
   const { data, isLoading, refetch } = useAvailabilityRange(fromIso, toIso);
   const setAvail = useSetAvailability();
 
@@ -64,7 +63,7 @@ export function AvailabilityScreen() {
 
         <View style={styles.grid}>
           {dates.map((d) => {
-            const iso = toIsoDate(d);
+            const iso = d.toISOString().split('T')[0];
             const isClosed = closedSet.has(iso) || isSunday(d);
             const isSel = selected === iso;
             return (
