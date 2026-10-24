@@ -32,6 +32,7 @@ const config: ExpoConfig = {
   web: {
     bundler: 'metro',
     output: 'single',
+    display: 'standalone',
   },
   plugins: [
     'expo-router',
@@ -71,6 +72,7 @@ const config: ExpoConfig = {
     'expo-web-browser',
     'expo-sqlite',
     'expo-camera',
+    'expo-sharing',
   ],
   extra: {
     router: {},

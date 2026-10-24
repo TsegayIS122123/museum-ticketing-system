@@ -41,11 +41,30 @@ function HomeScreen() {
   return (
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Top bar: brand + language toggle, always the first thing on screen */}
-        <View style={styles.topBar}>
-          <Text style={styles.topBarTitle}>{t('museumName', BRAND.museumName)}</Text>
-          <LanguageToggle />
-        </View>
+        <View style={styles.content}>
+          {/* Top bar: brand + navigation + language toggle */}
+          <View style={styles.topBar}>
+            <Text style={styles.topBarTitle}>{t('museumName', BRAND.museumName)}</Text>
+            <View style={styles.headerLinks}>
+              <Pressable onPress={() => router.push(bookHref as any)}>
+                <Text style={styles.headerLink}>{t('bookVisit', 'Book a visit')}</Text>
+              </Pressable>
+              <Pressable onPress={() => router.push('/(visitor)/(tabs)/tickets' as any)}>
+                <Text style={styles.headerLink}>{t('manageBookings', 'Manage bookings')}</Text>
+              </Pressable>
+              {!isAuthenticated ? (
+                <>
+                  <Pressable onPress={() => router.push('/(auth)/sign-in' as any)}>
+                    <Text style={styles.headerLink}>{t('signIn', 'Sign in')}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => router.push('/(auth)/register' as any)}>
+                    <Text style={styles.headerLink}>{t('sign_up', 'Create account')}</Text>
+                  </Pressable>
+                </>
+              ) : null}
+              <LanguageToggle />
+            </View>
+          </View>
 
         {/* Hero */}
         <View style={styles.hero}>
@@ -138,6 +157,13 @@ function HomeScreen() {
             </Card>
           </Pressable>
         </View>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>{t('museumName', BRAND.museumName)}</Text>
+          <Pressable onPress={() => router.push('/(auth)/sign-in' as any)}>
+            <Text style={styles.staffLink}>{t('staffSignIn', 'Staff Sign In')}</Text>
+          </Pressable>
+        </View>
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -161,6 +187,7 @@ function Step({ n, title, body }: { n: number; title: string; body: string }) {
 
 const styles = StyleSheet.create({
   scroll: { paddingBottom: spacing.xxxl },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -177,6 +204,18 @@ const styles = StyleSheet.create({
     color: colors.brandPrimary,
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
+  },
+  headerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
+  headerLink: {
+    color: colors.brandPrimary,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
   },
   hero: { height: 420, position: 'relative', justifyContent: 'flex-end' },
   heroImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
@@ -232,4 +271,7 @@ const styles = StyleSheet.create({
   exhibitInfo: { padding: spacing.md },
   exhibitName: { fontSize: typography.sizes.md, fontWeight: typography.weights.semibold, color: colors.text },
   exhibitTag: { fontSize: typography.sizes.xs, color: colors.textMuted, marginTop: 2 },
+  footer: { alignItems: 'center', padding: spacing.xl, gap: spacing.sm },
+  footerText: { color: colors.textMuted, fontSize: typography.sizes.xs },
+  staffLink: { color: colors.textMuted, fontSize: typography.sizes.xs, textDecorationLine: 'underline' },
 });

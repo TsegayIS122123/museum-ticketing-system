@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   View,
@@ -16,8 +17,10 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { colors, spacing, typography } from '@/theme';
-import { apiClient } from '@/api/client';
 import { getAccessToken } from '@/auth/session';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { API_BASE_URL } from '@/constants/config';
 import { fetchBooking } from '@/api/queries/payments';
 import { formatEtb } from '@/utils/money';
 import { formatDateOnly } from '@/utils/dates';
@@ -59,13 +62,9 @@ export function TicketDetail() {
     retry: 1,
   });
 
-  // If the network fetch fails, try the cache
   useEffect(() => {
     if (!id) return;
     if (isError && !liveBooking) {
-      // No reference known until we've cached at least once; try the cache
-      // keyed by any reference (we store by reference, so we need a lookup
-      // helper). Fallback: scan the full cache for this booking_id.
       (async () => {
         const { listCachedTickets } = await import('@/database/tickets');
         const all = await listCachedTickets();
@@ -137,10 +136,41 @@ export function TicketDetail() {
   const handleDownloadReceipt = async () => {
     try {
       const token = await getAccessToken();
-      await apiClient.get(`/api/v1/bookings/${vm.id}/receipt/download/`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        responseType: 'blob',
-      });
+      const endpoint = `${API_BASE_URL}/api/v1/bookings/${vm.id}/receipt/download/`;
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      if (Platform.OS === 'web') {
+        const response = await fetch(endpoint, { headers });
+        if (!response.ok) throw new Error(`Receipt download failed: ${response.status}`);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'receipt.pdf';
+        anchor.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      const directory = FileSystem.documentDirectory;
+      if (!directory) throw new Error('Document storage is unavailable.');
+      const fileUri = `${directory}receipt.pdf`;
+      await FileSystem.deleteAsync(fileUri, { idempotent: true });
+      const result = await FileSystem.downloadAsync(endpoint, fileUri, { headers });
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(`Receipt download failed: ${result.status}`);
+      }
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.uri, {
+          mimeType: 'application/pdf',
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert(
+          t('receiptDownloaded', 'Receipt downloaded'),
+          t('receiptDownloadedBody', 'The receipt was saved to your device.')
+        );
+      }
     } catch {
       Alert.alert(
         t('downloadReceiptFailed', 'Download failed'),
@@ -188,7 +218,7 @@ export function TicketDetail() {
             : null}
         </Card>
 
-        {vm.status === 'awaiting_payment' ? (
+        {isAwaitingPayment ? (
           <Button
             label={t('payNow', 'Pay Now')}
             onPress={() => router.push('/(visitor)/book/payment') as any}
@@ -197,12 +227,10 @@ export function TicketDetail() {
 
         {isPaid ? (
           <View style={styles.actions}>
-            {isAwaitingPayment ? null : (
-              <Button
-                label={t('downloadReceipt', 'Download Receipt')}
-                onPress={handleDownloadReceipt}
-              />
-            )}
+            <Button
+              label={t('downloadReceipt', 'Download Receipt')}
+              onPress={handleDownloadReceipt}
+            />
             {canCancelOrReschedule ? (
               <>
                 <View style={{ height: spacing.sm }} />
